@@ -200,6 +200,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
     }
+
+    // Do not leave the previous session's song on the lock screen.
+    try {
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = null;
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   // Persist volume between sessions
@@ -244,11 +253,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Record personal play event after ~3 seconds of continuous playback
   useEffect(() => {
-    if (currentSong && currentTime > 3 && hasRecordedPlayRef.current !== currentSong.id) {
+    if (
+      currentSong &&
+      isPlaying &&
+      currentTime > 3 &&
+      hasRecordedPlayRef.current !== currentSong.id
+    ) {
       hasRecordedPlayRef.current = currentSong.id;
       recordSongPlay(currentSong.id);
     }
-  }, [currentSong, currentTime, recordSongPlay]);
+  }, [currentSong, currentTime, isPlaying, recordSongPlay]);
 
   // Load and play song (handling offline blob caching transparently)
   const loadAndPlaySong = useCallback(

@@ -130,16 +130,27 @@ async function subscribeWhenReady(
 ): Promise<Unsubscribe | null> {
   if (!db) return null;
 
-  const authenticated = await ensureAuth();
-  if (!authenticated) return null;
+  // A transient network failure during anonymous sign-in used to leave the
+  // device with no realtime listener until a manual reload.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const authenticated = await ensureAuth();
+    if (authenticated) {
+      try {
+        return setup();
+      } catch (err) {
+        console.warn('Firestore listener setup error:', err);
+        onError?.(err);
+        return null;
+      }
+    }
 
-  try {
-    return setup();
-  } catch (err) {
-    console.warn('Firestore listener setup error:', err);
-    onError?.(err);
-    return null;
+    if (attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, 1200 * (attempt + 1)));
+    }
   }
+
+  onError?.(new Error('No se pudo autenticar con Firebase'));
+  return null;
 }
 
 // Firestore operations for Songs Catalog
