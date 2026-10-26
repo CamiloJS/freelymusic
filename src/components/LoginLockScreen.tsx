@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useCustomization } from '../context/CustomizationContext';
-import { KeyRound, LogIn, Lock, Music2, User, Eye, EyeOff } from 'lucide-react';
+import KeyRound from 'lucide-react/dist/esm/icons/key-round.mjs';
+import LogIn from 'lucide-react/dist/esm/icons/log-in.mjs';
+import Lock from 'lucide-react/dist/esm/icons/lock.mjs';
+import Music2 from 'lucide-react/dist/esm/icons/eighth-note.mjs';
+import User from 'lucide-react/dist/esm/icons/user.mjs';
+import Eye from 'lucide-react/dist/esm/icons/eye.mjs';
+import EyeOff from 'lucide-react/dist/esm/icons/eye-off.mjs';
 
 export const LoginLockScreen: React.FC = () => {
   const { loginWithCredentials } = useAuth();

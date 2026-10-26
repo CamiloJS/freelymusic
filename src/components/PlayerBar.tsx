@@ -1,22 +1,20 @@
 import React, { useState } from 'react';
-import {
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Shuffle,
-  Repeat,
-  Repeat1,
-  Volume2,
-  VolumeX,
-  Heart,
-  Mic2,
-  ListMusic,
-  CheckCircle2,
-  Maximize2,
-  Loader2,
-  AlertCircle
-} from 'lucide-react';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
+import SkipBack from 'lucide-react/dist/esm/icons/skip-back.mjs';
+import SkipForward from 'lucide-react/dist/esm/icons/skip-forward.mjs';
+import Shuffle from 'lucide-react/dist/esm/icons/shuffle.mjs';
+import Repeat from 'lucide-react/dist/esm/icons/repeat.mjs';
+import Repeat1 from 'lucide-react/dist/esm/icons/repeat-1.mjs';
+import Volume2 from 'lucide-react/dist/esm/icons/volume-2.mjs';
+import VolumeX from 'lucide-react/dist/esm/icons/volume-x.mjs';
+import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
+import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
+import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
+import AlertCircle from 'lucide-react/dist/esm/icons/circle-alert.mjs';
 import { useAudio } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';

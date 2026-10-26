@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { X, Check, Plus, Music } from 'lucide-react';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Check from 'lucide-react/dist/esm/icons/check.mjs';
+import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
+import Music from 'lucide-react/dist/esm/icons/eighth-notes.mjs';
 import { useMusic } from '../context/MusicContext';
 import { Song } from '../types';
 

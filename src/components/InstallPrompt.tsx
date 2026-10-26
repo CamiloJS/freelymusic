@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Download, X, Smartphone, Check } from 'lucide-react';
+import Download from 'lucide-react/dist/esm/icons/download.mjs';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Smartphone from 'lucide-react/dist/esm/icons/smartphone.mjs';
+import Check from 'lucide-react/dist/esm/icons/check.mjs';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;

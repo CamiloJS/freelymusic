@@ -1,18 +1,16 @@
 import React from 'react';
-import {
-  X,
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Shuffle,
-  Repeat,
-  Repeat1,
-  Minimize2,
-  Heart,
-  CheckCircle2,
-  Mic2
-} from 'lucide-react';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
+import SkipBack from 'lucide-react/dist/esm/icons/skip-back.mjs';
+import SkipForward from 'lucide-react/dist/esm/icons/skip-forward.mjs';
+import Shuffle from 'lucide-react/dist/esm/icons/shuffle.mjs';
+import Repeat from 'lucide-react/dist/esm/icons/repeat.mjs';
+import Repeat1 from 'lucide-react/dist/esm/icons/repeat-1.mjs';
+import Minimize2 from 'lucide-react/dist/esm/icons/minimize-2.mjs';
+import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
 import { useAudio } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';

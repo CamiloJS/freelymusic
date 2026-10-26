@@ -30,16 +30,7 @@ import {
   normalizeSong,
   normalizeUserData,
 } from '../services/storage';
-import {
-  saveSongToFirestore,
-  saveSongsToFirestore,
-  deleteSongFromFirestore,
-  saveUserDataToFirestore,
-  subscribeToCatalogUpdates,
-  subscribeToUserDataUpdates,
-  saveArtistProfileToFirestore,
-  subscribeToArtistProfilesUpdates,
-} from '../services/firebase';
+import { loadFirebaseService } from '../services/firebaseLoader';
 
 export interface DownloadingState {
   isDownloading: boolean;
@@ -121,7 +112,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     userSaveTimerRef.current = setTimeout(() => {
       userSaveTimerRef.current = null;
-      void saveUserDataToFirestore(userId, data);
+      void loadFirebaseService()
+        .then((firebase) => firebase.saveUserDataToFirestore(userId, data))
+        .catch((err) => console.warn('No se pudo guardar la biblioteca en la nube:', err));
     }, 700);
   }, []);
 
@@ -171,19 +164,26 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setUserData(cloud);
         saveStoredUserData(currentUser.id, cloud);
       } else {
-        void saveUserDataToFirestore(currentUser.id, currentLocal);
+        void loadFirebaseService()
+          .then((firebase) => firebase.saveUserDataToFirestore(currentUser.id, currentLocal))
+          .catch((err) => console.warn('No se pudo subir la biblioteca local:', err));
       }
     };
 
-    subscribeToUserDataUpdates(currentUser.id, applyCloudData, (err) => {
-      console.warn('No se pudo sincronizar la biblioteca del usuario:', err);
-    }).then((unsub) => {
-      if (cancelled) {
-        unsub?.();
-      } else {
-        unsubscribe = unsub;
-      }
-    });
+    loadFirebaseService()
+      .then((firebase) =>
+        firebase.subscribeToUserDataUpdates(currentUser.id, applyCloudData, (err) => {
+          console.warn('No se pudo sincronizar la biblioteca del usuario:', err);
+        })
+      )
+      .then((unsub) => {
+        if (cancelled) {
+          unsub?.();
+        } else {
+          unsubscribe = unsub;
+        }
+      })
+      .catch((err) => console.warn('No se pudo escuchar la biblioteca del usuario:', err));
 
     return () => {
       cancelled = true;
@@ -192,7 +192,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (userSaveTimerRef.current) {
         clearTimeout(userSaveTimerRef.current);
         userSaveTimerRef.current = null;
-        void saveUserDataToFirestore(currentUser.id, userDataRef.current);
+        void loadFirebaseService()
+          .then((firebase) =>
+            firebase.saveUserDataToFirestore(currentUser.id, userDataRef.current)
+          )
+          .catch((err) => console.warn('No se pudo guardar la biblioteca al salir:', err));
       }
     };
   }, [currentUser.id, isAuthenticated]);
@@ -233,22 +237,33 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           removeStoredPendingSong(song.id);
           return;
         }
-        void saveSongToFirestore(song).then((ok) => {
-          if (ok) removeStoredPendingSong(song.id);
-        });
+        void loadFirebaseService()
+          .then((firebase) => firebase.saveSongToFirestore(song))
+          .then((ok) => {
+            if (ok) removeStoredPendingSong(song.id);
+          })
+          .catch((err) => console.warn('No se pudo reintentar una canción pendiente:', err));
       });
     };
 
-    subscribeToCatalogUpdates(applyCatalog, (err) => {
-      console.warn('No se pudo sincronizar el catálogo:', err);
-      setIsCatalogReady(true);
-    }).then((unsub) => {
-      if (cancelled) {
-        unsub?.();
-      } else {
-        unsubscribe = unsub;
-      }
-    });
+    loadFirebaseService()
+      .then((firebase) =>
+        firebase.subscribeToCatalogUpdates(applyCatalog, (err) => {
+          console.warn('No se pudo sincronizar el catálogo:', err);
+          setIsCatalogReady(true);
+        })
+      )
+      .then((unsub) => {
+        if (cancelled) {
+          unsub?.();
+        } else {
+          unsubscribe = unsub;
+        }
+      })
+      .catch((err) => {
+        console.warn('No se pudo escuchar el catálogo:', err);
+        setIsCatalogReady(true);
+      });
 
     return () => {
       cancelled = true;
@@ -264,19 +279,24 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let cancelled = false;
     let unsubscribe: (() => void) | null = null;
 
-    subscribeToArtistProfilesUpdates(
-      (cloudArtists) => {
-        setArtistProfiles(cloudArtists);
-        saveStoredArtistProfiles(cloudArtists);
-      },
-      (err) => console.warn('No se pudieron sincronizar los artistas:', err)
-    ).then((unsub) => {
-      if (cancelled) {
-        unsub?.();
-      } else {
-        unsubscribe = unsub;
-      }
-    });
+    loadFirebaseService()
+      .then((firebase) =>
+        firebase.subscribeToArtistProfilesUpdates(
+          (cloudArtists) => {
+            setArtistProfiles(cloudArtists);
+            saveStoredArtistProfiles(cloudArtists);
+          },
+          (err) => console.warn('No se pudieron sincronizar los artistas:', err)
+        )
+      )
+      .then((unsub) => {
+        if (cancelled) {
+          unsub?.();
+        } else {
+          unsubscribe = unsub;
+        }
+      })
+      .catch((err) => console.warn('No se pudo escuchar los artistas:', err));
 
     return () => {
       cancelled = true;
@@ -319,9 +339,12 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return updated;
     });
 
-    void saveSongToFirestore(cleanSong).then((ok) => {
-      if (ok) removeStoredPendingSong(cleanSong.id);
-    });
+    void loadFirebaseService()
+      .then((firebase) => firebase.saveSongToFirestore(cleanSong))
+      .then((ok) => {
+        if (ok) removeStoredPendingSong(cleanSong.id);
+      })
+      .catch((err) => console.warn('La canción quedó pendiente de sincronizar:', err));
 
     return cleanSong;
   };
@@ -354,9 +377,14 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     // One batch instead of N sequential round-trips.
-    const saved = await saveSongsToFirestore(newSongs);
-    if (saved) {
-      newSongs.forEach((song) => removeStoredPendingSong(song.id));
+    try {
+      const firebase = await loadFirebaseService();
+      const saved = await firebase.saveSongsToFirestore(newSongs);
+      if (saved) {
+        newSongs.forEach((song) => removeStoredPendingSong(song.id));
+      }
+    } catch (err) {
+      console.warn('El álbum quedó pendiente de sincronizar:', err);
     }
 
     return newSongs;
@@ -373,9 +401,12 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return updated;
     });
 
-    void saveSongToFirestore(cleanSong).then((ok) => {
-      if (ok) removeStoredPendingSong(cleanSong.id);
-    });
+    void loadFirebaseService()
+      .then((firebase) => firebase.saveSongToFirestore(cleanSong))
+      .then((ok) => {
+        if (ok) removeStoredPendingSong(cleanSong.id);
+      })
+      .catch((err) => console.warn('La edición quedó pendiente de sincronizar:', err));
   };
 
   const deleteCatalogTrack = (songId: string) => {
@@ -388,7 +419,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return updated;
     });
 
-    void deleteSongFromFirestore(songId);
+    void loadFirebaseService()
+      .then((firebase) => firebase.deleteSongFromFirestore(songId))
+      .catch((err) => console.warn('No se pudo borrar la canción de la nube:', err));
     void deleteSongBlob(songId).catch((err) =>
       console.warn('No se pudo borrar el audio local:', err)
     );
@@ -594,7 +627,8 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     saveStoredArtistProfile(updated);
-    await saveArtistProfileToFirestore(updated);
+    const firebase = await loadFirebaseService();
+    await firebase.saveArtistProfileToFirestore(updated);
   };
 
   // User Play Counts & Analytics Actions

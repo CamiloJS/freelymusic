@@ -1,16 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  X,
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Mic2,
-  Volume2,
-  VolumeX,
-  Heart,
-  Edit3
-} from 'lucide-react';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
+import SkipBack from 'lucide-react/dist/esm/icons/skip-back.mjs';
+import SkipForward from 'lucide-react/dist/esm/icons/skip-forward.mjs';
+import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
+import Volume2 from 'lucide-react/dist/esm/icons/volume-2.mjs';
+import VolumeX from 'lucide-react/dist/esm/icons/volume-x.mjs';
+import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import Edit3 from 'lucide-react/dist/esm/icons/pen-line.mjs';
 import { useAudio } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';

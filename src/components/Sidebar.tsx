@@ -1,24 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Home,
-  Compass,
-  Library,
-  UploadCloud,
-  HardDriveDownload,
-  ShieldAlert,
-  Plus,
-  Music,
-  UserCheck,
-  Disc,
-  Disc3,
-  Wifi,
-  WifiOff,
-  Settings,
-  Heart,
-  CheckCircle2,
-  ArrowDownCircle,
-  Search
-} from 'lucide-react';
+import Home from 'lucide-react/dist/esm/icons/house.mjs';
+import Compass from 'lucide-react/dist/esm/icons/compass.mjs';
+import Library from 'lucide-react/dist/esm/icons/library.mjs';
+import UploadCloud from 'lucide-react/dist/esm/icons/cloud-upload.mjs';
+import HardDriveDownload from 'lucide-react/dist/esm/icons/hard-drive-download.mjs';
+import ShieldAlert from 'lucide-react/dist/esm/icons/shield-alert.mjs';
+import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
+import Music from 'lucide-react/dist/esm/icons/eighth-notes.mjs';
+import UserCheck from 'lucide-react/dist/esm/icons/user-check.mjs';
+import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
+import Disc3 from 'lucide-react/dist/esm/icons/disc-3.mjs';
+import Wifi from 'lucide-react/dist/esm/icons/wifi.mjs';
+import WifiOff from 'lucide-react/dist/esm/icons/wifi-off.mjs';
+import Settings from 'lucide-react/dist/esm/icons/settings.mjs';
+import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import ArrowDownCircle from 'lucide-react/dist/esm/icons/circle-arrow-down.mjs';
+import Search from 'lucide-react/dist/esm/icons/search.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';

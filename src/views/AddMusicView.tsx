@@ -1,27 +1,25 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import {
-  UploadCloud,
-  Play,
-  Pause,
-  Check,
-  AlertCircle,
-  Music,
-  Disc,
-  FileCode,
-  Image as ImageIcon,
-  Sparkles,
-  RefreshCw,
-  Trash2,
-  ExternalLink,
-  Plus,
-  Layers,
-  Radio,
-  FileAudio,
-  ChevronUp,
-  ChevronDown,
-  Sliders,
-  ListOrdered
-} from 'lucide-react';
+import UploadCloud from 'lucide-react/dist/esm/icons/cloud-upload.mjs';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
+import Check from 'lucide-react/dist/esm/icons/check.mjs';
+import AlertCircle from 'lucide-react/dist/esm/icons/circle-alert.mjs';
+import Music from 'lucide-react/dist/esm/icons/eighth-notes.mjs';
+import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
+import FileCode from 'lucide-react/dist/esm/icons/file-code.mjs';
+import ImageIcon from 'lucide-react/dist/esm/icons/image.mjs';
+import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
+import RefreshCw from 'lucide-react/dist/esm/icons/refresh-cw.mjs';
+import Trash2 from 'lucide-react/dist/esm/icons/trash.mjs';
+import ExternalLink from 'lucide-react/dist/esm/icons/external-link.mjs';
+import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
+import Layers from 'lucide-react/dist/esm/icons/layers.mjs';
+import Radio from 'lucide-react/dist/esm/icons/radio.mjs';
+import FileAudio from 'lucide-react/dist/esm/icons/file-headphone.mjs';
+import ChevronUp from 'lucide-react/dist/esm/icons/chevron-up.mjs';
+import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down.mjs';
+import Sliders from 'lucide-react/dist/esm/icons/sliders-vertical.mjs';
+import ListOrdered from 'lucide-react/dist/esm/icons/list-ordered.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';

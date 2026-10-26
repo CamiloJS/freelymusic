@@ -1,23 +1,21 @@
 import React, { useState, useRef } from 'react';
-import {
-  X,
-  UserCheck,
-  Shield,
-  Plus,
-  KeyRound,
-  User,
-  Palette,
-  Upload,
-  Check,
-  RotateCcw,
-  Sparkles,
-  UploadCloud,
-  LogOut,
-  Sun,
-  Moon,
-  Layers,
-  Image as ImageIcon
-} from 'lucide-react';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
+import UserCheck from 'lucide-react/dist/esm/icons/user-check.mjs';
+import Shield from 'lucide-react/dist/esm/icons/shield.mjs';
+import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
+import KeyRound from 'lucide-react/dist/esm/icons/key-round.mjs';
+import User from 'lucide-react/dist/esm/icons/user.mjs';
+import Palette from 'lucide-react/dist/esm/icons/palette.mjs';
+import Upload from 'lucide-react/dist/esm/icons/upload.mjs';
+import Check from 'lucide-react/dist/esm/icons/check.mjs';
+import RotateCcw from 'lucide-react/dist/esm/icons/rotate-ccw.mjs';
+import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
+import UploadCloud from 'lucide-react/dist/esm/icons/cloud-upload.mjs';
+import LogOut from 'lucide-react/dist/esm/icons/log-out.mjs';
+import Sun from 'lucide-react/dist/esm/icons/sun.mjs';
+import Moon from 'lucide-react/dist/esm/icons/moon.mjs';
+import Layers from 'lucide-react/dist/esm/icons/layers.mjs';
+import ImageIcon from 'lucide-react/dist/esm/icons/image.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useCustomization, ACCENT_PRESETS } from '../context/CustomizationContext';
 import { UserProfile } from '../types';

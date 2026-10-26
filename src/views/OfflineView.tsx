@@ -1,13 +1,11 @@
 import React from 'react';
-import {
-  HardDriveDownload,
-  Play,
-  Trash2,
-  Disc,
-  CheckCircle2,
-  WifiOff,
-  Music
-} from 'lucide-react';
+import HardDriveDownload from 'lucide-react/dist/esm/icons/hard-drive-download.mjs';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Trash2 from 'lucide-react/dist/esm/icons/trash.mjs';
+import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import WifiOff from 'lucide-react/dist/esm/icons/wifi-off.mjs';
+import Music from 'lucide-react/dist/esm/icons/eighth-notes.mjs';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
 import { formatTime } from '../utils/lyrics';

@@ -1,16 +1,14 @@
 import React from 'react';
-import {
-  X,
-  Play,
-  Heart,
-  CheckCircle2,
-  ListMusic,
-  Disc,
-  Mic2,
-  ExternalLink,
-  ChevronRight,
-  Maximize2
-} from 'lucide-react';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
+import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
+import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
+import ExternalLink from 'lucide-react/dist/esm/icons/external-link.mjs';
+import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right.mjs';
+import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
 import { useAudio } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';

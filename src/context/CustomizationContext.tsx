@@ -1,10 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  syncGlobalSettingsFromFirestore,
-  saveGlobalSettingsToFirestore,
-  subscribeToGlobalSettingsUpdates,
-  GlobalAppSettings,
-} from '../services/firebase';
+import type { GlobalAppSettings } from '../services/firebase';
+import { loadFirebaseService } from '../services/firebaseLoader';
 import {
   getCustomAppIcon,
   setCustomAppIcon,
@@ -148,20 +144,28 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
 
-    syncGlobalSettingsFromFirestore().then((settings) => {
-      if (settings) applyGlobalSettings(settings);
-    });
+    loadFirebaseService()
+      .then(async (firebase) => {
+        const settings = await firebase.syncGlobalSettingsFromFirestore();
+        if (settings) applyGlobalSettings(settings);
+      })
+      .catch((err) => console.warn('No se pudieron cargar los ajustes globales:', err));
 
-    subscribeToGlobalSettingsUpdates(
-      applyGlobalSettings,
-      (err) => console.warn('No se pudieron sincronizar los ajustes globales:', err)
-    ).then((unsub) => {
-      if (cancelled) {
-        unsub?.();
-      } else {
-        unsubscribe = unsub;
-      }
-    });
+    loadFirebaseService()
+      .then((firebase) =>
+        firebase.subscribeToGlobalSettingsUpdates(
+          applyGlobalSettings,
+          (err) => console.warn('No se pudieron sincronizar los ajustes globales:', err)
+        )
+      )
+      .then((unsub) => {
+        if (cancelled) {
+          unsub?.();
+        } else {
+          unsubscribe = unsub;
+        }
+      })
+      .catch((err) => console.warn('No se pudo escuchar los ajustes globales:', err));
 
     return () => {
       cancelled = true;
@@ -207,13 +211,15 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     } catch {
       // ignore
     }
-    await saveGlobalSettingsToFirestore({ globalAppName: clean });
+    const firebase = await loadFirebaseService();
+    await firebase.saveGlobalSettingsToFirestore({ globalAppName: clean });
   };
 
   const uploadGlobalIcon = async (iconDataUrl: string) => {
     const updated = [iconDataUrl, ...globalIcons.filter((i) => i !== iconDataUrl)];
     setGlobalIcons(updated);
-    await saveGlobalSettingsToFirestore({ globalIcons: updated });
+    const firebase = await loadFirebaseService();
+    await firebase.saveGlobalSettingsToFirestore({ globalIcons: updated });
     // Also apply it locally
     selectIcon(iconDataUrl);
   };

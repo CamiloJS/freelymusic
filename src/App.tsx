@@ -10,22 +10,20 @@ import { InstallPrompt } from './components/InstallPrompt';
 import { Playlist, Song, Album } from './types';
 import { getCustomAppIcon, applyAppIcon } from './utils/appIcon';
 import { DEFAULT_AVATAR } from './services/storage';
-import {
-  Compass,
-  Home,
-  Library,
-  HardDriveDownload,
-  ShieldAlert,
-  Search,
-  Menu,
-  X,
-  UploadCloud,
-  ChevronLeft,
-  ChevronRight,
-  ArrowDownCircle,
-  Settings,
-  Loader2
-} from 'lucide-react';
+import Compass from 'lucide-react/dist/esm/icons/compass.mjs';
+import Home from 'lucide-react/dist/esm/icons/house.mjs';
+import Library from 'lucide-react/dist/esm/icons/library.mjs';
+import HardDriveDownload from 'lucide-react/dist/esm/icons/hard-drive-download.mjs';
+import ShieldAlert from 'lucide-react/dist/esm/icons/shield-alert.mjs';
+import Search from 'lucide-react/dist/esm/icons/search.mjs';
+import Menu from 'lucide-react/dist/esm/icons/menu.mjs';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
+import UploadCloud from 'lucide-react/dist/esm/icons/cloud-upload.mjs';
+import ChevronLeft from 'lucide-react/dist/esm/icons/chevron-left.mjs';
+import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right.mjs';
+import ArrowDownCircle from 'lucide-react/dist/esm/icons/circle-arrow-down.mjs';
+import Settings from 'lucide-react/dist/esm/icons/settings.mjs';
+import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 
 // Views and modals are split into separate chunks: the first paint no longer
 // has to download Admin, Add Music, the artist page or every modal.

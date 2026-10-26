@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { X, Image, Sparkles, FolderPlus } from 'lucide-react';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Image from 'lucide-react/dist/esm/icons/image.mjs';
+import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
+import FolderPlus from 'lucide-react/dist/esm/icons/folder-plus.mjs';
 import { useMusic } from '../context/MusicContext';
 
 interface CreatePlaylistModalProps {

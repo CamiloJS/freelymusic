@@ -9,12 +9,7 @@ import {
   saveStoredActiveSessionUserId,
   INITIAL_PROFILES,
 } from '../services/storage';
-import {
-  syncProfilesFromFirestore,
-  saveProfileToFirestore,
-  deleteProfileFromFirestore,
-  subscribeToProfilesUpdates,
-} from '../services/firebase';
+import { loadFirebaseService } from '../services/firebaseLoader';
 
 interface AuthContextType {
   currentUser: UserProfile;
@@ -49,36 +44,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let unsubscribe: (() => void) | null = null;
     const localProfiles = getStoredProfiles();
 
-    syncProfilesFromFirestore().then(async (cloudProfiles) => {
-      if (cancelled) return;
-
-      if (cloudProfiles && cloudProfiles.length > 0) {
-        setAllUsers(cloudProfiles);
-        saveStoredProfiles(cloudProfiles);
-      } else {
-        // First time initializing Firestore database with profiles
-        for (const profile of localProfiles) {
-          await saveProfileToFirestore(profile);
-        }
-      }
-    });
-
-    subscribeToProfilesUpdates(
-      (cloudProfiles) => {
+    loadFirebaseService()
+      .then(async (firebase) => {
+        const cloudProfiles = await firebase.syncProfilesFromFirestore();
         if (cancelled) return;
+
         if (cloudProfiles && cloudProfiles.length > 0) {
           setAllUsers(cloudProfiles);
           saveStoredProfiles(cloudProfiles);
+        } else {
+          // First time initializing Firestore database with profiles
+          for (const profile of localProfiles) {
+            await firebase.saveProfileToFirestore(profile);
+          }
         }
-      },
-      (err) => console.warn('No se pudieron sincronizar los perfiles:', err)
-    ).then((unsub) => {
-      if (cancelled) {
-        unsub?.();
-      } else {
-        unsubscribe = unsub;
-      }
-    });
+      })
+      .catch((err) => console.warn('No se pudieron cargar los perfiles:', err));
+
+    loadFirebaseService()
+      .then((firebase) =>
+        firebase.subscribeToProfilesUpdates(
+          (cloudProfiles) => {
+            if (cancelled) return;
+            if (cloudProfiles && cloudProfiles.length > 0) {
+              setAllUsers(cloudProfiles);
+              saveStoredProfiles(cloudProfiles);
+            }
+          },
+          (err) => console.warn('No se pudieron sincronizar los perfiles:', err)
+        )
+      )
+      .then((unsub) => {
+        if (cancelled) {
+          unsub?.();
+        } else {
+          unsubscribe = unsub;
+        }
+      })
+      .catch((err) => console.warn('No se pudo escuchar los perfiles:', err));
 
     return () => {
       cancelled = true;
@@ -191,7 +194,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = [...allUsers, newProfile];
     setAllUsers(updated);
     saveStoredProfiles(updated);
-    saveProfileToFirestore(newProfile);
+    void loadFirebaseService()
+      .then((firebase) => firebase.saveProfileToFirestore(newProfile))
+      .catch((err) => console.warn('No se pudo guardar el perfil en la nube:', err));
 
     return newProfile;
   };
@@ -200,7 +205,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = allUsers.map((u) => (u.id === profile.id ? profile : u));
     setAllUsers(updated);
     saveStoredProfiles(updated);
-    saveProfileToFirestore(profile);
+    void loadFirebaseService()
+      .then((firebase) => firebase.saveProfileToFirestore(profile))
+      .catch((err) => console.warn('No se pudo actualizar el perfil en la nube:', err));
   };
 
   const deleteProfile = (userId: string): boolean => {
@@ -213,7 +220,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = allUsers.filter((u) => u.id !== userId);
     setAllUsers(updated);
     saveStoredProfiles(updated);
-    deleteProfileFromFirestore(userId);
+    void loadFirebaseService()
+      .then((firebase) => firebase.deleteProfileFromFirestore(userId))
+      .catch((err) => console.warn('No se pudo borrar el perfil de la nube:', err));
 
     if (activeUserId === userId) {
       const fallback = updated[0].id;

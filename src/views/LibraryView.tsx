@@ -1,22 +1,20 @@
 import React, { useState } from 'react';
-import {
-  Play,
-  Pause,
-  Heart,
-  Music,
-  Trash2,
-  Download,
-  FolderDown,
-  ArrowLeft,
-  CheckCircle2,
-  Clock,
-  Plus,
-  Shuffle,
-  Search,
-  ArrowDownCircle,
-  MoreHorizontal,
-  Disc
-} from 'lucide-react';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
+import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import Music from 'lucide-react/dist/esm/icons/eighth-notes.mjs';
+import Trash2 from 'lucide-react/dist/esm/icons/trash.mjs';
+import Download from 'lucide-react/dist/esm/icons/download.mjs';
+import FolderDown from 'lucide-react/dist/esm/icons/folder-down.mjs';
+import ArrowLeft from 'lucide-react/dist/esm/icons/arrow-left.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import Clock from 'lucide-react/dist/esm/icons/clock.mjs';
+import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
+import Shuffle from 'lucide-react/dist/esm/icons/shuffle.mjs';
+import Search from 'lucide-react/dist/esm/icons/search.mjs';
+import ArrowDownCircle from 'lucide-react/dist/esm/icons/circle-arrow-down.mjs';
+import MoreHorizontal from 'lucide-react/dist/esm/icons/ellipsis.mjs';
+import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';

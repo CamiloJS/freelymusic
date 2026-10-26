@@ -1,24 +1,22 @@
 import React, { useState, useRef } from 'react';
-import {
-  ShieldAlert,
-  Link2,
-  Users,
-  Database,
-  ListMusic,
-  Plus,
-  Play,
-  Check,
-  AlertCircle,
-  Trash2,
-  Upload,
-  RefreshCw,
-  Sparkles,
-  KeyRound,
-  Download,
-  FileCode,
-  Pencil,
-  X
-} from 'lucide-react';
+import ShieldAlert from 'lucide-react/dist/esm/icons/shield-alert.mjs';
+import Link2 from 'lucide-react/dist/esm/icons/link-2.mjs';
+import Users from 'lucide-react/dist/esm/icons/users.mjs';
+import Database from 'lucide-react/dist/esm/icons/database.mjs';
+import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
+import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Check from 'lucide-react/dist/esm/icons/check.mjs';
+import AlertCircle from 'lucide-react/dist/esm/icons/circle-alert.mjs';
+import Trash2 from 'lucide-react/dist/esm/icons/trash.mjs';
+import Upload from 'lucide-react/dist/esm/icons/upload.mjs';
+import RefreshCw from 'lucide-react/dist/esm/icons/refresh-cw.mjs';
+import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
+import KeyRound from 'lucide-react/dist/esm/icons/key-round.mjs';
+import Download from 'lucide-react/dist/esm/icons/download.mjs';
+import FileCode from 'lucide-react/dist/esm/icons/file-code.mjs';
+import Pencil from 'lucide-react/dist/esm/icons/pencil.mjs';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { Song, UserRole, FirebaseConfigOptions } from '../types';

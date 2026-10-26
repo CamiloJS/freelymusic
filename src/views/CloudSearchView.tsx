@@ -1,21 +1,19 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import {
-  Search,
-  Play,
-  Heart,
-  Plus,
-  Download,
-  CheckCircle2,
-  Cloud,
-  Music,
-  Disc,
-  Clock,
-  X,
-  Mic2,
-  Trash2,
-  Sparkles,
-  ArrowRight
-} from 'lucide-react';
+import Search from 'lucide-react/dist/esm/icons/search.mjs';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
+import Download from 'lucide-react/dist/esm/icons/download.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import Cloud from 'lucide-react/dist/esm/icons/cloud.mjs';
+import Music from 'lucide-react/dist/esm/icons/eighth-notes.mjs';
+import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
+import Clock from 'lucide-react/dist/esm/icons/clock.mjs';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
+import Trash2 from 'lucide-react/dist/esm/icons/trash.mjs';
+import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
+import ArrowRight from 'lucide-react/dist/esm/icons/arrow-right.mjs';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
 import { Song, Album } from '../types';

@@ -1,13 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  X,
-  Minimize2,
-  Maximize2,
-  Mic2,
-  Disc,
-  Play,
-  Pause
-} from 'lucide-react';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Minimize2 from 'lucide-react/dist/esm/icons/minimize-2.mjs';
+import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
+import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
+import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
 import { useAudio } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';

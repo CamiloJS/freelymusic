@@ -1,19 +1,17 @@
 import React, { useState, useMemo, useRef } from 'react';
-import {
-  Play,
-  Pause,
-  Heart,
-  Music,
-  Disc,
-  Clock,
-  Pencil,
-  Upload,
-  CheckCircle2,
-  X,
-  Sparkles,
-  Flame,
-  ArrowLeft
-} from 'lucide-react';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
+import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import Music from 'lucide-react/dist/esm/icons/eighth-notes.mjs';
+import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
+import Clock from 'lucide-react/dist/esm/icons/clock.mjs';
+import Pencil from 'lucide-react/dist/esm/icons/pencil.mjs';
+import Upload from 'lucide-react/dist/esm/icons/upload.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
+import Flame from 'lucide-react/dist/esm/icons/flame.mjs';
+import ArrowLeft from 'lucide-react/dist/esm/icons/arrow-left.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';

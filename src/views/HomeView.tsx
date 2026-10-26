@@ -1,19 +1,17 @@
 import React, { useMemo } from 'react';
-import {
-  Play,
-  Heart,
-  Plus,
-  Sparkles,
-  Music,
-  Clock,
-  Compass,
-  Radio,
-  Disc,
-  Flame,
-  Shuffle,
-  Loader2,
-  Music2
-} from 'lucide-react';
+import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
+import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
+import Music from 'lucide-react/dist/esm/icons/eighth-notes.mjs';
+import Clock from 'lucide-react/dist/esm/icons/clock.mjs';
+import Compass from 'lucide-react/dist/esm/icons/compass.mjs';
+import Radio from 'lucide-react/dist/esm/icons/radio.mjs';
+import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
+import Flame from 'lucide-react/dist/esm/icons/flame.mjs';
+import Shuffle from 'lucide-react/dist/esm/icons/shuffle.mjs';
+import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
+import Music2 from 'lucide-react/dist/esm/icons/eighth-note.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
