@@ -18,7 +18,7 @@ import { LibraryView } from './views/LibraryView';
 import { OfflineView } from './views/OfflineView';
 import { AdminView } from './views/AdminView';
 import { AddMusicView } from './views/AddMusicView';
-import { Playlist, Song } from './types';
+import { Playlist, Song, Album } from './types';
 import { getCustomAppIcon, applyAppIcon } from './utils/appIcon';
 import {
   Compass,
@@ -39,7 +39,7 @@ import {
 
 const MainLayout: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('home');
-  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | 'favorites' | null>(null);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | 'favorites' | Album | null>(null);
   const [songToAddToPlaylist, setSongToAddToPlaylist] = useState<Song | null>(null);
   const [isProfileSwitcherOpen, setIsProfileSwitcherOpen] = useState(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
@@ -78,7 +78,7 @@ const MainLayout: React.FC = () => {
     setSongToAddToPlaylist(song);
   };
 
-  const handleSelectPlaylist = (playlist: Playlist | 'favorites') => {
+  const handleSelectPlaylist = (playlist: Playlist | 'favorites' | Album) => {
     setSelectedPlaylist(playlist);
     setCurrentTab('library');
     setIsCenterLyricsOpen(false);

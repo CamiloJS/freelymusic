@@ -19,12 +19,12 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
-import { Playlist, Song } from '../types';
+import { Playlist, Song, Album } from '../types';
 import { formatTime } from '../utils/lyrics';
 
 interface LibraryViewProps {
-  selectedPlaylist: Playlist | 'favorites' | null;
-  setSelectedPlaylist: (playlist: Playlist | 'favorites' | null) => void;
+  selectedPlaylist: Playlist | 'favorites' | Album | null;
+  setSelectedPlaylist: (playlist: Playlist | 'favorites' | Album | null) => void;
   onOpenCreatePlaylist: () => void;
   onOpenAddToPlaylist: (song: Song) => void;
 }
@@ -54,15 +54,22 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [playlistSearch, setPlaylistSearch] = useState('');
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; status: string } | null>(null);
 
-  // If a playlist or 'favorites' is selected, show Spotify-style Hero Detail
+  // If a playlist, album, or 'favorites' is selected, show Spotify-style Hero Detail
   if (selectedPlaylist) {
     const isFavorites = selectedPlaylist === 'favorites';
+    const isAlbum = Boolean(
+      selectedPlaylist && typeof selectedPlaylist === 'object' && 'songs' in selectedPlaylist
+    );
+    const albumObj = isAlbum ? (selectedPlaylist as Album) : null;
+    const playlistObj = !isFavorites && !isAlbum ? (selectedPlaylist as Playlist) : null;
 
     const playlistSongs: Song[] = isFavorites
       ? userFavoriteSongs
-      : selectedPlaylist.songIds
+      : isAlbum && albumObj
+      ? [...albumObj.songs].sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0))
+      : playlistObj?.songIds
           .map((id) => catalog.find((s) => s.id === id))
-          .filter((s): s is Song => Boolean(s));
+          .filter((s): s is Song => Boolean(s)) || [];
 
     const totalSeconds = playlistSongs.reduce((acc, s) => acc + (s?.duration || 0), 0);
     const areAllDownloaded = playlistSongs.length > 0 && playlistSongs.every((s) => isDownloaded(s.id));
@@ -80,14 +87,21 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const isThisPlaylistPlaying =
       playlistSongs.length > 0 && playlistSongs.some((s) => s.id === currentSong?.id) && isPlaying;
 
+    const sourceName = isFavorites
+      ? 'Tus me gusta'
+      : isAlbum && albumObj
+      ? albumObj.name
+      : playlistObj?.name || 'Playlist';
+
+    const sourceType = isFavorites ? 'favorites' : isAlbum ? 'album' : 'playlist';
+
     const handlePlayAll = () => {
       if (playlistSongs.length === 0) return;
       if (isThisPlaylistPlaying) {
         togglePlayPause();
       } else {
-        const sourceName = isFavorites ? 'Tus me gusta' : selectedPlaylist.name;
         playSong(playlistSongs[0], playlistSongs, {
-          type: isFavorites ? 'favorites' : 'playlist',
+          type: sourceType,
           name: sourceName,
         });
       }
@@ -102,10 +116,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     };
 
     const handleDownloadZip = async () => {
-      if (isFavorites) {
+      if (isFavorites || isAlbum) {
         const dummyPl: Playlist = {
-          id: 'favorites',
-          name: 'Tus me gusta',
+          id: isAlbum ? `album-${albumObj?.name}` : 'favorites',
+          name: sourceName,
           userId: currentUser?.id || 'user',
           songIds: playlistSongs.map((s) => s.id),
           createdAt: new Date().toISOString(),
@@ -114,8 +128,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         await downloadFullPlaylistZip(dummyPl, (percent, status) => {
           setDownloadProgress({ percent, status });
         });
-      } else {
-        await downloadFullPlaylistZip(selectedPlaylist, (percent, status) => {
+      } else if (playlistObj) {
+        await downloadFullPlaylistZip(playlistObj, (percent, status) => {
           setDownloadProgress({ percent, status });
         });
       }
@@ -124,11 +138,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
     return (
       <div className="flex-1 overflow-y-auto pb-36 animate-in fade-in duration-200 select-none">
-        {/* Spotify Hero Banner (Image 1 & 2) */}
+        {/* Spotify Hero Banner */}
         <div
           className={`p-6 md:p-8 pt-10 flex flex-col md:flex-row items-start md:items-end gap-6 shadow-2xl relative ${
             isFavorites
               ? 'bg-gradient-to-b from-indigo-900 via-purple-950 to-neutral-950'
+              : isAlbum
+              ? 'bg-gradient-to-b from-blue-950 via-slate-900 to-neutral-950'
               : 'bg-gradient-to-b from-emerald-950 via-teal-950 to-neutral-950'
           }`}
         >
@@ -138,10 +154,16 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-2xl">
                 <Heart className="w-24 h-24 text-white fill-white" />
               </div>
-            ) : selectedPlaylist.coverUrl ? (
+            ) : isAlbum && albumObj?.coverUrl ? (
               <img
-                src={selectedPlaylist.coverUrl}
-                alt={selectedPlaylist.name}
+                src={albumObj.coverUrl}
+                alt={albumObj.name}
+                className="w-full h-full object-cover"
+              />
+            ) : playlistObj?.coverUrl ? (
+              <img
+                src={playlistObj.coverUrl}
+                alt={playlistObj.name}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -154,19 +176,27 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           {/* Details */}
           <div className="flex-1 space-y-2">
             <span className="text-[11px] font-black uppercase tracking-wider text-white">
-              Playlist pública
+              {isFavorites ? 'Colección privada' : isAlbum ? 'Álbum' : 'Playlist pública'}
             </span>
             <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight leading-none py-1">
-              {isFavorites ? 'Tus me gusta' : selectedPlaylist.name}
+              {sourceName}
             </h1>
-            {!isFavorites && selectedPlaylist.description && (
+            {!isFavorites && !isAlbum && playlistObj?.description && (
               <p className="text-xs text-neutral-300 line-clamp-2">
-                {selectedPlaylist.description}
+                {playlistObj.description}
               </p>
             )}
 
             <div className="flex items-center gap-1.5 text-xs text-neutral-300 font-semibold pt-1">
-              <span className="text-white font-extrabold">{currentUser?.displayName || 'Tú'}</span>
+              <span className="text-white font-extrabold">
+                {isAlbum ? albumObj?.artist : currentUser?.displayName || 'Tú'}
+              </span>
+              {isAlbum && albumObj?.year && (
+                <>
+                  <span>•</span>
+                  <span>{albumObj.year}</span>
+                </>
+              )}
               <span>•</span>
               <span>{playlistSongs.length} canciones</span>
               <span>•</span>
@@ -175,7 +205,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
         </div>
 
-        {/* Action Controls Bar (Spotify Style: Big Green Play, Shuffle, Download, Search) */}
+        {/* Action Controls Bar */}
         <div className="p-6 md:p-8 pt-6 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-5">
@@ -203,7 +233,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 <Shuffle className="w-6 h-6" />
               </button>
 
-              {/* Download All Button (Green Circle with Arrow Down) */}
+              {/* Download All Button */}
               <button
                 onClick={handleDownloadAll}
                 className={`p-1.5 rounded-full transition-all ${
@@ -230,11 +260,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               </button>
 
               {/* Delete Playlist (only if custom playlist) */}
-              {!isFavorites && (
+              {!isFavorites && !isAlbum && playlistObj && (
                 <button
                   onClick={() => {
-                    if (confirm(`¿Eliminar la playlist "${selectedPlaylist.name}"?`)) {
-                      deletePlaylist(selectedPlaylist.id);
+                    if (confirm(`¿Eliminar la playlist "${playlistObj.name}"?`)) {
+                      deletePlaylist(playlistObj.id);
                       setSelectedPlaylist(null);
                     }
                   }}
@@ -306,8 +336,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       key={song.id}
                       onClick={() =>
                         playSong(song, playlistSongs, {
-                          type: isFavorites ? 'favorites' : 'playlist',
-                          name: isFavorites ? 'Tus me gusta' : selectedPlaylist.name,
+                          type: sourceType,
+                          name: sourceName,
                         })
                       }
                       className="grid grid-cols-12 gap-4 px-4 py-2.5 rounded-xl hover:bg-neutral-900/70 items-center cursor-pointer group transition-colors"
@@ -315,7 +345,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       {/* # or Play button */}
                       <div className="col-span-1 flex items-center justify-center">
                         <span className="text-xs font-mono text-neutral-500 group-hover:hidden">
-                          {idx + 1}
+                          {song.trackNumber || idx + 1}
                         </span>
                         <button className="hidden group-hover:block text-white">
                           {isCurrent && isPlaying ? (

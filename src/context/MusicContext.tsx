@@ -30,6 +30,7 @@ export interface DownloadingState {
 interface MusicContextType {
   catalog: Song[];
   addTrackToCatalog: (song: Omit<Song, 'id' | 'createdAt' | 'addedBy'>) => Song;
+  addMultipleTracksToCatalog: (songs: Omit<Song, 'id' | 'createdAt' | 'addedBy'>[]) => Promise<Song[]>;
   updateCatalogTrack: (song: Song) => void;
   deleteCatalogTrack: (songId: string) => void;
 
@@ -148,6 +149,26 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     saveSongToFirestore(newSong);
 
     return newSong;
+  };
+
+  const addMultipleTracksToCatalog = async (
+    songsData: Omit<Song, 'id' | 'createdAt' | 'addedBy'>[]
+  ): Promise<Song[]> => {
+    const now = Date.now();
+    const newSongs: Song[] = songsData.map((songData, idx) => ({
+      ...songData,
+      id: `song-${now}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+      addedBy: currentUser.id,
+      createdAt: new Date(now + idx).toISOString(),
+    }));
+
+    const updated = [...newSongs, ...catalog];
+    setCatalog(updated);
+    saveStoredCatalog(updated);
+    for (const song of newSongs) {
+      await saveSongToFirestore(song);
+    }
+    return newSongs;
   };
 
   const updateCatalogTrack = (song: Song) => {
@@ -318,6 +339,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       value={{
         catalog,
         addTrackToCatalog,
+        addMultipleTracksToCatalog,
         updateCatalogTrack,
         deleteCatalogTrack,
         favoriteSongIds: userData.favoriteSongIds,

@@ -76,6 +76,7 @@ export const AdminView: React.FC = () => {
   const [editAudioUrl, setEditAudioUrl] = useState('');
   const [editLyricsLrc, setEditLyricsLrc] = useState('');
   const [editIsExplicit, setEditIsExplicit] = useState(false);
+  const [editTrackNumber, setEditTrackNumber] = useState<number | undefined>(undefined);
   const [editDuration, setEditDuration] = useState(180);
   const editCoverFileInputRef = useRef<HTMLInputElement | null>(null);
   const editLrcFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -86,6 +87,7 @@ export const AdminView: React.FC = () => {
     const split = song.artist ? song.artist.split(',').map((a) => a.trim()).filter(Boolean) : [''];
     setEditArtistList(split.length > 0 ? split : ['']);
     setEditAlbum(song.album || '');
+    setEditTrackNumber(song.trackNumber);
     setEditGenre(song.genre || '');
     setEditYear(song.year || '2026');
     setEditCoverUrl(song.coverUrl);
@@ -110,6 +112,7 @@ export const AdminView: React.FC = () => {
       title: editTitle.trim(),
       artist: finalArtist,
       album: editAlbum.trim() || 'Sencillo',
+      trackNumber: editTrackNumber ? Number(editTrackNumber) : undefined,
       genre: editGenre.trim() || 'General',
       year: editYear.trim() || '2026',
       coverUrl: editCoverUrl.trim(),
@@ -873,7 +876,7 @@ export const AdminView: React.FC = () => {
                       <span className="block font-bold text-sm text-white truncate">{song.title}</span>
                     </div>
                     <span className="block text-xs text-neutral-400 truncate">
-                      {song.artist} • {song.album}
+                      {song.trackNumber ? `Pista #${song.trackNumber} • ` : ''}{song.artist} • {song.album}
                     </span>
                   </div>
                 </div>
@@ -986,14 +989,25 @@ export const AdminView: React.FC = () => {
                     ))}
                   </div>
 
-                  {/* Album & Year */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Album, Track # & Year */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-neutral-300 mb-1.5">Álbum</label>
                       <input
                         type="text"
                         value={editAlbum}
                         onChange={(e) => setEditAlbum(e.target.value)}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-300 mb-1.5">Nº de Pista (Track #)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={editTrackNumber || ''}
+                        onChange={(e) => setEditTrackNumber(e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                        placeholder="Ej. 1"
                         className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                       />
                     </div>

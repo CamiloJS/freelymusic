@@ -6,7 +6,7 @@ import { getSongBlob } from '../services/storage';
 export type RepeatMode = 'off' | 'all' | 'one';
 
 export interface PlaybackSource {
-  type: 'playlist' | 'favorites' | 'catalog';
+  type: 'playlist' | 'favorites' | 'catalog' | 'album';
   name: string;
 }
 

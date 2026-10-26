@@ -9,6 +9,7 @@ import {
   Plus,
   Music,
   UserCheck,
+  Disc,
   Disc3,
   Wifi,
   WifiOff,
@@ -22,13 +23,13 @@ import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
 import { getCustomAppIcon } from '../utils/appIcon';
-import { Playlist } from '../types';
+import { Playlist, Album } from '../types';
 
 interface SidebarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
-  onSelectPlaylist: (playlist: Playlist | 'favorites') => void;
-  selectedPlaylist: Playlist | 'favorites' | null;
+  onSelectPlaylist: (playlist: Playlist | 'favorites' | Album) => void;
+  selectedPlaylist: Playlist | 'favorites' | Album | null;
   onOpenCreatePlaylist: () => void;
   onOpenProfileSwitcher: () => void;
   isOnline: boolean;
@@ -44,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOnline,
 }) => {
   const { currentUser, isAdmin } = useAuth();
-  const { playlists, userFavoriteSongs, downloadedSongIds, isDownloaded } = useMusic();
+  const { playlists, userFavoriteSongs, downloadedSongIds, isDownloaded, catalog } = useMusic();
   const { setIsCenterLyricsOpen } = useAudio();
   const [appIcon, setAppIcon] = useState<string | null>(() => getCustomAppIcon());
   const [libraryFilter, setLibraryFilter] = useState<'all' | 'playlists' | 'albums'>('all');
@@ -66,6 +67,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'add-music', label: 'Añadir Música', icon: UploadCloud },
   ];
 
+  // Extract unique albums from catalog
+  const uniqueAlbums = React.useMemo((): Album[] => {
+    const map = new Map<string, Album>();
+    catalog.forEach((song) => {
+      if (!song.album || song.album.trim().toLowerCase() === 'sencillo') return;
+      const key = `${song.album.trim().toLowerCase()}___${song.artist.trim().toLowerCase()}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          name: song.album.trim(),
+          artist: song.artist.trim(),
+          coverUrl: song.coverUrl,
+          year: song.year,
+          genre: song.genre,
+          songs: [],
+        });
+      }
+      map.get(key)!.songs.push(song);
+    });
+
+    map.forEach((alb) => {
+      alb.songs.sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
+    });
+
+    return Array.from(map.values());
+  }, [catalog]);
+
   // Check if all favorites are downloaded
   const areFavoritesDownloaded = userFavoriteSongs.length > 0 && userFavoriteSongs.every((s) => isDownloaded(s.id));
 
@@ -73,6 +100,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const filteredPlaylists = playlists.filter((pl) => {
     if (!librarySearch) return true;
     return pl.name.toLowerCase().includes(librarySearch.toLowerCase());
+  });
+
+  // Filter albums
+  const filteredAlbums = uniqueAlbums.filter((alb) => {
+    if (!librarySearch) return true;
+    const q = librarySearch.toLowerCase();
+    return alb.name.toLowerCase().includes(q) || alb.artist.toLowerCase().includes(q);
   });
 
   return (
@@ -205,88 +239,151 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Scrollable Playlists List */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {/* Pinned: "Tus me gusta" (Spotify Image 1 & 2) */}
-          <div
-            onClick={() => {
-              setIsCenterLyricsOpen(false);
-              onSelectPlaylist('favorites');
-              setCurrentTab('library');
-            }}
-            className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all ${
-              selectedPlaylist === 'favorites' && currentTab === 'library'
-                ? 'bg-neutral-850 text-white'
-                : 'hover:bg-neutral-900/70 text-neutral-300'
-            }`}
-          >
-            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center flex-shrink-0 shadow-md">
-              <Heart className="w-5 h-5 text-white fill-white" />
-            </div>
+          {(libraryFilter === 'all' || libraryFilter === 'playlists') && (
+            <div
+              onClick={() => {
+                setIsCenterLyricsOpen(false);
+                onSelectPlaylist('favorites');
+                setCurrentTab('library');
+              }}
+              className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all ${
+                selectedPlaylist === 'favorites' && currentTab === 'library'
+                  ? 'bg-neutral-850 text-white'
+                  : 'hover:bg-neutral-900/70 text-neutral-300'
+              }`}
+            >
+              <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                <Heart className="w-5 h-5 text-white fill-white" />
+              </div>
 
-            <div className="truncate flex-1">
-              <span className={`block font-bold text-xs truncate ${selectedPlaylist === 'favorites' ? 'text-emerald-400' : 'text-white'}`}>
-                Tus me gusta
-              </span>
-              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 truncate mt-0.5">
-                {areFavoritesDownloaded ? (
-                  <span title="Descargado en tu dispositivo">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400 text-black flex-shrink-0 inline" />
-                  </span>
-                ) : (
-                  <span title="Disponible para descargar">
-                    <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 inline" />
-                  </span>
-                )}
-                <span>Playlist • {currentUser?.displayName || 'Tú'} ({userFavoriteSongs.length})</span>
+              <div className="truncate flex-1">
+                <span className={`block font-bold text-xs truncate ${selectedPlaylist === 'favorites' ? 'text-emerald-400' : 'text-white'}`}>
+                  Tus me gusta
+                </span>
+                <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 truncate mt-0.5">
+                  {areFavoritesDownloaded ? (
+                    <span title="Descargado en tu dispositivo">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400 text-black flex-shrink-0 inline" />
+                    </span>
+                  ) : (
+                    <span title="Disponible para descargar">
+                      <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 inline" />
+                    </span>
+                  )}
+                  <span>Playlist • {currentUser?.displayName || 'Tú'} ({userFavoriteSongs.length})</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* User Playlists */}
-          {filteredPlaylists.map((pl) => {
-            const isSelected = selectedPlaylist !== 'favorites' && selectedPlaylist?.id === pl.id && currentTab === 'library';
-            const allSongsDownloaded = pl.songIds.length > 0 && pl.songIds.every((id) => isDownloaded(id));
+          {(libraryFilter === 'all' || libraryFilter === 'playlists') &&
+            filteredPlaylists.map((pl) => {
+              const isSelected =
+                selectedPlaylist !== 'favorites' &&
+                selectedPlaylist &&
+                'id' in selectedPlaylist &&
+                selectedPlaylist.id === pl.id &&
+                currentTab === 'library';
+              const allSongsDownloaded = pl.songIds.length > 0 && pl.songIds.every((id) => isDownloaded(id));
 
-            return (
-              <div
-                key={pl.id}
-                onClick={() => {
-                  setIsCenterLyricsOpen(false);
-                  onSelectPlaylist(pl);
-                  setCurrentTab('library');
-                }}
-                className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all group ${
-                  isSelected
-                    ? 'bg-neutral-850 text-white'
-                    : 'hover:bg-neutral-900/70 text-neutral-300'
-                }`}
-              >
-                <div className="w-12 h-12 rounded-lg overflow-hidden bg-neutral-900 flex-shrink-0 shadow flex items-center justify-center">
-                  {pl.coverUrl ? (
-                    <img src={pl.coverUrl} alt={pl.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <Music className="w-5 h-5 text-neutral-600" />
-                  )}
-                </div>
-
-                <div className="truncate flex-1">
-                  <span className={`block font-bold text-xs truncate ${isSelected ? 'text-emerald-400' : 'text-white group-hover:text-white'}`}>
-                    {pl.name}
-                  </span>
-                  <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 truncate mt-0.5">
-                    {allSongsDownloaded ? (
-                      <span title="Descargado">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400 text-black flex-shrink-0 inline" />
-                      </span>
+              return (
+                <div
+                  key={pl.id}
+                  onClick={() => {
+                    setIsCenterLyricsOpen(false);
+                    onSelectPlaylist(pl);
+                    setCurrentTab('library');
+                  }}
+                  className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all group ${
+                    isSelected
+                      ? 'bg-neutral-850 text-white'
+                      : 'hover:bg-neutral-900/70 text-neutral-300'
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-neutral-900 flex-shrink-0 shadow flex items-center justify-center">
+                    {pl.coverUrl ? (
+                      <img src={pl.coverUrl} alt={pl.name} className="w-full h-full object-cover" />
                     ) : (
-                      <span title="Descargar">
-                        <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 inline" />
-                      </span>
+                      <Music className="w-5 h-5 text-neutral-600" />
                     )}
-                    <span>Playlist • {currentUser?.displayName || 'Tú'} ({pl.songIds.length})</span>
+                  </div>
+
+                  <div className="truncate flex-1">
+                    <span className={`block font-bold text-xs truncate ${isSelected ? 'text-emerald-400' : 'text-white group-hover:text-white'}`}>
+                      {pl.name}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 truncate mt-0.5">
+                      {allSongsDownloaded ? (
+                        <span title="Descargado">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400 text-black flex-shrink-0 inline" />
+                        </span>
+                      ) : (
+                        <span title="Descargar">
+                          <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 inline" />
+                        </span>
+                      )}
+                      <span>Playlist • {currentUser?.displayName || 'Tú'} ({pl.songIds.length})</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+
+          {/* User Albums */}
+          {(libraryFilter === 'all' || libraryFilter === 'albums') &&
+            filteredAlbums.map((alb) => {
+              const isSelected =
+                selectedPlaylist &&
+                typeof selectedPlaylist === 'object' &&
+                'songs' in selectedPlaylist &&
+                selectedPlaylist.name.toLowerCase() === alb.name.toLowerCase() &&
+                currentTab === 'library';
+
+              const allDownloaded = alb.songs.length > 0 && alb.songs.every((s) => isDownloaded(s.id));
+
+              return (
+                <div
+                  key={`${alb.name}-${alb.artist}`}
+                  onClick={() => {
+                    setIsCenterLyricsOpen(false);
+                    onSelectPlaylist(alb);
+                    setCurrentTab('library');
+                  }}
+                  className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all group ${
+                    isSelected
+                      ? 'bg-neutral-850 text-white'
+                      : 'hover:bg-neutral-900/70 text-neutral-300'
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-neutral-900 flex-shrink-0 shadow flex items-center justify-center">
+                    {alb.coverUrl ? (
+                      <img src={alb.coverUrl} alt={alb.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Disc className="w-5 h-5 text-neutral-600" />
+                    )}
+                  </div>
+
+                  <div className="truncate flex-1">
+                    <span className={`block font-bold text-xs truncate ${isSelected ? 'text-emerald-400' : 'text-white group-hover:text-white'}`}>
+                      {alb.name}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 truncate mt-0.5">
+                      {allDownloaded ? (
+                        <span title="Descargado">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400 text-black flex-shrink-0 inline" />
+                        </span>
+                      ) : (
+                        <span title="Disponible para descargar">
+                          <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 inline" />
+                        </span>
+                      )}
+                      <span>Álbum • {alb.artist} ({alb.songs.length})</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
         </div>
       </div>
 

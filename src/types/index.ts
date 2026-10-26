@@ -22,9 +22,19 @@ export interface Song {
   plainLyrics?: string;
   genre?: string;
   year?: string;
+  trackNumber?: number;
   isExplicit?: boolean;
   addedBy?: string;
   createdAt: string;
+}
+
+export interface Album {
+  name: string;
+  artist: string;
+  coverUrl: string;
+  year?: string;
+  genre?: string;
+  songs: Song[];
 }
 
 export interface Playlist {
