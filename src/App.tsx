@@ -15,6 +15,7 @@ import { LibraryView } from './views/LibraryView';
 import { OfflineView } from './views/OfflineView';
 import { AdminView } from './views/AdminView';
 import { Playlist, Song } from './types';
+import { getCustomAppIcon, applyAppIcon } from './utils/appIcon';
 import {
   Compass,
   Home,
@@ -38,8 +39,13 @@ const MainLayout: React.FC = () => {
   const { isAdmin } = useAuth();
   const { setShowLyricsView } = useAudio();
 
-  // Listen to network status
+  // Listen to network status & initialize custom app icon
   useEffect(() => {
+    const customIcon = getCustomAppIcon();
+    if (customIcon) {
+      applyAppIcon(customIcon);
+    }
+
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
@@ -77,10 +83,7 @@ const MainLayout: React.FC = () => {
         {/* Mobile Top Header */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 bg-neutral-950/90 border-b border-neutral-900 z-30">
           <div className="flex items-center gap-2">
-            <span className="font-black text-lg text-white">SONORA</span>
-            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
-              Music
-            </span>
+            <span className="font-black text-lg text-white">MÚSICA</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -174,7 +177,10 @@ const MainLayout: React.FC = () => {
           )}
 
           {currentTab === 'cloud' && (
-            <CloudSearchView onOpenAddToPlaylist={handleOpenAddToPlaylist} />
+            <CloudSearchView
+              onOpenAddToPlaylist={handleOpenAddToPlaylist}
+              onOpenAddMusic={() => setIsProfileSwitcherOpen(true)}
+            />
           )}
 
           {currentTab === 'library' && (

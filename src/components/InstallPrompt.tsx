@@ -12,7 +12,14 @@ export const InstallPrompt: React.FC = () => {
   const [isIOS, setIsIOS] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
 
+  const DISMISSED_KEY = 'musica_install_banner_seen';
+
   useEffect(() => {
+    // If the user already saw/dismissed the prompt once, never show it again
+    if (localStorage.getItem(DISMISSED_KEY) === 'true') {
+      return;
+    }
+
     // Check if running as standalone PWA
     if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as unknown as { standalone?: boolean }).standalone) {
       setIsInstalled(true);
@@ -28,13 +35,17 @@ export const InstallPrompt: React.FC = () => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setShowBanner(true);
+      localStorage.setItem(DISMISSED_KEY, 'true');
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
 
-    // If on iOS and not standalone, show prompt after a short delay
+    // If on iOS and not standalone, show prompt after a short delay (once only)
     if (iosDevice && !isInstalled) {
-      const timer = setTimeout(() => setShowBanner(true), 2500);
+      const timer = setTimeout(() => {
+        setShowBanner(true);
+        localStorage.setItem(DISMISSED_KEY, 'true');
+      }, 2500);
       return () => clearTimeout(timer);
     }
 
@@ -42,6 +53,7 @@ export const InstallPrompt: React.FC = () => {
   }, [isInstalled]);
 
   const handleInstallClick = async () => {
+    localStorage.setItem(DISMISSED_KEY, 'true');
     if (deferredPrompt) {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
@@ -50,6 +62,11 @@ export const InstallPrompt: React.FC = () => {
       }
       setDeferredPrompt(null);
     }
+  };
+
+  const handleDismiss = () => {
+    localStorage.setItem(DISMISSED_KEY, 'true');
+    setShowBanner(false);
   };
 
   if (!showBanner || isInstalled) return null;
@@ -62,16 +79,16 @@ export const InstallPrompt: React.FC = () => {
             <Smartphone className="w-6 h-6 text-black" />
           </div>
           <div>
-            <h4 className="font-bold text-white text-sm">Instalar FreelyMusic</h4>
+            <h4 className="font-bold text-white text-sm">Instalar Música</h4>
             <p className="text-xs text-neutral-400 mt-0.5">
               Instala la aplicación para escuchar y descargar tu música sin conexión.
             </p>
           </div>
         </div>
         <button
-          onClick={() => setShowBanner(false)}
+          onClick={handleDismiss}
           className="text-neutral-500 hover:text-white p-1 rounded-lg transition-colors"
-          title="Cerrar"
+          title="Cerrar y no volver a mostrar"
         >
           <X className="w-4 h-4" />
         </button>

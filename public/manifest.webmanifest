@@ -1,6 +1,6 @@
 {
-  "name": "FreelyMusic - Cloud Music",
-  "short_name": "FreelyMusic",
+  "name": "Música",
+  "short_name": "Música",
   "description": "Tu reproductor privado de música en la nube con letras en tiempo real y modo sin conexión.",
   "start_url": "/",
   "display": "standalone",

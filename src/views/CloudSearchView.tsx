@@ -20,9 +20,13 @@ import { formatTime } from '../utils/lyrics';
 
 interface CloudSearchViewProps {
   onOpenAddToPlaylist: (song: Song) => void;
+  onOpenAddMusic?: () => void;
 }
 
-export const CloudSearchView: React.FC<CloudSearchViewProps> = ({ onOpenAddToPlaylist }) => {
+export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
+  onOpenAddToPlaylist,
+  onOpenAddMusic,
+}) => {
   const {
     catalog,
     isFavorite,
@@ -65,15 +69,27 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({ onOpenAddToPla
   return (
     <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-32">
       {/* Search Header */}
-      <div>
-        <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider mb-2">
-          <Cloud className="w-4 h-4" />
-          <span>Repositorio Global en la Nube</span>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider mb-2">
+            <Cloud className="w-4 h-4" />
+            <span>Repositorio Global en la Nube</span>
+          </div>
+          <h1 className="text-3xl font-extrabold text-white">Buscar en la Nube</h1>
+          <p className="text-neutral-400 text-sm mt-1">
+            Busca cualquier canción almacenada en tu repositorio por enlace. No aparecen en tu biblioteca hasta que las agregues a tus favoritos o a tus playlists.
+          </p>
         </div>
-        <h1 className="text-3xl font-extrabold text-white">Buscar en la Nube</h1>
-        <p className="text-neutral-400 text-sm mt-1">
-          Busca cualquier canción almacenada en tu repositorio por enlace. No aparecen en tu biblioteca hasta que las agregues a tus favoritos o a tus playlists.
-        </p>
+
+        {onOpenAddMusic && (
+          <button
+            onClick={onOpenAddMusic}
+            className="self-start md:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all flex-shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Añadir Música por Enlace</span>
+          </button>
+        )}
       </div>
 
       {/* Search Bar & Filters */}

@@ -62,6 +62,21 @@ export const AdminView: React.FC = () => {
   const [fbStatusMessage, setFbStatusMessage] = useState('');
 
   const lrcFileInputRef = useRef<HTMLInputElement | null>(null);
+  const coverFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleCoverFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        setCoverUrl(dataUrl);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   if (!isAdmin) {
     return (
@@ -339,7 +354,7 @@ export const AdminView: React.FC = () => {
                   value={audioUrl}
                   onChange={(e) => setAudioUrl(e.target.value)}
                   onBlur={handleUrlBlur}
-                  placeholder="https://ejemplo.com/musica/mi_cancion.mp3"
+                  placeholder="https://filegarden.com/... o enlace directo a MP3/WAV/FLAC"
                   className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
                 />
 
@@ -455,9 +470,28 @@ export const AdminView: React.FC = () => {
 
             {/* Cover Image URL & Preview */}
             <div>
-              <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
-                URL de la Carátula (Cover Art)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider">
+                  Carátula (Cover Art)
+                </label>
+                <div>
+                  <input
+                    type="file"
+                    ref={coverFileInputRef}
+                    accept="image/*"
+                    onChange={handleCoverFileUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => coverFileInputRef.current?.click()}
+                    className="text-xs font-bold text-emerald-400 hover:underline flex items-center gap-1"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Subir carátula desde tu PC
+                  </button>
+                </div>
+              </div>
               <div className="flex gap-4 items-center">
                 <div className="w-16 h-16 rounded-xl overflow-hidden bg-neutral-950 border border-neutral-800 flex-shrink-0">
                   <img src={coverUrl} alt="Cover preview" className="w-full h-full object-cover" />
@@ -466,7 +500,7 @@ export const AdminView: React.FC = () => {
                   type="url"
                   value={coverUrl}
                   onChange={(e) => setCoverUrl(e.target.value)}
-                  placeholder="https://images.unsplash.com/..."
+                  placeholder="https://images.unsplash.com/... o sube una imagen de tu PC"
                   className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
                 />
               </div>

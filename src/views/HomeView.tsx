@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Play,
   Heart,
   Plus,
-  Compass,
-  HardDriveDownload,
   Sparkles,
   Music,
+  Clock,
+  Compass,
+  Radio,
+  Disc,
   Flame,
-  Clock
+  Shuffle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
@@ -30,57 +32,98 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const { catalog, userFavoriteSongs, playlists, isFavorite, toggleFavorite } = useMusic();
   const { playSong, currentSong, isPlaying } = useAudio();
 
-  // Dynamic greeting based on time of day
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Buenos días';
-    if (hour < 19) return 'Buenas tardes';
-    return 'Buenas noches';
-  };
+  // AI-Driven Recommendations based on user favorites & catalog genres
+  const { aiRecommendations, genreMixes, topGenreName } = useMemo(() => {
+    if (catalog.length === 0) {
+      return { aiRecommendations: [], genreMixes: [], topGenreName: 'Música' };
+    }
+
+    // Calculate genre affinities from user favorites
+    const genreScore: Record<string, number> = {};
+    userFavoriteSongs.forEach((s) => {
+      const g = s.genre || 'General';
+      genreScore[g] = (genreScore[g] || 0) + 2;
+    });
+
+    // Also factor catalog genres
+    catalog.forEach((s) => {
+      const g = s.genre || 'General';
+      genreScore[g] = (genreScore[g] || 0) + 0.5;
+    });
+
+    const sortedGenres = Object.keys(genreScore).sort(
+      (a, b) => genreScore[b] - genreScore[a]
+    );
+
+    const primaryGenre = sortedGenres[0] || 'General';
+
+    // AI recommended tracks (blended selection prioritizing favored genres)
+    const scoredSongs = [...catalog].sort((a, b) => {
+      const scoreA = (genreScore[a.genre || 'General'] || 1) + Math.sin(a.id.length);
+      const scoreB = (genreScore[b.genre || 'General'] || 1) + Math.cos(b.id.length);
+      return scoreB - scoreA;
+    });
+
+    const recommendations = scoredSongs.slice(0, 10);
+
+    // Group top genres for dedicated "Mix IA" cards
+    const mixes: { genre: string; songs: Song[] }[] = [];
+    sortedGenres.slice(0, 3).forEach((g) => {
+      const gSongs = catalog.filter((s) => (s.genre || 'General') === g);
+      if (gSongs.length > 0) {
+        mixes.push({ genre: g, songs: gSongs.slice(0, 6) });
+      }
+    });
+
+    return {
+      aiRecommendations: recommendations,
+      genreMixes: mixes,
+      topGenreName: primaryGenre,
+    };
+  }, [catalog, userFavoriteSongs]);
 
   const recentSongs = catalog.slice(0, 6);
 
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto pb-32">
-      {/* Hero Welcome Banner */}
-      <div className="relative rounded-3xl overflow-hidden p-8 md:p-10 bg-gradient-to-r from-emerald-950 via-neutral-900 to-black border border-emerald-500/20 shadow-2xl">
-        <div className="relative z-10 max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold mb-4">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>FreelyMusic Cloud Studio</span>
+    <div className="p-6 md:p-8 space-y-9 max-w-7xl mx-auto pb-32">
+      {/* AI Smart Mix Spotlight Header (NO welcome text or banners) */}
+      <div className="bg-gradient-to-r from-emerald-950/70 via-neutral-900 to-black p-6 rounded-3xl border border-emerald-500/20 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+        <div className="space-y-1.5">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Recomendación Inteligente IA</span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight">
-            {getGreeting()}, {currentUser.displayName}
+          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+            Mix IA personalizado · {topGenreName}
           </h1>
-          <p className="mt-3 text-neutral-300 text-sm md:text-base leading-relaxed">
-            Tu nube privada de música por streaming. Las canciones subidas por enlace se almacenan en tu catálogo global y puedes agregarlas a tus favoritos o descargarlas para escuchar sin conexión.
+          <p className="text-neutral-400 text-xs md:text-sm">
+            Generado automáticamente con base en tus géneros favoritos y el repositorio en la nube.
           </p>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              onClick={() => onNavigate('cloud')}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs tracking-wide shadow-lg shadow-emerald-500/25 transition-transform active:scale-95"
-            >
-              <Compass className="w-4 h-4" />
-              Explorar Catálogo en la Nube
-            </button>
-            <button
-              onClick={() => onNavigate('library')}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-neutral-800/80 hover:bg-neutral-700 text-white font-semibold text-xs tracking-wide border border-neutral-700 transition-colors"
-            >
-              <Music className="w-4 h-4 text-emerald-400" />
-              Ver Mi Biblioteca
-            </button>
-          </div>
         </div>
 
-        {/* Ambient glow */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full filter blur-3xl pointer-events-none" />
+        <div className="flex items-center gap-3">
+          {aiRecommendations.length > 0 && (
+            <button
+              onClick={() => playSong(aiRecommendations[0], aiRecommendations)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs tracking-wide shadow-lg shadow-emerald-500/25 transition-transform active:scale-95"
+            >
+              <Play className="w-4 h-4 fill-black" />
+              Reproducir Mix IA
+            </button>
+          )}
+          <button
+            onClick={() => onNavigate('cloud')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 font-semibold text-xs border border-neutral-800 transition-colors"
+          >
+            <Compass className="w-4 h-4 text-emerald-400" />
+            Explorar Repositorio
+          </button>
+        </div>
       </div>
 
-      {/* Quick Picks Grid (6 items like Spotify desktop) */}
+      {/* Quick Picks Grid (6 items) */}
       <div>
-        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+        <h2 className="text-lg md:text-xl font-bold text-white mb-4 flex items-center gap-2">
           <Clock className="w-5 h-5 text-emerald-400" />
           <span>Acceso Rápido</span>
         </h2>
@@ -122,12 +165,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     e.stopPropagation();
                     playSong(song, recentSongs);
                   }}
-                  className="w-10 h-10 rounded-full bg-emerald-500 text-black flex items-center justify-center opacity-0 group-hover:opacity-100 hover:scale-105 active:scale-95 transition-all shadow-md flex-shrink-0"
+                  className="w-9 h-9 rounded-full bg-emerald-500 text-black flex items-center justify-center opacity-0 group-hover:opacity-100 hover:scale-105 active:scale-95 transition-all shadow-md flex-shrink-0"
                 >
                   {isCurrent && isPlaying ? (
-                    <span className="w-3 h-3 bg-black rounded-sm" />
+                    <span className="w-2.5 h-2.5 bg-black rounded-sm" />
                   ) : (
-                    <Play className="w-4 h-4 fill-current ml-0.5" />
+                    <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
                   )}
                 </button>
               </div>
@@ -135,6 +178,73 @@ export const HomeView: React.FC<HomeViewProps> = ({
           })}
         </div>
       </div>
+
+      {/* Recommended by AI by Genre Carousel/Grid */}
+      {genreMixes.map((mix) => (
+        <div key={mix.genre} className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-emerald-400" />
+              <h2 className="text-xl font-bold text-white">
+                Recomendado por IA · {mix.genre}
+              </h2>
+              <span className="text-[10px] uppercase font-extrabold tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                IA Match
+              </span>
+            </div>
+            <button
+              onClick={() => onNavigate('cloud')}
+              className="text-xs font-bold text-neutral-400 hover:text-emerald-400 transition-colors"
+            >
+              Ver más canciones
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {mix.songs.map((song) => {
+              const isCurrent = currentSong?.id === song.id;
+              return (
+                <div
+                  key={song.id}
+                  onClick={() => playSong(song, mix.songs)}
+                  className="bg-neutral-900/40 hover:bg-neutral-800/60 p-3.5 rounded-2xl border border-neutral-800/60 cursor-pointer group transition-all"
+                >
+                  <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow-md relative">
+                    <img
+                      src={song.coverUrl}
+                      alt={song.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500 text-black flex items-center justify-center shadow-lg">
+                        {isCurrent && isPlaying ? (
+                          <span className="w-3 h-3 bg-black rounded-sm" />
+                        ) : (
+                          <Play className="w-4 h-4 fill-current ml-0.5" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <h3
+                    className={`font-bold text-xs truncate ${
+                      isCurrent ? 'text-emerald-400' : 'text-white'
+                    }`}
+                  >
+                    {song.title}
+                  </h3>
+                  <p className="text-[11px] text-neutral-400 truncate mt-0.5">
+                    {song.artist}
+                  </p>
+                  <span className="inline-block mt-2 text-[9px] uppercase font-bold text-neutral-500 bg-neutral-950 px-1.5 py-0.5 rounded">
+                    {song.genre || 'General'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
 
       {/* Tus Playlists */}
       {playlists.length > 0 && (
@@ -210,13 +320,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
               onClick={() => onNavigate('cloud')}
               className="mt-4 px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-emerald-400 font-bold text-xs tracking-wide"
             >
-              Explorar Catálogo
+              Explorar Repositorio
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {userFavoriteSongs.slice(0, 8).map((song) => {
-              const liked = isFavorite(song.id);
               const isCurrent = currentSong?.id === song.id;
               return (
                 <div

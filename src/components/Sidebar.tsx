@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Home,
   Compass,
   Library,
-  Mic2,
   HardDriveDownload,
   ShieldAlert,
   PlusCircle,
@@ -11,11 +10,12 @@ import {
   UserCheck,
   Disc3,
   Wifi,
-  WifiOff
+  WifiOff,
+  Settings
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
-import { useAudio } from '../context/AudioContext';
+import { getCustomAppIcon } from '../utils/appIcon';
 
 interface SidebarProps {
   currentTab: string;
@@ -34,7 +34,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { currentUser, isAdmin } = useAuth();
   const { playlists, downloadedSongIds } = useMusic();
-  const { setShowLyricsView } = useAudio();
+  const [appIcon, setAppIcon] = useState<string | null>(() => getCustomAppIcon());
+
+  useEffect(() => {
+    const handleIconChange = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setAppIcon(customEvent.detail || null);
+    };
+
+    window.addEventListener('musica_icon_changed', handleIconChange);
+    return () => window.removeEventListener('musica_icon_changed', handleIconChange);
+  }, []);
 
   const navItems = [
     { id: 'home', label: 'Inicio', icon: Home },
@@ -51,15 +61,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => setCurrentTab('home')}
           className="flex items-center gap-3 cursor-pointer group"
         >
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-green-400 to-teal-300 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-all">
-            <Disc3 className="w-6 h-6 text-black animate-spin" style={{ animationDuration: '8s' }} />
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-green-400 to-teal-300 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-all overflow-hidden">
+            {appIcon ? (
+              <img src={appIcon} alt="App Icon" className="w-full h-full object-cover" />
+            ) : (
+              <Disc3 className="w-6 h-6 text-black animate-spin" style={{ animationDuration: '8s' }} />
+            )}
           </div>
           <div>
             <span className="font-extrabold tracking-wider text-xl text-white block">
-              FreelyMusic
-            </span>
-            <span className="text-[10px] tracking-widest text-emerald-400 font-bold uppercase block -mt-1">
-              Cloud Audio
+              Música
             </span>
           </div>
         </div>
@@ -85,18 +96,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-150 ${
                 isActive
-                  ? 'bg-neutral-800/90 text-white shadow-inner font-bold'
+                  ? 'bg-neutral-800/90 text-white font-bold shadow-sm'
                   : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60'
               }`}
             >
-              <div className="flex items-center gap-3">
-                <Icon className={`w-5 h-5 ${isActive ? 'text-emerald-400' : 'text-neutral-400'}`} />
+              <div className="flex items-center gap-3.5">
+                <Icon
+                  className={`w-5 h-5 ${
+                    isActive ? 'text-emerald-400' : 'text-neutral-400 group-hover:text-white'
+                  }`}
+                />
                 <span>{item.label}</span>
               </div>
-              {item.badge !== null && (
-                <span className="text-[11px] bg-neutral-800 text-emerald-400 px-2 py-0.5 rounded-full font-bold">
+              {item.badge && (
+                <span className="text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
                   {item.badge}
                 </span>
               )}
@@ -104,30 +119,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })}
 
-        {/* Apple Music Style Lyrics trigger */}
-        <button
-          onClick={() => setShowLyricsView(true)}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-sm text-neutral-400 hover:text-emerald-300 hover:bg-neutral-900/60 transition-all"
-        >
-          <Mic2 className="w-5 h-5 text-emerald-400" />
-          <span>Letras Sincronizadas</span>
-        </button>
-
-        {/* Admin Panel (Admin-Only) */}
         {isAdmin && (
           <button
             onClick={() => setCurrentTab('admin')}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-150 ${
               currentTab === 'admin'
-                ? 'bg-emerald-950/50 border border-emerald-500/30 text-emerald-400'
-                : 'text-neutral-400 hover:text-emerald-300 hover:bg-neutral-900/60'
+                ? 'bg-emerald-950/60 text-emerald-300 font-bold border border-emerald-500/30'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60'
             }`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3.5">
               <ShieldAlert className="w-5 h-5 text-emerald-400" />
               <span>Panel Admin</span>
             </div>
-            <span className="text-[9px] uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded font-black">
+            <span className="text-[9px] uppercase tracking-wider font-black bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">
               ADMIN
             </span>
           </button>
@@ -189,6 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           onClick={onOpenProfileSwitcher}
           className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-neutral-900 transition-colors text-left group"
+          title="Abrir Perfil y Ajustes"
         >
           <img
             src={currentUser.avatarUrl}
@@ -205,9 +211,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </div>
             <span className="text-[10px] text-neutral-500 block truncate">
-              @{currentUser.username} • {currentUser.role === 'admin' ? 'Administrador' : 'Miembro'}
+              Ajustes y Perfiles
             </span>
           </div>
+          <Settings className="w-4 h-4 text-neutral-500 group-hover:text-white transition-colors flex-shrink-0" />
         </button>
       </div>
     </aside>
