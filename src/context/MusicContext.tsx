@@ -84,34 +84,23 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Sync catalog from Firestore & setup listener
   useEffect(() => {
-    const localSongs = getStoredCatalog();
-    syncCatalogFromFirestore().then(async (cloudSongs) => {
-      if (cloudSongs && cloudSongs.length > 0) {
-        // Upload any songs from local that are not yet in Firestore (recovering user's previous uploads!)
-        const cloudIds = new Set(cloudSongs.map((s) => s.id));
-        const missingInCloud = localSongs.filter((s) => !cloudIds.has(s.id));
-
-        if (missingInCloud.length > 0) {
-          for (const s of missingInCloud) {
-            await saveSongToFirestore(s);
-          }
-        }
-
-        const merged = [...cloudSongs, ...missingInCloud];
-        setCatalog(merged);
-        saveStoredCatalog(merged);
-      } else if (localSongs.length > 0) {
-        // First cloud sync: push all local songs to Firestore
-        for (const s of localSongs) {
-          await saveSongToFirestore(s);
-        }
+    syncCatalogFromFirestore().then((cloudSongs) => {
+      if (cloudSongs !== null) {
+        const cleaned = cloudSongs.filter(
+          (s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3'
+        );
+        setCatalog(cleaned);
+        saveStoredCatalog(cleaned);
       }
     });
 
     const unsubscribe = subscribeToCatalogUpdates((updatedCatalog) => {
-      if (updatedCatalog && updatedCatalog.length > 0) {
-        setCatalog(updatedCatalog);
-        saveStoredCatalog(updatedCatalog);
+      if (updatedCatalog !== null) {
+        const cleaned = updatedCatalog.filter(
+          (s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3'
+        );
+        setCatalog(cleaned);
+        saveStoredCatalog(cleaned);
       }
     });
 

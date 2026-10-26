@@ -24,6 +24,7 @@ import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
 import { getCustomAppIcon } from '../utils/appIcon';
 import { Playlist, Album } from '../types';
+import { DEFAULT_AVATAR } from '../services/storage';
 
 interface SidebarProps {
   currentTab: string;
@@ -395,7 +396,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title="Ajustes, preferencias y perfiles"
         >
           <img
-            src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'}
+            src={currentUser?.avatarUrl || DEFAULT_AVATAR}
             alt={currentUser?.displayName || 'Usuario'}
             className="w-8 h-8 rounded-xl object-cover ring-2 ring-emerald-500/30 flex-shrink-0"
           />

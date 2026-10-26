@@ -47,27 +47,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const localProfiles = getStoredProfiles();
     syncProfilesFromFirestore().then(async (cloudProfiles) => {
       if (cloudProfiles && cloudProfiles.length > 0) {
-        // Merge with local profiles in case local has updated avatar or pin that hadn't reached cloud
-        const cloudMap = new Map(cloudProfiles.map((p) => [p.id, p]));
-        const merged = localProfiles.map((lp) => {
-          const cp = cloudMap.get(lp.id);
-          if (!cp) return lp;
-          const avatarUrl = lp.avatarUrl?.startsWith('data:') ? lp.avatarUrl : cp.avatarUrl;
-          const pin = lp.pin || cp.pin || (lp.id === 'camilo-admin' ? '2410' : undefined);
-          return { ...cp, ...lp, avatarUrl, pin };
-        });
-
-        cloudProfiles.forEach((cp) => {
-          if (!localProfiles.some((lp) => lp.id === cp.id)) {
-            merged.push(cp);
-          }
-        });
-
-        setAllUsers(merged);
-        saveStoredProfiles(merged);
-        for (const p of merged) {
-          await saveProfileToFirestore(p);
-        }
+        setAllUsers(cloudProfiles);
+        saveStoredProfiles(cloudProfiles);
       } else {
         // First time initializing Firestore database with profiles
         for (const p of localProfiles) {

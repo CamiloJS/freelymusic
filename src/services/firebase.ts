@@ -152,9 +152,7 @@ export function subscribeToProfilesUpdates(onUpdate: (profiles: UserProfile[]) =
     const unsubscribe = onSnapshot(collection(db, ...BASE_PATH, 'profiles'), (snapshot) => {
       const profiles: UserProfile[] = [];
       snapshot.forEach((d) => profiles.push(d.data() as UserProfile));
-      if (profiles.length > 0) {
-        onUpdate(profiles);
-      }
+      onUpdate(profiles);
     });
     return unsubscribe;
   } catch {
@@ -196,9 +194,7 @@ export function subscribeToCatalogUpdates(onUpdate: (songs: Song[]) => void): ((
     const unsubscribe = onSnapshot(collection(db, ...BASE_PATH, 'catalog'), (snapshot) => {
       const songs: Song[] = [];
       snapshot.forEach((d) => songs.push(d.data() as Song));
-      if (songs.length > 0) {
-        onUpdate(songs);
-      }
+      onUpdate(songs);
     });
     return unsubscribe;
   } catch {

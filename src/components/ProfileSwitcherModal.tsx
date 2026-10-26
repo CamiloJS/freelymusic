@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { UserProfile } from '../types';
 import { compressImage } from '../utils/imageCompressor';
+import { DEFAULT_AVATAR } from '../services/storage';
 import {
   getCustomAppIcon,
   setCustomAppIcon,
@@ -378,7 +379,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
               {/* Avatar Uploader */}
               <div className="flex items-center gap-5 p-4 bg-neutral-950 rounded-2xl border border-neutral-800">
                 <img
-                  src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'}
+                  src={currentUser?.avatarUrl || DEFAULT_AVATAR}
                   alt={currentUser?.displayName || 'Usuario'}
                   className="w-20 h-20 rounded-2xl object-cover ring-2 ring-emerald-500/50 shadow-lg"
                 />

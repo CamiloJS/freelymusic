@@ -20,6 +20,7 @@ import { AdminView } from './views/AdminView';
 import { AddMusicView } from './views/AddMusicView';
 import { Playlist, Song, Album } from './types';
 import { getCustomAppIcon, applyAppIcon } from './utils/appIcon';
+import { DEFAULT_AVATAR } from './services/storage';
 import {
   Compass,
   Home,
@@ -46,14 +47,9 @@ const MainLayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
-  const { currentUser, isAdmin, isAuthenticated } = useAuth();
+  const { currentUser, isAdmin } = useAuth();
   const { downloadingState } = useMusic();
   const { isCenterLyricsOpen, setIsCenterLyricsOpen, currentSong } = useAudio();
-
-  // If session is not authenticated on this device/browser, require profile selection & login
-  if (!isAuthenticated) {
-    return <LoginLockScreen />;
-  }
 
   // Listen to network status & initialize custom app icon
   useEffect(() => {
@@ -155,7 +151,7 @@ const MainLayout: React.FC = () => {
             title="Abrir preferencias, cuenta y ajustes"
           >
             <img
-              src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'}
+              src={currentUser?.avatarUrl || DEFAULT_AVATAR}
               alt={currentUser?.displayName || 'Usuario'}
               className="w-7 h-7 rounded-full object-cover ring-1 ring-emerald-500/40"
             />
@@ -355,12 +351,20 @@ const MainLayout: React.FC = () => {
   );
 };
 
+const AuthenticatedApp: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
+    return <LoginLockScreen />;
+  }
+  return <MainLayout />;
+};
+
 export function App() {
   return (
     <AuthProvider>
       <MusicProvider>
         <AudioProvider>
-          <MainLayout />
+          <AuthenticatedApp />
         </AudioProvider>
       </MusicProvider>
     </AuthProvider>

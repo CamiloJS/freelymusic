@@ -170,6 +170,10 @@ export async function downloadPlaylistAsZip(
   if (onProgress) onProgress(100, '¡Descarga completada!');
 }
 
+import { CAMILO_SAVED_AVATAR } from './camiloAvatar';
+
+export const DEFAULT_AVATAR = CAMILO_SAVED_AVATAR;
+
 // LocalStorage Keys
 const KEYS = {
   CATALOG: 'sonora_cloud_catalog',
@@ -181,99 +185,38 @@ const KEYS = {
   FIREBASE_CONFIG: 'sonora_firebase_config',
 };
 
-// Default seed data for initial setup
+// Default seed data for initial setup (uses Camilo's real uploaded photo)
 export const INITIAL_PROFILES: UserProfile[] = [
   {
     id: 'camilo-admin',
     username: 'camilo',
     displayName: 'Camilo Jaimes',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+    avatarUrl: CAMILO_SAVED_AVATAR,
     role: 'admin',
     pin: '2410',
-    createdAt: new Date().toISOString(),
+    createdAt: '2026-10-26T17:05:53.257Z',
   },
 ];
 
-export const INITIAL_CATALOG: Song[] = [
-  {
-    id: 'track-1',
-    title: 'Starboy (Electronic Chill)',
-    artist: 'Cyber Sound',
-    album: 'Neon Horizon',
-    coverUrl: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80',
-    audioUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3',
-    duration: 147,
-    genre: 'Synthwave / Lofi',
-    year: '2024',
-    addedBy: 'camilo-admin',
-    createdAt: new Date().toISOString(),
-    lyricsLrc: `[00:00.00] Sonora - Audio Stream
-[00:05.50] Siente el ritmo bajo las luces de neón
-[00:15.20] La música fluye en la nube personal
-[00:26.80] Cada nota conecta tu espacio privado
-[00:40.10] Sonora reproduce en alta definición
-[00:54.30] Guardado sin conexión para cualquier lugar
-[01:12.00] Siempre disponible, siempre tuyo
-[01:30.00] Fin de la transmisión`,
-  },
-  {
-    id: 'track-2',
-    title: 'Midnight City Lights',
-    artist: 'Luna Groove',
-    album: 'Nocturnal Vibes',
-    coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
-    audioUrl: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=spirit-blossom-15285.mp3',
-    duration: 172,
-    genre: 'Chillhop',
-    year: '2024',
-    addedBy: 'camilo-admin',
-    createdAt: new Date().toISOString(),
-    lyricsLrc: `[00:00.00] Luna Groove - Midnight City Lights
-[00:10.00] Caminando por la ciudad a medianoche
-[00:22.50] Los reflejos dorados en el asfalto mojado
-[00:35.00] Tu biblioteca personalizada te acompaña
-[00:50.00] Descarga en tu celular y escucha sin límites
-[01:15.00] El sonido perfecto para descansar
-[01:35.00] Sonora - Tu música en todo momento`,
-  },
-  {
-    id: 'track-3',
-    title: 'Retrowave Sunset Drive',
-    artist: 'VaporPulse',
-    album: 'Outrun 80s',
-    coverUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=600&q=80',
-    audioUrl: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3?filename=electronic-future-beats-117997.mp3',
-    duration: 165,
-    genre: 'Retrowave',
-    year: '2024',
-    addedBy: 'camilo-admin',
-    createdAt: new Date().toISOString(),
-    lyricsLrc: `[00:00.00] VaporPulse - Sunset Drive
-[00:08.00] Acelerando hacia el atardecer púrpura
-[00:18.00] Los sintetizadores despiertan la nostalgia
-[00:32.00] Canciones añadidas por link a la nube
-[00:48.00] Crea tus playlists favoritas con carátula personalizada
-[01:05.00] Sonido envolvente con letras sincronizadas
-[01:25.00] Sonora Music Platform`,
-  }
-];
+export const INITIAL_CATALOG: Song[] = [];
 
 // LocalStorage Handlers
 export function getStoredCatalog(): Song[] {
   try {
     const raw = localStorage.getItem(KEYS.CATALOG);
     if (!raw) {
-      localStorage.setItem(KEYS.CATALOG, JSON.stringify(INITIAL_CATALOG));
-      return INITIAL_CATALOG;
+      return [];
     }
-    return JSON.parse(raw);
+    const parsed: Song[] = JSON.parse(raw);
+    return parsed.filter((s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3');
   } catch {
-    return INITIAL_CATALOG;
+    return [];
   }
 }
 
 export function saveStoredCatalog(songs: Song[]): void {
-  localStorage.setItem(KEYS.CATALOG, JSON.stringify(songs));
+  const cleaned = songs.filter((s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3');
+  localStorage.setItem(KEYS.CATALOG, JSON.stringify(cleaned));
 }
 
 export function getStoredProfiles(): UserProfile[] {
@@ -283,7 +226,14 @@ export function getStoredProfiles(): UserProfile[] {
       localStorage.setItem(KEYS.PROFILES, JSON.stringify(INITIAL_PROFILES));
       return INITIAL_PROFILES;
     }
-    return JSON.parse(raw);
+    const parsed: UserProfile[] = JSON.parse(raw);
+    return parsed.map((p) => {
+      // If profile had the unwanted lady photo, replace with Camilo's real avatar
+      if (!p.avatarUrl || p.avatarUrl.includes('photo-1534528741775-53994a69daeb')) {
+        return { ...p, avatarUrl: CAMILO_SAVED_AVATAR };
+      }
+      return p;
+    });
   } catch {
     return INITIAL_PROFILES;
   }
