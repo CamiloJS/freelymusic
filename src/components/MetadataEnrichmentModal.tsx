@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
 import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
@@ -42,6 +42,21 @@ export const MetadataEnrichmentModal: React.FC<MetadataEnrichmentModalProps> = (
     () => catalog.filter((song) => songNeedsEnrichment(song)),
     [catalog]
   );
+
+  useEffect(() => {
+    if (isOpen) {
+      setEntries((previous) =>
+        previous.length > 0
+          ? previous
+          : pendingSongs.map((song) => ({ song }))
+      );
+    } else {
+      cancelledRef.current = true;
+      setEntries([]);
+      setRunning(false);
+      setAnalyzingId(null);
+    }
+  }, [isOpen, pendingSongs]);
 
   if (!isOpen) return null;
 
