@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
-import { Song } from '../types';
+import { Song, Album } from '../types';
 import { formatTime } from '../utils/lyrics';
+import { getAlbumsFromCatalog } from '../utils/albums';
+import { ArtistLinks } from '../components/ArtistLinks';
 import {
   getRecentSearches,
   saveRecentSearch,
@@ -30,6 +32,8 @@ import {
 interface CloudSearchViewProps {
   onOpenAddToPlaylist: (song: Song) => void;
   onOpenAddMusic?: () => void;
+  onSelectArtist?: (artistName: string) => void;
+  onSelectAlbum?: (album: Album) => void;
 }
 
 interface AutocompleteItem {
@@ -58,6 +62,8 @@ function findMatchingLyricSnippet(song: Song, query: string): string | null {
 export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
   onOpenAddToPlaylist,
   onOpenAddMusic,
+  onSelectArtist,
+  onSelectAlbum,
 }) => {
   const {
     catalog,
@@ -506,24 +512,10 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-1 text-xs text-neutral-400 truncate mt-0.5">
-                          {song.artist.split(',').map((art, aIdx, arr) => {
-                            const trimmed = art.trim();
-                            return (
-                              <React.Fragment key={aIdx}>
-                                <span
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleSelectQuery(trimmed);
-                                  }}
-                                  className="hover:text-emerald-400 hover:underline cursor-pointer"
-                                  title={`Ver todas las canciones y colaboraciones de ${trimmed}`}
-                                >
-                                  {trimmed}
-                                </span>
-                                {aIdx < arr.length - 1 && <span>,</span>}
-                              </React.Fragment>
-                            );
-                          })}
+                          <ArtistLinks
+                            artists={song.artist}
+                            onSelectArtist={onSelectArtist || handleSelectQuery}
+                          />
                           {song.year ? <span>• {song.year}</span> : ''}
                         </div>
 
@@ -538,9 +530,27 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
 
                     {/* Right: Album, Duration, Actions */}
                     <div className="flex items-center gap-6 md:gap-12 flex-shrink-0 pr-2">
-                      <span className="hidden md:inline text-xs text-neutral-400 max-w-[140px] truncate">
-                        {song.album || '—'}
-                      </span>
+                      {song.album && song.album.trim().toLowerCase() !== 'sencillo' ? (
+                        <span
+                          onClick={(e) => {
+                            if (onSelectAlbum) {
+                              e.stopPropagation();
+                              const targetAlbum = getAlbumsFromCatalog(catalog).find(
+                                (a) => a.name.trim().toLowerCase() === song.album.trim().toLowerCase()
+                              );
+                              if (targetAlbum) onSelectAlbum(targetAlbum);
+                            }
+                          }}
+                          className="hidden md:inline text-xs text-neutral-400 max-w-[140px] truncate hover:underline hover:text-white cursor-pointer"
+                          title={`Abrir álbum ${song.album}`}
+                        >
+                          {song.album}
+                        </span>
+                      ) : (
+                        <span className="hidden md:inline text-xs text-neutral-400 max-w-[140px] truncate">
+                          {song.album || '—'}
+                        </span>
+                      )}
 
                       <span className="text-xs font-mono text-neutral-400">
                         {formatTime(song.duration)}

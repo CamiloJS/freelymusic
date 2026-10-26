@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { Song, UserProfile, UserLibraryData, FirebaseConfigOptions, Playlist } from '../types';
+import { Song, UserProfile, UserLibraryData, FirebaseConfigOptions, Playlist, ArtistProfile } from '../types';
 
 const DB_NAME = 'sonora-audio-cache';
 const DB_VERSION = 1;
@@ -183,6 +183,7 @@ const KEYS = {
   RECENT_SEARCHES: 'sonora_recent_searches',
   USER_DATA_PREFIX: 'sonora_userdata_',
   FIREBASE_CONFIG: 'sonora_firebase_config',
+  ARTIST_PROFILES: 'sonora_artist_profiles',
 };
 
 // Default seed data for initial setup (uses Camilo's real uploaded photo)
@@ -314,6 +315,40 @@ export function getStoredUserData(userId: string): UserLibraryData {
 
 export function saveStoredUserData(userId: string, data: UserLibraryData): void {
   localStorage.setItem(`${KEYS.USER_DATA_PREFIX}${userId}`, JSON.stringify(data));
+}
+
+// Artist Profiles storage
+export function getStoredArtistProfiles(): ArtistProfile[] {
+  try {
+    const raw = localStorage.getItem(KEYS.ARTIST_PROFILES);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredArtistProfiles(artists: ArtistProfile[]): void {
+  localStorage.setItem(KEYS.ARTIST_PROFILES, JSON.stringify(artists));
+}
+
+export function getStoredArtistProfile(artistName: string): ArtistProfile | null {
+  const norm = artistName.trim().toLowerCase();
+  const list = getStoredArtistProfiles();
+  return list.find((a) => a.id === norm || a.name.trim().toLowerCase() === norm) || null;
+}
+
+export function saveStoredArtistProfile(artist: ArtistProfile): void {
+  const list = getStoredArtistProfiles();
+  const norm = artist.id || artist.name.trim().toLowerCase();
+  const updatedArtist: ArtistProfile = {
+    ...artist,
+    id: norm,
+    updatedAt: new Date().toISOString(),
+  };
+  const filtered = list.filter((a) => a.id !== norm);
+  const updatedList = [...filtered, updatedArtist];
+  saveStoredArtistProfiles(updatedList);
 }
 
 export function getStoredFirebaseConfig(): FirebaseConfigOptions | null {

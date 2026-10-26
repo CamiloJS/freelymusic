@@ -19,6 +19,7 @@ import { LibraryView } from './views/LibraryView';
 import { OfflineView } from './views/OfflineView';
 import { AdminView } from './views/AdminView';
 import { AddMusicView } from './views/AddMusicView';
+import { ArtistProfileView } from './views/ArtistProfileView';
 import { Playlist, Song, Album } from './types';
 import { getCustomAppIcon, applyAppIcon } from './utils/appIcon';
 import { DEFAULT_AVATAR } from './services/storage';
@@ -42,6 +43,7 @@ import {
 const MainLayout: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('home');
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | 'favorites' | Album | null>(null);
+  const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [songToAddToPlaylist, setSongToAddToPlaylist] = useState<Song | null>(null);
   const [isProfileSwitcherOpen, setIsProfileSwitcherOpen] = useState(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
@@ -78,6 +80,18 @@ const MainLayout: React.FC = () => {
 
   const handleSelectPlaylist = (playlist: Playlist | 'favorites' | Album) => {
     setSelectedPlaylist(playlist);
+    setCurrentTab('library');
+    setIsCenterLyricsOpen(false);
+  };
+
+  const handleSelectArtist = (artistName: string) => {
+    setSelectedArtist(artistName);
+    setCurrentTab('artist');
+    setIsCenterLyricsOpen(false);
+  };
+
+  const handleSelectAlbum = (album: Album) => {
+    setSelectedPlaylist(album);
     setCurrentTab('library');
     setIsCenterLyricsOpen(false);
   };
@@ -281,6 +295,7 @@ const MainLayout: React.FC = () => {
                   }}
                   onSelectPlaylist={handleSelectPlaylist}
                   onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                  onSelectArtist={handleSelectArtist}
                 />
               )}
 
@@ -288,6 +303,8 @@ const MainLayout: React.FC = () => {
                 <CloudSearchView
                   onOpenAddToPlaylist={handleOpenAddToPlaylist}
                   onOpenAddMusic={() => setCurrentTab('add-music')}
+                  onSelectArtist={handleSelectArtist}
+                  onSelectAlbum={handleSelectAlbum}
                 />
               )}
 
@@ -301,6 +318,16 @@ const MainLayout: React.FC = () => {
                   setSelectedPlaylist={setSelectedPlaylist}
                   onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
                   onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                  onSelectArtist={handleSelectArtist}
+                />
+              )}
+
+              {currentTab === 'artist' && selectedArtist && (
+                <ArtistProfileView
+                  artistName={selectedArtist}
+                  onSelectArtist={handleSelectArtist}
+                  onSelectAlbum={handleSelectAlbum}
+                  onOpenAddToPlaylist={handleOpenAddToPlaylist}
                 />
               )}
 
@@ -313,15 +340,18 @@ const MainLayout: React.FC = () => {
 
         {/* Right Column: Spotify Right Panel (Now Playing & Queue - Spotify Images 4 & 5) */}
         <div className="hidden lg:flex flex-shrink-0 h-full">
-          <SpotifyRightPanel />
+          <SpotifyRightPanel
+            onSelectArtist={handleSelectArtist}
+            onSelectAlbum={handleSelectAlbum}
+          />
         </div>
       </div>
 
       {/* Spotify Bottom Player Bar */}
-      <PlayerBar />
+      <PlayerBar onSelectArtist={handleSelectArtist} />
 
       {/* Fullscreen Now Playing View Modal (Bottom right expand button) */}
-      <FullscreenNowPlayingModal />
+      <FullscreenNowPlayingModal onSelectArtist={handleSelectArtist} />
 
       {/* PWA Install Banner */}
       <InstallPrompt />

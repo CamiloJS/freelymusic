@@ -23,12 +23,14 @@ import { useAudio } from '../context/AudioContext';
 import { Playlist, Song, Album } from '../types';
 import { formatTime } from '../utils/lyrics';
 import { getAlbumsFromCatalog } from '../utils/albums';
+import { ArtistLinks } from '../components/ArtistLinks';
 
 interface LibraryViewProps {
   selectedPlaylist: Playlist | 'favorites' | Album | null;
   setSelectedPlaylist: (playlist: Playlist | 'favorites' | Album | null) => void;
   onOpenCreatePlaylist: () => void;
   onOpenAddToPlaylist: (song: Song) => void;
+  onSelectArtist?: (artistName: string) => void;
 }
 
 export const LibraryView: React.FC<LibraryViewProps> = ({
@@ -36,6 +38,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   setSelectedPlaylist,
   onOpenCreatePlaylist,
   onOpenAddToPlaylist,
+  onSelectArtist,
 }) => {
   const { currentUser } = useAuth();
   const {
@@ -49,6 +52,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     isDownloaded,
     toggleDownloadSong,
     downloadFullPlaylistZip,
+    getUserSongPlayCount,
   } = useMusic();
 
   const { playSong, currentSong, isPlaying, togglePlayPause, isShuffle, toggleShuffle } = useAudio();
@@ -314,7 +318,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             <div className="grid grid-cols-12 gap-4 px-4 py-2 text-[11px] font-black uppercase tracking-wider text-neutral-400 border-b border-neutral-900">
               <span className="col-span-1 text-center">#</span>
               <span className="col-span-5 md:col-span-6">Título</span>
-              <span className="col-span-4 md:col-span-4 hidden sm:block">Álbum</span>
+              <span className="col-span-4 md:col-span-4 hidden sm:block">
+                {isAlbum ? 'Reproducciones' : 'Álbum'}
+              </span>
               <span className="col-span-6 sm:col-span-2 md:col-span-1 text-right flex justify-end">
                 <Clock className="w-4 h-4" />
               </span>
@@ -334,6 +340,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   const isCurrent = currentSong?.id === song.id;
                   const downloaded = isDownloaded(song.id);
                   const liked = isFavorite(song.id);
+                  const playCount = getUserSongPlayCount(song.id);
 
                   return (
                     <div
@@ -386,14 +393,43 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                             </span>
                           </div>
                           <span className="block text-xs text-neutral-400 truncate mt-0.5">
-                            {song.artist}
+                            <ArtistLinks artists={song.artist} onSelectArtist={onSelectArtist} />
                           </span>
                         </div>
                       </div>
 
-                      {/* Album */}
+                      {/* Album / Reproducciones */}
                       <div className="col-span-4 md:col-span-4 hidden sm:block truncate text-xs text-neutral-400">
-                        {song.album}
+                        {isAlbum ? (
+                          <span
+                            className="font-medium text-neutral-300"
+                            title="Tus reproducciones para esta pista"
+                          >
+                            {playCount > 0
+                              ? `${playCount} ${playCount === 1 ? 'reproducción' : 'reproducciones'}`
+                              : '0 reproducciones'}
+                          </span>
+                        ) : (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const targetAlbum = albums.find(
+                                (a) => a.name.trim().toLowerCase() === song.album?.trim().toLowerCase()
+                              );
+                              if (targetAlbum) {
+                                setSelectedPlaylist(targetAlbum);
+                              }
+                            }}
+                            className={
+                              song.album && song.album.trim().toLowerCase() !== 'sencillo'
+                                ? 'hover:underline hover:text-white cursor-pointer'
+                                : ''
+                            }
+                            title={song.album ? `Abrir álbum ${song.album}` : undefined}
+                          >
+                            {song.album || 'Sencillo'}
+                          </span>
+                        )}
                       </div>
 
                       {/* Actions & Duration */}

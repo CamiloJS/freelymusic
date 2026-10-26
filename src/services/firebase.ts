@@ -11,7 +11,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, Auth } from 'firebase/auth';
-import { Song, UserProfile, UserLibraryData, FirebaseConfigOptions } from '../types';
+import { Song, UserProfile, UserLibraryData, FirebaseConfigOptions, ArtistProfile } from '../types';
 import { getStoredFirebaseConfig } from './storage';
 
 export const DEFAULT_FIREBASE_CONFIG: FirebaseConfigOptions = {
@@ -266,6 +266,51 @@ export function subscribeToGlobalSettingsUpdates(
       if (snap.exists()) {
         onUpdate(snap.data() as GlobalAppSettings);
       }
+    });
+    return unsubscribe;
+  } catch {
+    return null;
+  }
+}
+
+// Artist Profiles Firestore Operations
+export async function syncArtistProfilesFromFirestore(): Promise<ArtistProfile[] | null> {
+  if (!db) return null;
+  try {
+    await ensureAuth();
+    const snapshot = await getDocs(collection(db, ...BASE_PATH, 'artists'));
+    const artists: ArtistProfile[] = [];
+    snapshot.forEach((d) => {
+      artists.push(d.data() as ArtistProfile);
+    });
+    return artists;
+  } catch (err) {
+    console.warn('Error fetching artist profiles from Firestore:', err);
+    return null;
+  }
+}
+
+export async function saveArtistProfileToFirestore(artist: ArtistProfile): Promise<void> {
+  if (!db) return;
+  try {
+    await ensureAuth();
+    const artistId = artist.id || artist.name.trim().toLowerCase();
+    await setDoc(doc(db, ...BASE_PATH, 'artists', artistId), { ...artist, id: artistId }, { merge: true });
+  } catch (err) {
+    console.warn('Error saving artist profile to Firestore:', err);
+  }
+}
+
+export function subscribeToArtistProfilesUpdates(
+  onUpdate: (artists: ArtistProfile[]) => void
+): (() => void) | null {
+  if (!db) return null;
+  try {
+    ensureAuth();
+    const unsubscribe = onSnapshot(collection(db, ...BASE_PATH, 'artists'), (snapshot) => {
+      const artists: ArtistProfile[] = [];
+      snapshot.forEach((d) => artists.push(d.data() as ArtistProfile));
+      onUpdate(artists);
     });
     return unsubscribe;
   } catch {

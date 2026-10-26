@@ -18,8 +18,13 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
+import { ArtistLinks } from './ArtistLinks';
 
-export const PlayerBar: React.FC = () => {
+interface PlayerBarProps {
+  onSelectArtist?: (artistName: string) => void;
+}
+
+export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
   const {
     currentSong,
     isPlaying,
@@ -136,7 +141,7 @@ export const PlayerBar: React.FC = () => {
             )}
           </div>
           <span className="text-xs text-neutral-400 truncate block">
-            {currentSong.artist}
+            <ArtistLinks artists={currentSong.artist} onSelectArtist={onSelectArtist} />
           </span>
         </div>
 

@@ -16,8 +16,15 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
+import { ArtistLinks } from './ArtistLinks';
 
-export const FullscreenNowPlayingModal: React.FC = () => {
+interface FullscreenNowPlayingModalProps {
+  onSelectArtist?: (artistName: string) => void;
+}
+
+export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps> = ({
+  onSelectArtist,
+}) => {
   const {
     currentSong,
     isPlaying,
@@ -89,7 +96,13 @@ export const FullscreenNowPlayingModal: React.FC = () => {
               {currentSong.title}
             </h1>
             <p className="text-lg md:text-xl text-neutral-400 font-medium mt-1">
-              {currentSong.artist}
+              <ArtistLinks
+                artists={currentSong.artist}
+                onSelectArtist={(name) => {
+                  setIsFullscreenNowPlaying(false);
+                  if (onSelectArtist) onSelectArtist(name);
+                }}
+              />
             </p>
             <p className="text-xs text-neutral-500 mt-0.5">
               {currentSong.album} • {currentSong.year || '2026'}

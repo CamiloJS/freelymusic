@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Song, Playlist, UserLibraryData } from '../types';
+import { Song, Playlist, UserLibraryData, ArtistProfile, PlayEvent } from '../types';
 import { useAuth } from './AuthContext';
 import {
   getStoredCatalog,
@@ -8,6 +8,9 @@ import {
   saveStoredUserData,
   getStoredDeletedSongIds,
   addStoredDeletedSongId,
+  getStoredArtistProfiles,
+  saveStoredArtistProfiles,
+  saveStoredArtistProfile,
   cacheSongOffline,
   deleteSongBlob,
   getAllDownloadedSongIds,
@@ -21,6 +24,9 @@ import {
   syncUserDataFromFirestore,
   saveUserDataToFirestore,
   subscribeToCatalogUpdates,
+  syncArtistProfilesFromFirestore,
+  saveArtistProfileToFirestore,
+  subscribeToArtistProfilesUpdates,
 } from '../services/firebase';
 
 export interface DownloadingState {
@@ -49,6 +55,17 @@ interface MusicContextType {
   addSongToPlaylist: (playlistId: string, songId: string) => void;
   removeSongFromPlaylist: (playlistId: string, songId: string) => void;
 
+  // Artist Profiles
+  artistProfiles: ArtistProfile[];
+  getArtistProfile: (artistName: string) => ArtistProfile | null;
+  updateArtistProfile: (artist: ArtistProfile) => Promise<void>;
+
+  // User Play Counts & Analytics
+  recordSongPlay: (songId: string) => void;
+  getUserSongPlayCount: (songId: string) => number;
+  userPlayCounts: Record<string, number>;
+  userPlayHistory: PlayEvent[];
+
   // Offline caching
   downloadedSongIds: string[];
   isDownloaded: (songId: string) => boolean;
@@ -67,8 +84,30 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { currentUser } = useAuth();
   const [catalog, setCatalog] = useState<Song[]>(() => getStoredCatalog());
   const [userData, setUserData] = useState<UserLibraryData>(() => getStoredUserData(currentUser.id));
+  const [artistProfiles, setArtistProfiles] = useState<ArtistProfile[]>(() => getStoredArtistProfiles());
   const [downloadedSongIds, setDownloadedSongIds] = useState<string[]>([]);
   const [downloadingState, setDownloadingState] = useState<DownloadingState | null>(null);
+
+  // Sync Artist Profiles from Firestore & realtime listener
+  useEffect(() => {
+    syncArtistProfilesFromFirestore().then((cloudArtists) => {
+      if (cloudArtists && cloudArtists.length > 0) {
+        setArtistProfiles(cloudArtists);
+        saveStoredArtistProfiles(cloudArtists);
+      }
+    });
+
+    const unsubscribe = subscribeToArtistProfilesUpdates((cloudArtists) => {
+      if (cloudArtists) {
+        setArtistProfiles(cloudArtists);
+        saveStoredArtistProfiles(cloudArtists);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
 
   // Refresh user data when active user changes
   useEffect(() => {
@@ -353,6 +392,71 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setTimeout(() => setDownloadingState(null), 2500);
   };
 
+  // Artist Profiles Actions
+  const getArtistProfile = useCallback(
+    (artistName: string): ArtistProfile | null => {
+      const norm = artistName.trim().toLowerCase();
+      return artistProfiles.find((a) => a.id === norm || a.name.trim().toLowerCase() === norm) || null;
+    },
+    [artistProfiles]
+  );
+
+  const updateArtistProfile = async (artist: ArtistProfile) => {
+    const norm = artist.id || artist.name.trim().toLowerCase();
+    const updated: ArtistProfile = {
+      ...artist,
+      id: norm,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setArtistProfiles((prev) => {
+      const filtered = prev.filter((a) => a.id !== norm);
+      const next = [...filtered, updated];
+      saveStoredArtistProfiles(next);
+      return next;
+    });
+
+    saveStoredArtistProfile(updated);
+    await saveArtistProfileToFirestore(updated);
+  };
+
+  // User Play Counts & Analytics Actions
+  const recordSongPlay = useCallback(
+    (songId: string) => {
+      setUserData((prev) => {
+        const currentCount = prev.playCounts?.[songId] || 0;
+        const updatedCounts = {
+          ...(prev.playCounts || {}),
+          [songId]: currentCount + 1,
+        };
+        const updatedHistory = [
+          { songId, playedAt: new Date().toISOString() },
+          ...(prev.playHistory || []).slice(0, 999),
+        ];
+
+        const updatedData: UserLibraryData = {
+          ...prev,
+          playCounts: updatedCounts,
+          playHistory: updatedHistory,
+        };
+
+        if (currentUser?.id) {
+          saveStoredUserData(currentUser.id, updatedData);
+          saveUserDataToFirestore(currentUser.id, updatedData);
+        }
+        return updatedData;
+      });
+    },
+    [currentUser?.id]
+  );
+
+  const getUserSongPlayCount = useCallback(
+    (songId: string): number => {
+      return userData?.playCounts?.[songId] || 0;
+    },
+    [userData?.playCounts]
+  );
+
   return (
     <MusicContext.Provider
       value={{
@@ -371,6 +475,13 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         deletePlaylist,
         addSongToPlaylist,
         removeSongFromPlaylist,
+        artistProfiles,
+        getArtistProfile,
+        updateArtistProfile,
+        recordSongPlay,
+        getUserSongPlayCount,
+        userPlayCounts: userData.playCounts || {},
+        userPlayHistory: userData.playHistory || [],
         downloadedSongIds,
         isDownloaded,
         toggleDownloadSong,

@@ -14,9 +14,19 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
-import { Song } from '../types';
+import { Song, Album } from '../types';
+import { getAlbumsFromCatalog } from '../utils/albums';
+import { ArtistLinks } from './ArtistLinks';
 
-export const SpotifyRightPanel: React.FC = () => {
+interface SpotifyRightPanelProps {
+  onSelectArtist?: (artistName: string) => void;
+  onSelectAlbum?: (album: Album) => void;
+}
+
+export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
+  onSelectArtist,
+  onSelectAlbum,
+}) => {
   const {
     currentSong,
     queue,
@@ -33,7 +43,7 @@ export const SpotifyRightPanel: React.FC = () => {
     activeLyricIndex,
   } = useAudio();
 
-  const { isFavorite, toggleFavorite, isDownloaded } = useMusic();
+  const { catalog, isFavorite, toggleFavorite, isDownloaded } = useMusic();
 
   if (!isRightPanelOpen || !currentSong) return null;
 
@@ -135,7 +145,7 @@ export const SpotifyRightPanel: React.FC = () => {
                   </h3>
                 </div>
                 <p className="text-xs text-neutral-400 truncate mt-0.5">
-                  {currentSong.artist}
+                  <ArtistLinks artists={currentSong.artist} onSelectArtist={onSelectArtist} />
                 </p>
               </div>
 
@@ -198,7 +208,20 @@ export const SpotifyRightPanel: React.FC = () => {
               <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 block">
                 Álbum y detalles
               </span>
-              <p className="font-bold text-white truncate">{currentSong.album}</p>
+              <p
+                onClick={() => {
+                  if (onSelectAlbum && currentSong.album) {
+                    const alb = getAlbumsFromCatalog(catalog).find(
+                      (a) => a.name.trim().toLowerCase() === currentSong.album.trim().toLowerCase()
+                    );
+                    if (alb) onSelectAlbum(alb);
+                  }
+                }}
+                className={`font-bold text-white truncate ${onSelectAlbum ? 'hover:underline cursor-pointer' : ''}`}
+                title={onSelectAlbum ? `Abrir álbum ${currentSong.album}` : undefined}
+              >
+                {currentSong.album}
+              </p>
               <p className="text-neutral-400">
                 Género: <span className="text-emerald-400 font-semibold">{currentSong.genre || 'General'}</span> • Año: {currentSong.year || '2026'}
               </p>
@@ -226,7 +249,7 @@ export const SpotifyRightPanel: React.FC = () => {
                     {currentSong.title}
                   </span>
                   <span className="text-[11px] text-neutral-400 truncate block">
-                    {currentSong.artist}
+                    <ArtistLinks artists={currentSong.artist} onSelectArtist={onSelectArtist} />
                   </span>
                 </div>
               </div>
@@ -270,7 +293,7 @@ export const SpotifyRightPanel: React.FC = () => {
                             {song.title}
                           </span>
                           <span className="text-[10px] text-neutral-400 truncate block">
-                            {song.artist}
+                            <ArtistLinks artists={song.artist} onSelectArtist={onSelectArtist} />
                           </span>
                         </div>
                       </div>

@@ -16,17 +16,20 @@ import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
 import { Song, Playlist } from '../types';
+import { ArtistLinks } from '../components/ArtistLinks';
 
 interface HomeViewProps {
   onNavigate: (tab: string) => void;
   onSelectPlaylist: (playlist: Playlist) => void;
   onOpenAddToPlaylist: (song: Song) => void;
+  onSelectArtist?: (artistName: string) => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
   onNavigate,
   onSelectPlaylist,
   onOpenAddToPlaylist,
+  onSelectArtist,
 }) => {
   const { currentUser } = useAuth();
   const { catalog, userFavoriteSongs, playlists, isFavorite, toggleFavorite } = useMusic();
@@ -168,7 +171,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     </span>
                   </div>
                   <span className="block text-xs text-neutral-400 truncate mt-0.5">
-                    {song.artist}
+                    <ArtistLinks artists={song.artist} onSelectArtist={onSelectArtist} />
                   </span>
                 </div>
 
@@ -252,7 +255,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     </h3>
                   </div>
                   <p className="text-[11px] text-neutral-400 truncate mt-0.5">
-                    {song.artist}
+                    <ArtistLinks artists={song.artist} onSelectArtist={onSelectArtist} />
                   </p>
                 </div>
               );
@@ -363,7 +366,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                         {song.title}
                       </span>
                       <span className="block text-xs text-neutral-400 truncate mt-0.5">
-                        {song.artist}
+                        <ArtistLinks artists={song.artist} onSelectArtist={onSelectArtist} />
                       </span>
                     </div>
                   </div>

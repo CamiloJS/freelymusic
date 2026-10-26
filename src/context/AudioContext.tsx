@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { Song, LyricLine } from '../types';
 import { parseLrc, getActiveLyricIndex } from '../utils/lyrics';
 import { getSongBlob } from '../services/storage';
+import { useMusic } from './MusicContext';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
@@ -50,8 +51,10 @@ interface AudioContextType {
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { recordSongPlay } = useMusic();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
+  const hasRecordedPlayRef = useRef<string | null>(null);
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [queue, setQueue] = useState<Song[]>([]);
@@ -122,10 +125,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return getActiveLyricIndex(parsedLyrics, currentTime);
   }, [parsedLyrics, currentTime]);
 
+  // Record personal play event after ~3 seconds of continuous playback
+  useEffect(() => {
+    if (currentSong && currentTime > 3 && hasRecordedPlayRef.current !== currentSong.id) {
+      hasRecordedPlayRef.current = currentSong.id;
+      recordSongPlay(currentSong.id);
+    }
+  }, [currentSong, currentTime, recordSongPlay]);
+
   // Load and play song (handling offline blob caching transparently)
   const loadAndPlaySong = useCallback(async (song: Song) => {
     const audio = audioRef.current;
     if (!audio) return;
+    hasRecordedPlayRef.current = null;
 
     // Revoke previous blob url if exists
     if (blobUrlRef.current) {

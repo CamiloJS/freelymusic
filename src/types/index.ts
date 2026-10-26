@@ -38,6 +38,15 @@ export interface Album {
   songs: Song[];
 }
 
+export interface ArtistProfile {
+  id: string; // normalized artist name, e.g. "aitana"
+  name: string;
+  avatarUrl?: string;
+  headerUrl?: string;
+  bio?: string;
+  updatedAt?: string;
+}
+
 export interface Playlist {
   id: string;
   name: string;
@@ -49,10 +58,17 @@ export interface Playlist {
   updatedAt: string;
 }
 
+export interface PlayEvent {
+  songId: string;
+  playedAt: string;
+}
+
 export interface UserLibraryData {
   favoriteSongIds: string[];
   historySongIds: string[];
   playlists: Playlist[];
+  playCounts?: Record<string, number>; // songId -> user play count
+  playHistory?: PlayEvent[]; // user play history for Top tracks / Wrapped
 }
 
 export interface LyricLine {
