@@ -28,6 +28,7 @@ interface LibraryViewProps {
   setSelectedPlaylist: (playlist: Playlist | 'favorites' | Album | null) => void;
   onOpenCreatePlaylist: () => void;
   onOpenAddToPlaylist: (song: Song) => void;
+  onOpenImportPlaylist?: () => void;
   onSelectArtist?: (artistName: string) => void;
 }
 
@@ -36,6 +37,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   setSelectedPlaylist,
   onOpenCreatePlaylist,
   onOpenAddToPlaylist,
+  onOpenImportPlaylist,
   onSelectArtist,
 }) => {
   const { currentUser } = useAuth();
@@ -470,13 +472,24 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={onOpenCreatePlaylist}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs shadow-lg transition-transform active:scale-95"
-        >
-          <Plus className="w-4 h-4 stroke-[3]" />
-          <span>Crear Playlist</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenImportPlaylist && (
+            <button
+              onClick={onOpenImportPlaylist}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-neutral-800 hover:bg-neutral-700 text-emerald-300 font-extrabold text-xs transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              <span>Importar</span>
+            </button>
+          )}
+          <button
+            onClick={onOpenCreatePlaylist}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs shadow-lg transition-transform active:scale-95"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Crear Playlist</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">

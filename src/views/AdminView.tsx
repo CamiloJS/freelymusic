@@ -24,6 +24,7 @@ import { saveStoredFirebaseConfig, getStoredFirebaseConfig } from '../services/s
 import { isFirebaseConnected } from '../services/firebase';
 import { compressImage } from '../utils/imageCompressor';
 import { SongMediaEditor, SongMediaValue, EMPTY_SONG_MEDIA } from '../components/SongMediaEditor';
+import { MetadataEnrichmentModal } from '../components/MetadataEnrichmentModal';
 
 export const AdminView: React.FC = () => {
   const { currentUser, allUsers, createProfile, deleteProfile, isAdmin } = useAuth();
@@ -79,6 +80,7 @@ export const AdminView: React.FC = () => {
   const [editTrackNumber, setEditTrackNumber] = useState<number | undefined>(undefined);
   const [editDuration, setEditDuration] = useState(180);
   const [editMedia, setEditMedia] = useState<SongMediaValue>({ ...EMPTY_SONG_MEDIA });
+  const [isEnrichmentOpen, setIsEnrichmentOpen] = useState(false);
   const editCoverFileInputRef = useRef<HTMLInputElement | null>(null);
   const editLrcFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -865,13 +867,20 @@ export const AdminView: React.FC = () => {
       {/* TAB 3: GLOBAL CATALOG LIST */}
       {activeTab === 'catalog' && (
         <div className="bg-neutral-900/40 border border-neutral-800/80 rounded-3xl p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <h3 className="font-extrabold text-white text-lg">Catálogo Global de Música</h3>
               <p className="text-xs text-neutral-400">
                 Configura cada canción, modifica sus artistas colaboradores, ajusta sus letras sincronizadas o marca si es explícita (E).
               </p>
             </div>
+            <button
+              onClick={() => setIsEnrichmentOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-extrabold"
+            >
+              <Sparkles className="w-4 h-4" />
+              Enriquecer metadatos
+            </button>
           </div>
 
           <div className="divide-y divide-neutral-800/40 max-h-[600px] overflow-y-auto">
@@ -1324,6 +1333,11 @@ export const AdminView: React.FC = () => {
           </div>
         </div>
       )}
+
+      <MetadataEnrichmentModal
+        isOpen={isEnrichmentOpen}
+        onClose={() => setIsEnrichmentOpen(false)}
+      />
     </div>
   );
 };

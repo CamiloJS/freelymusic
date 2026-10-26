@@ -18,6 +18,7 @@ import { buildDisplayLyrics, formatTime } from '../utils/lyrics';
 import { ArtistLinks } from './ArtistLinks';
 import { LyricsTranslationControls } from './LyricsTranslationControls';
 import { SongVersionSelector } from './SongVersionSelector';
+import { GlobalStatsCard } from './GlobalStatsCard';
 
 interface FullscreenNowPlayingModalProps {
   onSelectArtist?: (artistName: string) => void;
@@ -131,6 +132,14 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
                 </button>
               )}
             </div>
+
+            <GlobalStatsCard
+              type="track"
+              name={currentSong.title}
+              artist={currentSong.artist}
+              compact
+              className="pt-1"
+            />
           </div>
 
           {/* Current Live Lyric Snippet */}

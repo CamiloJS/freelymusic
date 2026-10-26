@@ -121,6 +121,22 @@ export interface UserLibraryData {
   updatedAt?: string; // last local write, used for cross-device conflict resolution
 }
 
+export interface GlobalStatsCacheEntry {
+  key: string;
+  type: 'artist' | 'track';
+  name: string;
+  artist?: string;
+  source: 'last.fm' | 'deezer';
+  listeners?: number;
+  playcount?: number;
+  fans?: number;
+  rank?: number;
+  url?: string;
+  fetchedAt: string;
+  period?: string;
+  note?: string;
+}
+
 export interface LyricsTranslation {
   id: string;
   songId: string;

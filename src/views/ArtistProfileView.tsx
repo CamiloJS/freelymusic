@@ -20,6 +20,7 @@ import { formatTime } from '../utils/lyrics';
 import { getAlbumsFromCatalog } from '../utils/albums';
 import { compressImage } from '../utils/imageCompressor';
 import { ArtistLinks } from '../components/ArtistLinks';
+import { GlobalStatsCard } from '../components/GlobalStatsCard';
 
 interface ArtistProfileViewProps {
   artistName: string;
@@ -275,6 +276,8 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
             )}
           </button>
         </div>
+
+        <GlobalStatsCard type="artist" name={artistName} />
 
         {/* Section 1: Canciones Populares / Repertorio */}
         <div className="space-y-4">

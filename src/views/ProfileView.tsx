@@ -21,6 +21,7 @@ interface ProfileViewProps {
   onSelectPlaylist: (playlist: Playlist) => void;
   onSelectArtist: (artistName: string) => void;
   onOpenCreatePlaylist: () => void;
+  onOpenImportPlaylist?: () => void;
   onNavigate: (tab: string) => void;
 }
 
@@ -39,6 +40,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onSelectPlaylist,
   onSelectArtist,
   onOpenCreatePlaylist,
+  onOpenImportPlaylist,
   onNavigate,
 }) => {
   const { currentUser } = useAuth();
@@ -347,12 +349,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <Heart className="w-5 h-5 text-emerald-400" />
             Tus playlists
           </h2>
-          <button
-            onClick={onOpenCreatePlaylist}
-            className="px-3.5 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-transform active:scale-95"
-          >
-            Crear playlist
-          </button>
+          <div className="flex items-center gap-2">
+            {onOpenImportPlaylist && (
+              <button
+                onClick={onOpenImportPlaylist}
+                className="px-3.5 py-2 rounded-full bg-neutral-800 hover:bg-neutral-700 text-emerald-300 text-xs font-extrabold transition-colors"
+              >
+                Importar
+              </button>
+            )}
+            <button
+              onClick={onOpenCreatePlaylist}
+              className="px-3.5 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-transform active:scale-95"
+            >
+              Crear playlist
+            </button>
+          </div>
         </div>
 
         {playlists.length === 0 ? (

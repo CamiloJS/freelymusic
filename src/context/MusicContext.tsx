@@ -54,6 +54,12 @@ interface MusicContextType {
 
   playlists: Playlist[];
   createPlaylist: (name: string, description?: string, coverUrl?: string) => Playlist;
+  importPlaylist: (
+    name: string,
+    description: string,
+    songIds: string[],
+    coverUrl?: string
+  ) => Playlist;
   updatePlaylist: (playlist: Playlist) => void;
   deletePlaylist: (playlistId: string) => void;
   addSongToPlaylist: (playlistId: string, songId: string) => void;
@@ -498,6 +504,38 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return newPlaylist;
   };
 
+  const importPlaylist = (
+    name: string,
+    description: string,
+    songIds: string[],
+    coverUrl?: string
+  ): Playlist => {
+    const catalogIds = new Set(catalog.map((song) => song.id));
+    const uniqueIds = Array.from(new Set(songIds.filter((id) => catalogIds.has(id))));
+    const firstSong = catalog.find((song) => song.id === uniqueIds[0]);
+
+    const newPlaylist: Playlist = {
+      id: `pl-imported-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      name: name.trim() || 'Playlist importada',
+      description: description.trim() || undefined,
+      coverUrl:
+        coverUrl ||
+        firstSong?.coverUrl ||
+        'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80',
+      userId: currentUser.id,
+      songIds: uniqueIds,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    mutateUserData((previous) => ({
+      ...previous,
+      playlists: [...previous.playlists, newPlaylist],
+    }));
+
+    return newPlaylist;
+  };
+
   const updatePlaylist = (playlist: Playlist) => {
     mutateUserData((previous) => ({
       ...previous,
@@ -708,6 +746,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         userFavoriteSongs,
         playlists: userData.playlists,
         createPlaylist,
+        importPlaylist,
         updatePlaylist,
         deletePlaylist,
         addSongToPlaylist,

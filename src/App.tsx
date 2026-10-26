@@ -52,6 +52,11 @@ const ArtistProfileView = lazy(() =>
 const ProfileView = lazy(() =>
   import('./views/ProfileView').then((module) => ({ default: module.ProfileView }))
 );
+const ImportPlaylistModal = lazy(() =>
+  import('./components/ImportPlaylistModal').then((module) => ({
+    default: module.ImportPlaylistModal,
+  }))
+);
 const CenterLyricsView = lazy(() =>
   import('./components/CenterLyricsView').then((module) => ({ default: module.CenterLyricsView }))
 );
@@ -102,6 +107,7 @@ const MainLayout: React.FC = () => {
   const [songToAddToPlaylist, setSongToAddToPlaylist] = useState<Song | null>(null);
   const [isProfileSwitcherOpen, setIsProfileSwitcherOpen] = useState(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
+  const [isImportPlaylistOpen, setIsImportPlaylistOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
@@ -408,6 +414,7 @@ const MainLayout: React.FC = () => {
                     setSelectedPlaylist={setSelectedPlaylist}
                     onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
                     onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                    onOpenImportPlaylist={() => setIsImportPlaylistOpen(true)}
                     onSelectArtist={handleSelectArtist}
                   />
                 )}
@@ -427,6 +434,7 @@ const MainLayout: React.FC = () => {
                     onSelectPlaylist={handleSelectPlaylist}
                     onSelectArtist={handleSelectArtist}
                     onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
+                    onOpenImportPlaylist={() => setIsImportPlaylistOpen(true)}
                     onNavigate={(tab) => {
                       setCurrentTab(tab);
                       if (tab !== 'library') setSelectedPlaylist(null);
@@ -500,6 +508,20 @@ const MainLayout: React.FC = () => {
           <CreatePlaylistModal
             isOpen={isCreatePlaylistOpen}
             onClose={() => setIsCreatePlaylistOpen(false)}
+          />
+        </Suspense>
+      )}
+
+      {isImportPlaylistOpen && (
+        <Suspense fallback={null}>
+          <ImportPlaylistModal
+            isOpen={isImportPlaylistOpen}
+            onClose={() => setIsImportPlaylistOpen(false)}
+            onCreated={(playlist) => {
+              setSelectedPlaylist(playlist);
+              setCurrentTab('library');
+              setIsImportPlaylistOpen(false);
+            }}
           />
         </Suspense>
       )}

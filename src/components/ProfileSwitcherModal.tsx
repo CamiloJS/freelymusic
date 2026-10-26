@@ -44,6 +44,8 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
     appName,
     setCustomAppName,
     setGlobalAppName,
+    lastfmApiKey,
+    setGlobalLastfmKey,
     globalIcons,
     uploadGlobalIcon,
     appIcon,
@@ -68,6 +70,8 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   const [nameInput, setNameInput] = useState(appName);
   const [nameSuccessMsg, setNameSuccessMsg] = useState('');
   const [iconSuccessMsg, setIconSuccessMsg] = useState('');
+  const [lastfmKeyInput, setLastfmKeyInput] = useState(lastfmApiKey);
+  const [lastfmSuccessMsg, setLastfmSuccessMsg] = useState('');
   const iconFileInputRef = useRef<HTMLInputElement | null>(null);
   const adminGlobalIconInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -81,6 +85,10 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   React.useEffect(() => {
     setNameInput(appName);
   }, [appName]);
+
+  React.useEffect(() => {
+    setLastfmKeyInput(lastfmApiKey);
+  }, [lastfmApiKey]);
 
   if (!isOpen) return null;
 
@@ -191,6 +199,16 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
     await setGlobalAppName(nameInput);
     setNameSuccessMsg('¡Nombre de aplicación guardado globalmente para todos los perfiles!');
     setTimeout(() => setNameSuccessMsg(''), 3500);
+  };
+
+  const handleSaveLastfmKey = async () => {
+    await setGlobalLastfmKey(lastfmKeyInput);
+    setLastfmSuccessMsg(
+      lastfmKeyInput.trim()
+        ? '¡Clave de Last.fm guardada! Las fichas usarán Last.fm.'
+        : 'Clave eliminada. Se usarán las estadísticas de Deezer.'
+    );
+    setTimeout(() => setLastfmSuccessMsg(''), 4500);
   };
 
   return (
@@ -615,6 +633,50 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {isAdmin && (
+                <div className="space-y-3 p-4 bg-neutral-950 rounded-2xl border border-neutral-800">
+                  <label className="block text-xs font-black uppercase tracking-wider text-emerald-400">
+                    Estadísticas globales · Last.fm (opcional)
+                  </label>
+                  <p className="text-[11px] text-neutral-400">
+                    Sin clave se usan los datos públicos de Deezer (fans y popularidad).
+                    Con una clave gratuita de Last.fm se muestran oyentes y reproducciones
+                    totales. Ninguna de las dos fuentes son los oyentes mensuales de Spotify.
+                  </p>
+
+                  {lastfmSuccessMsg && (
+                    <div className="p-2.5 bg-emerald-500/15 border border-emerald-500/25 rounded-xl text-emerald-300 text-[11px] font-bold">
+                      {lastfmSuccessMsg}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="password"
+                      value={lastfmKeyInput}
+                      onChange={(event) => setLastfmKeyInput(event.target.value)}
+                      placeholder="API key de Last.fm"
+                      className="flex-1 bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveLastfmKey}
+                      className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-extrabold transition-colors"
+                    >
+                      Guardar clave
+                    </button>
+                  </div>
+                  <a
+                    href="https://www.last.fm/api/account/create"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block text-[10px] text-emerald-400 hover:underline"
+                  >
+                    Crear una API key gratuita en Last.fm →
+                  </a>
+                </div>
+              )}
 
               {/* 4. App Icon Customization & Global Gallery */}
               <div className="space-y-4 p-4 bg-neutral-950 rounded-2xl border border-neutral-800">

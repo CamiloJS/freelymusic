@@ -22,6 +22,7 @@ import {
   FirebaseConfigOptions,
   ArtistProfile,
   LyricsTranslation,
+  GlobalStatsCacheEntry,
 } from '../types';
 import {
   getStoredFirebaseConfig,
@@ -442,6 +443,32 @@ export async function saveLyricsTranslation(
     );
   } catch (err) {
     console.warn('Error saving lyrics translation:', err);
+  }
+}
+
+// External popularity stats (Last.fm / Deezer), cached for one week.
+export async function getCachedGlobalStats(
+  cacheKey: string
+): Promise<GlobalStatsCacheEntry | null> {
+  if (!db) return null;
+  try {
+    await ensureAuth();
+    const snapshot = await getDoc(doc(db, ...BASE_PATH, 'statsCache', cacheKey));
+    if (!snapshot.exists()) return null;
+    return snapshot.data() as GlobalStatsCacheEntry;
+  } catch (err) {
+    console.warn('Error reading cached global stats:', err);
+    return null;
+  }
+}
+
+export async function saveCachedGlobalStats(entry: GlobalStatsCacheEntry): Promise<void> {
+  if (!db) return;
+  try {
+    await ensureAuth();
+    await setDoc(doc(db, ...BASE_PATH, 'statsCache', entry.key), entry, { merge: true });
+  } catch (err) {
+    console.warn('Error saving global stats cache:', err);
   }
 }
 

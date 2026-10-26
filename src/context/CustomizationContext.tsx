@@ -31,6 +31,7 @@ const THEME_STORAGE_KEY = 'musica_theme_mode';
 const ACCENT_STORAGE_KEY = 'musica_accent_color';
 const APP_NAME_STORAGE_KEY = 'musica_app_name';
 const GLOBAL_APP_NAME_KEY = 'musica_global_app_name';
+const LASTFM_KEY_STORAGE_KEY = 'musica_lastfm_api_key';
 
 interface CustomizationContextType {
   themeMode: ThemeMode;
@@ -43,6 +44,8 @@ interface CustomizationContextType {
   appName: string;
   setCustomAppName: (name: string) => void;
   setGlobalAppName: (name: string) => Promise<void>;
+  lastfmApiKey: string;
+  setGlobalLastfmKey: (key: string) => Promise<void>;
   globalIcons: string[];
   uploadGlobalIcon: (iconDataUrl: string) => Promise<void>;
   appIcon: string | null;
@@ -93,6 +96,13 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
   // 4. Global Settings from Firestore (Global App Name & Admin Icon Gallery)
   const [globalIcons, setGlobalIcons] = useState<string[]>([]);
   const [appIcon, setAppIconState] = useState<string | null>(() => getCustomAppIcon());
+  const [lastfmApiKey, setLastfmApiKey] = useState<string>(() => {
+    try {
+      return localStorage.getItem(LASTFM_KEY_STORAGE_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
 
   // Apply theme & accent to DOM
   useEffect(() => {
@@ -140,6 +150,19 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         if (!local || local === 'Música') {
           setAppName(settings.globalAppName);
+        }
+      }
+
+      if (typeof settings.lastfmApiKey === 'string') {
+        setLastfmApiKey(settings.lastfmApiKey);
+        try {
+          if (settings.lastfmApiKey) {
+            localStorage.setItem(LASTFM_KEY_STORAGE_KEY, settings.lastfmApiKey);
+          } else {
+            localStorage.removeItem(LASTFM_KEY_STORAGE_KEY);
+          }
+        } catch {
+          // ignore
         }
       }
     };
@@ -215,6 +238,22 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     await firebase.saveGlobalSettingsToFirestore({ globalAppName: clean });
   };
 
+  const setGlobalLastfmKey = async (key: string) => {
+    const clean = key.trim();
+    setLastfmApiKey(clean);
+    try {
+      if (clean) {
+        localStorage.setItem(LASTFM_KEY_STORAGE_KEY, clean);
+      } else {
+        localStorage.removeItem(LASTFM_KEY_STORAGE_KEY);
+      }
+    } catch {
+      // ignore
+    }
+    const firebase = await loadFirebaseService();
+    await firebase.saveGlobalSettingsToFirestore({ lastfmApiKey: clean });
+  };
+
   const uploadGlobalIcon = async (iconDataUrl: string) => {
     const updated = [iconDataUrl, ...globalIcons.filter((i) => i !== iconDataUrl)];
     setGlobalIcons(updated);
@@ -248,6 +287,8 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
         appName,
         setCustomAppName,
         setGlobalAppName,
+        lastfmApiKey,
+        setGlobalLastfmKey,
         globalIcons,
         uploadGlobalIcon,
         appIcon,

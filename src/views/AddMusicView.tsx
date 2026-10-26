@@ -26,6 +26,7 @@ import { useAudio } from '../context/AudioContext';
 import { parseLrc, formatTime } from '../utils/lyrics';
 import { compressImage } from '../utils/imageCompressor';
 import { SongMediaEditor, SongMediaValue, EMPTY_SONG_MEDIA } from '../components/SongMediaEditor';
+import { enrichSongMetadata } from '../services/metadataEnrichment';
 import { Song, LyricLine } from '../types';
 
 interface AddMusicViewProps {
@@ -60,7 +61,13 @@ const COMMON_GENRES = [
 
 export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   const { currentUser, isAdmin } = useAuth();
-  const { catalog, addTrackToCatalog, addMultipleTracksToCatalog, deleteCatalogTrack } = useMusic();
+  const {
+    catalog,
+    addTrackToCatalog,
+    addMultipleTracksToCatalog,
+    deleteCatalogTrack,
+    updateCatalogTrack,
+  } = useMusic();
   const { playSong, currentSong, isPlaying } = useAudio();
 
   // Mode: Single vs Album
@@ -82,6 +89,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectStatus, setDetectStatus] = useState<string | null>(null);
   const [songMedia, setSongMedia] = useState<SongMediaValue>({ ...EMPTY_SONG_MEDIA });
+  const [autoEnrich, setAutoEnrich] = useState(true);
 
   // Album Form State
   const [albumTitle, setAlbumTitle] = useState('');
@@ -389,7 +397,29 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
       });
 
       setSuccessMessage(`¡"${newSong.title}" guardada exitosamente en el repositorio en la nube!`);
-      
+
+      if (autoEnrich) {
+        void enrichSongMetadata(newSong)
+          .then((result) => {
+            if (Object.keys(result.updated).length === 0) return;
+
+            updateCatalogTrack({
+              ...newSong,
+              ...result.updated,
+              needsReview: undefined,
+              enrichmentNote: undefined,
+            });
+
+            setSuccessMessage(
+              `¡"${newSong.title}" guardada! Metadatos completados con ${result.sources.join(
+                ', '
+              ) || 'fuentes públicas'}.`
+            );
+            setTimeout(() => setSuccessMessage(''), 6000);
+          })
+          .catch((err) => console.warn('No se pudieron completar los metadatos:', err));
+      }
+
       // Stop preview audio if playing
       if (previewAudio) {
         previewAudio.pause();
@@ -869,6 +899,24 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
               </div>
 
               <SongMediaEditor value={songMedia} onChange={setSongMedia} />
+
+              <label className="flex items-start gap-2.5 rounded-xl border border-neutral-800 bg-neutral-950/60 p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoEnrich}
+                  onChange={(event) => setAutoEnrich(event.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-emerald-500 flex-shrink-0"
+                />
+                <span>
+                  <span className="block text-xs font-bold text-white">
+                    Completar metadatos y letra automáticamente
+                  </span>
+                  <span className="block text-[10px] text-neutral-500 mt-0.5">
+                    Busca carátula, álbum, año y letra LRC en MusicBrainz, iTunes y LRCLIB.
+                    Solo rellena campos vacíos y no inventa coincidencias.
+                  </span>
+                </span>
+              </label>
 
               {/* Submit Button */}
               <div className="pt-2">

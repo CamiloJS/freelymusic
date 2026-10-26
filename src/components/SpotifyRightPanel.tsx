@@ -17,6 +17,7 @@ import { Song, Album } from '../types';
 import { getAlbumsFromCatalog } from '../utils/albums';
 import { ArtistLinks } from './ArtistLinks';
 import { SongVersionSelector } from './SongVersionSelector';
+import { GlobalStatsCard } from './GlobalStatsCard';
 
 interface SpotifyRightPanelProps {
   onSelectArtist?: (artistName: string) => void;
@@ -152,6 +153,13 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
                 <div className="mt-2">
                   <SongVersionSelector compact />
                 </div>
+                <GlobalStatsCard
+                  type="track"
+                  name={currentSong.title}
+                  artist={currentSong.artist}
+                  compact
+                  className="mt-2"
+                />
               </div>
 
               <div className="flex items-center gap-1.5 flex-shrink-0">
