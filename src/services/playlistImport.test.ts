@@ -74,6 +74,13 @@ describe('playlist import matching', () => {
     expect(result.reason).toContain('Sin coincidencia');
   });
 
+  it('does not match a short artist name against an unrelated title', () => {
+    // Regression: "MØ" was normalized to "m", which was a substring of
+    // "MÚSICA EN EL CIELO" ("m" in "música") and produced a false 61% match.
+    const result = matchTrack({ title: 'Kamikaze', artist: 'MØ' }, catalog);
+    expect(result.songId).toBeUndefined();
+  });
+
   it('parses text playlists and deduplicates lines', () => {
     const tracks = parseTextPlaylist(`
       Aitana - MÚSICA EN EL CIELO

@@ -65,7 +65,12 @@ function bigrams(value: string): string[] {
 function diceCoefficient(a: string, b: string): number {
   if (!a || !b) return 0;
   if (a === b) return 1;
-  if (a.includes(b) || b.includes(a)) return 0.86;
+
+  // Never use the substring shortcut for very short strings: "m" is contained
+  // in "cumpleanos" and would otherwise produce absurd matches.
+  if (a.length >= 4 && b.length >= 4 && (a.includes(b) || b.includes(a))) {
+    return 0.85;
+  }
 
   const first = bigrams(a);
   const second = bigrams(b);
@@ -137,8 +142,8 @@ function matchOneOrientation(
       )
     : 1;
 
-  if (!track.isrc && (titleScore < 0.55 || artistScore < 0.32)) return null;
-  if (best.confidence < 0.6) return null;
+  if (!track.isrc && (titleScore < 0.62 || artistScore < 0.4)) return null;
+  if (best.confidence < 0.68) return null;
   return best;
 }
 
