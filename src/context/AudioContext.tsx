@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { Song, LyricLine } from '../types';
+import { Song, LyricLine, SongVersion } from '../types';
 import { parseLrc, getActiveLyricIndex } from '../utils/lyrics';
 import { getSongBlob } from '../services/storage';
+import { translateLyricsWithCache } from '../services/translation';
 import { useMusic } from './MusicContext';
 import { useAuth } from './AuthContext';
 
@@ -58,6 +59,34 @@ interface AudioContextType {
   isCenterLyricsOpen: boolean;
   isFullscreenNowPlaying: boolean;
 
+  // Versions, karaoke & video
+  activeVersionId: string | null;
+  activeVersionLabel: string;
+  availableVersions: SongVersion[];
+  setActiveVersion: (versionId: string | null) => void;
+  isKaraoke: boolean;
+  hasInstrumental: boolean;
+  toggleKaraoke: () => void;
+  isVideoMode: boolean;
+  videoUrl: string | null;
+  openVideo: () => void;
+  closeVideo: (seconds?: number) => void;
+
+  // Lyrics translation
+  translatedLyrics: LyricLine[];
+  lyricsDisplayMode: 'original' | 'translation' | 'both';
+  setLyricsDisplayMode: (mode: 'original' | 'translation' | 'both') => void;
+  translationLang: string;
+  setTranslationLang: (lang: string) => void;
+  translationSourceLang: string;
+  setTranslationSourceLang: (lang: string) => void;
+  translationStatus: 'idle' | 'loading' | 'error';
+  translationError: string | null;
+  translationProvider: string | null;
+  translationUpdatedAt: string | null;
+  translateCurrentLyrics: (lang?: string) => Promise<void>;
+  clearTranslation: () => void;
+
   // Actions
   playSong: (song: Song, newQueue?: Song[], source?: PlaybackSource) => void;
   togglePlayPause: () => void;
@@ -89,7 +118,7 @@ const AudioContext = createContext<AudioContextType | undefined>(undefined);
 const AudioTimeContext = createContext<AudioTimeState | undefined>(undefined);
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { recordSongPlay, isDownloaded } = useMusic();
+  const { recordSongPlay, recordListeningTime, isDownloaded } = useMusic();
   const { isAuthenticated, currentUser } = useAuth();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -114,6 +143,26 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [rightPanelTab, setRightPanelTab] = useState<'now-playing' | 'queue'>('now-playing');
   const [isCenterLyricsOpen, setIsCenterLyricsOpen] = useState<boolean>(false);
   const [isFullscreenNowPlaying, setIsFullscreenNowPlaying] = useState<boolean>(false);
+
+  // Versions / karaoke / video
+  const [activeVersionId, setActiveVersionIdState] = useState<string | null>(null);
+  const [isKaraoke, setIsKaraoke] = useState<boolean>(false);
+  const [isVideoMode, setIsVideoMode] = useState<boolean>(false);
+
+  // Lyrics translation
+  const [translatedLyrics, setTranslatedLyrics] = useState<LyricLine[]>([]);
+  const [lyricsDisplayMode, setLyricsDisplayModeState] = useState<
+    'original' | 'translation' | 'both'
+  >('original');
+  const [translationLang, setTranslationLangState] = useState<string>('es');
+  const [translationSourceLang, setTranslationSourceLangState] = useState<string>('auto');
+  const [translationStatus, setTranslationStatus] = useState<
+    'idle' | 'loading' | 'error'
+  >('idle');
+  const [translationError, setTranslationError] = useState<string | null>(null);
+  const [translationProvider, setTranslationProvider] = useState<string | null>(null);
+  const [translationUpdatedAt, setTranslationUpdatedAt] = useState<string | null>(null);
+  const translationRequestRef = useRef<number>(0);
 
   // Initialize Audio element once
   useEffect(() => {
@@ -195,6 +244,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     playRequestRef.current += 1;
+    translationRequestRef.current += 1;
     setIsPlaying(false);
     setIsBuffering(false);
     setCurrentSong(null);
@@ -202,6 +252,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCurrentTime(0);
     setDuration(0);
     setPlaybackError(null);
+
+    setActiveVersionIdState(null);
+    setIsKaraoke(false);
+    setIsVideoMode(false);
+    setTranslatedLyrics([]);
+    setLyricsDisplayModeState('original');
+    setTranslationStatus('idle');
+    setTranslationError(null);
+    setTranslationProvider(null);
+    setTranslationUpdatedAt(null);
 
     if (blobUrlRef.current) {
       URL.revokeObjectURL(blobUrlRef.current);
@@ -248,15 +308,65 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     previousUserIdRef.current = nextUserId;
   }, [currentUser?.id, stopPlayback]);
 
+  const activeVersion = React.useMemo(() => {
+    if (!currentSong?.versions?.length || !activeVersionId) return null;
+    return currentSong.versions.find((version) => version.id === activeVersionId) || null;
+  }, [currentSong, activeVersionId]);
+
+  const playbackTrack = React.useMemo(() => {
+    if (!currentSong) return null;
+    if (!activeVersion) return currentSong;
+
+    return {
+      ...currentSong,
+      audioUrl: activeVersion.audioUrl || currentSong.audioUrl,
+      lyricsLrc: activeVersion.lyricsLrc ?? currentSong.lyricsLrc,
+      plainLyrics: activeVersion.plainLyrics ?? currentSong.plainLyrics,
+      duration: activeVersion.duration ?? currentSong.duration,
+      videoUrl: activeVersion.videoUrl ?? currentSong.videoUrl,
+      instrumentalUrl: activeVersion.instrumentalUrl ?? currentSong.instrumentalUrl,
+      instrumentalLyricsLrc:
+        activeVersion.instrumentalLyricsLrc ?? currentSong.instrumentalLyricsLrc,
+      instrumentalOffset:
+        activeVersion.instrumentalOffset ?? currentSong.instrumentalOffset,
+    };
+  }, [currentSong, activeVersion]);
+
+  const availableVersions = React.useMemo(
+    () => currentSong?.versions || [],
+    [currentSong]
+  );
+
+  const activeVersionLabel = activeVersion?.label || 'Original';
+  const hasInstrumental = Boolean(playbackTrack?.instrumentalUrl);
+  const videoUrl = playbackTrack?.videoUrl || null;
+
+  // Karaoke can have its own LRC with different timings. Prefer it when present.
+  const effectiveLyricsLrc =
+    isKaraoke && playbackTrack?.instrumentalLyricsLrc
+      ? playbackTrack.instrumentalLyricsLrc
+      : playbackTrack?.lyricsLrc;
+
   // Sync lyrics parsing
   const parsedLyrics = React.useMemo(() => {
-    if (!currentSong?.lyricsLrc) return [];
-    return parseLrc(currentSong.lyricsLrc);
-  }, [currentSong?.lyricsLrc]);
+    if (!effectiveLyricsLrc) return [];
+    return parseLrc(effectiveLyricsLrc);
+  }, [effectiveLyricsLrc]);
 
   const activeLyricIndex = React.useMemo(() => {
     return getActiveLyricIndex(parsedLyrics, currentTime);
   }, [parsedLyrics, currentTime]);
+
+  // Changing songs, versions or karaoke mode invalidates the current translation.
+  useEffect(() => {
+    translationRequestRef.current += 1;
+    setTranslatedLyrics([]);
+    setLyricsDisplayModeState('original');
+    setTranslationStatus('idle');
+    setTranslationError(null);
+    setTranslationProvider(null);
+    setTranslationUpdatedAt(null);
+  }, [currentSong?.id, activeVersionId, isKaraoke]);
 
   // Record personal play event after ~3 seconds of continuous playback
   useEffect(() => {
@@ -271,13 +381,46 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [currentSong, currentTime, isPlaying, recordSongPlay]);
 
-  // Load and play song (handling offline blob caching transparently)
+  // Accumulate listening time in 10-second chunks while audio is playing.
+  // Video mode tracks its own time from the video element.
+  useEffect(() => {
+    if (!isPlaying || isVideoMode || !currentSong) return;
+
+    const interval = setInterval(() => {
+      recordListeningTime(currentSong.id, currentSong.artist, 10);
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [
+    isPlaying,
+    isVideoMode,
+    currentSong?.id,
+    currentSong?.artist,
+    recordListeningTime,
+  ]);
+
+  // Load and play song (handling offline blob caching, versions and karaoke)
   const loadAndPlaySong = useCallback(
-    async (song: Song) => {
+    async (
+      song: Song,
+      options?: {
+        versionId?: string | null;
+        karaoke?: boolean;
+        startAt?: number;
+      }
+    ) => {
       const audio = audioRef.current;
       if (!audio) return;
 
       const requestId = ++playRequestRef.current;
+      const version = options?.versionId
+        ? song.versions?.find((item) => item.id === options.versionId)
+        : null;
+      const karaoke = options?.karaoke === true;
+      const baseUrl = version?.audioUrl || song.audioUrl;
+      const instrumentalUrl = version?.instrumentalUrl ?? song.instrumentalUrl;
+      const canUseOffline = !version && !karaoke;
+
       hasRecordedPlayRef.current = null;
       setPlaybackError(null);
       setIsBuffering(true);
@@ -288,12 +431,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         blobUrlRef.current = null;
       }
 
-      let audioSource = song.audioUrl;
+      let audioSource = karaoke && instrumentalUrl ? instrumentalUrl : baseUrl;
       let usedBlob = false;
 
-      // Only touch IndexedDB when the song is actually downloaded. Looking up
-      // every song on every play added a noticeable delay on mobile devices.
-      if (isDownloaded(song.id)) {
+      // Only touch IndexedDB when the song is actually downloaded and we are
+      // playing its original audio. Alternates/karaoke are streamed.
+      if (canUseOffline && isDownloaded(song.id)) {
         const cachedBlob = await withTimeout(getSongBlob(song.id), 1200);
         if (requestId !== playRequestRef.current) return;
 
@@ -309,14 +452,33 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (!audioSource) {
         setIsBuffering(false);
-        setPlaybackError('Esta canción no tiene un enlace de audio válido.');
+        setPlaybackError(
+          karaoke
+            ? 'Esta canción no tiene una pista instrumental válida.'
+            : 'Esta canción no tiene un enlace de audio válido.'
+        );
         return;
       }
 
       try {
         audio.preload = 'auto';
         audio.src = audioSource;
-        audio.currentTime = 0;
+
+        const startAt = options?.startAt;
+        if (typeof startAt === 'number' && Number.isFinite(startAt) && startAt > 0) {
+          const applyStart = () => {
+            try {
+              audio.currentTime = startAt;
+            } catch {
+              // The browser will clamp values outside the media range.
+            }
+            audio.removeEventListener('loadedmetadata', applyStart);
+          };
+          audio.addEventListener('loadedmetadata', applyStart);
+        } else {
+          audio.currentTime = 0;
+        }
+
         await audio.play();
       } catch (err) {
         if (requestId !== playRequestRef.current) return;
@@ -328,7 +490,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               URL.revokeObjectURL(blobUrlRef.current);
               blobUrlRef.current = null;
             }
-            audio.src = song.audioUrl;
+            audio.src = baseUrl;
             await audio.play();
             return;
           } catch {
@@ -348,22 +510,206 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   // Play a specific song and optionally update queue and source
-  const playSong = useCallback((song: Song, newQueue?: Song[], source?: PlaybackSource) => {
-    setCurrentSong(song);
-    if (source) {
-      setPlaybackSource(source);
+  const playSong = useCallback(
+    (song: Song, newQueue?: Song[], source?: PlaybackSource) => {
+      setCurrentSong(song);
+      setActiveVersionIdState(null);
+      setIsKaraoke(false);
+      setIsVideoMode(false);
+      if (source) {
+        setPlaybackSource(source);
+      }
+      if (newQueue && newQueue.length > 0) {
+        setQueue(newQueue);
+      } else {
+        setQueue((prev) => (prev.some((s) => s.id === song.id) ? prev : [song, ...prev]));
+      }
+      void loadAndPlaySong(song, { versionId: null, karaoke: false });
+    },
+    [loadAndPlaySong]
+  );
+
+  const setActiveVersion = useCallback(
+    (versionId: string | null) => {
+      if (!currentSong) {
+        setActiveVersionIdState(versionId);
+        return;
+      }
+
+      const version = versionId
+        ? currentSong.versions?.find((item) => item.id === versionId)
+        : null;
+      if (versionId && !version) return;
+
+      const nextKaraoke =
+        isKaraoke && Boolean(version?.instrumentalUrl ?? currentSong.instrumentalUrl);
+
+      setActiveVersionIdState(versionId);
+      setIsKaraoke(nextKaraoke);
+      setIsVideoMode(false);
+
+      const audio = audioRef.current;
+      const startAt = audio?.currentTime || 0;
+      void loadAndPlaySong(currentSong, {
+        versionId,
+        karaoke: nextKaraoke,
+        startAt,
+      });
+    },
+    [currentSong, isKaraoke, loadAndPlaySong]
+  );
+
+  const toggleKaraoke = useCallback(() => {
+    if (!currentSong) return;
+
+    const instrumental =
+      activeVersion?.instrumentalUrl ?? currentSong.instrumentalUrl;
+    if (!instrumental) return;
+
+    const audio = audioRef.current;
+    const current = audio?.currentTime || 0;
+    const offset = Number(
+      activeVersion?.instrumentalOffset ?? currentSong.instrumentalOffset ?? 0
+    );
+    const nextKaraoke = !isKaraoke;
+    const startAt = Math.max(0, current + (nextKaraoke ? offset : -offset));
+
+    setIsKaraoke(nextKaraoke);
+    setIsVideoMode(false);
+
+    void loadAndPlaySong(currentSong, {
+      versionId: activeVersionId,
+      karaoke: nextKaraoke,
+      startAt,
+    });
+  }, [
+    currentSong,
+    activeVersion,
+    activeVersionId,
+    isKaraoke,
+    loadAndPlaySong,
+  ]);
+
+  const openVideo = useCallback(() => {
+    if (!playbackTrack?.videoUrl) return;
+    audioRef.current?.pause();
+    setIsVideoMode(true);
+  }, [playbackTrack]);
+
+  const closeVideo = useCallback((seconds?: number) => {
+    setIsVideoMode(false);
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (typeof seconds === 'number' && Number.isFinite(seconds)) {
+      const maxTime = Number.isFinite(audio.duration) && audio.duration > 0
+        ? audio.duration
+        : seconds;
+      audio.currentTime = Math.max(0, Math.min(seconds, maxTime));
+      setCurrentTime(audio.currentTime);
     }
-    if (newQueue && newQueue.length > 0) {
-      setQueue(newQueue);
-    } else {
-      setQueue((prev) => (prev.some((s) => s.id === song.id) ? prev : [song, ...prev]));
-    }
-    loadAndPlaySong(song);
-  }, [loadAndPlaySong]);
+
+    audio.play().catch((err) => {
+      console.warn('No se pudo reanudar el audio al cerrar el video:', err);
+    });
+  }, []);
+
+  const clearTranslation = useCallback(() => {
+    translationRequestRef.current += 1;
+    setTranslatedLyrics([]);
+    setLyricsDisplayModeState('original');
+    setTranslationStatus('idle');
+    setTranslationError(null);
+    setTranslationProvider(null);
+    setTranslationUpdatedAt(null);
+  }, []);
+
+  const setLyricsDisplayMode = useCallback(
+    (mode: 'original' | 'translation' | 'both') => {
+      if (mode !== 'original' && translatedLyrics.length === 0) return;
+      setLyricsDisplayModeState(mode);
+    },
+    [translatedLyrics.length]
+  );
+
+  const setTranslationLang = useCallback(
+    (lang: string) => {
+      setTranslationLangState(lang);
+      clearTranslation();
+    },
+    [clearTranslation]
+  );
+
+  const setTranslationSourceLang = useCallback(
+    (lang: string) => {
+      setTranslationSourceLangState(lang);
+      clearTranslation();
+    },
+    [clearTranslation]
+  );
+
+  const translateCurrentLyrics = useCallback(
+    async (lang?: string) => {
+      if (!currentSong) return;
+
+      const targetLang = lang || translationLang;
+      const lrc = effectiveLyricsLrc;
+
+      if (!lrc || !lrc.trim()) {
+        setTranslationStatus('error');
+        setTranslationError('Esta canción no tiene una letra sincronizada para traducir.');
+        return;
+      }
+
+      const requestId = translationRequestRef.current + 1;
+      translationRequestRef.current = requestId;
+
+      setTranslationStatus('loading');
+      setTranslationError(null);
+
+      try {
+        const result = await translateLyricsWithCache({
+          songId: currentSong.id,
+          versionId: activeVersionId || 'original',
+          lrc,
+          targetLang,
+          sourceLang:
+            translationSourceLang === 'auto' ? undefined : translationSourceLang,
+          songTitle: currentSong.title,
+          artist: currentSong.artist,
+        });
+
+        if (requestId !== translationRequestRef.current) return;
+
+        setTranslatedLyrics(result.lines);
+        setTranslationProvider(result.provider);
+        setTranslationUpdatedAt(result.updatedAt);
+        setTranslationStatus('idle');
+        setTranslationLangState(targetLang);
+        setLyricsDisplayModeState('both');
+      } catch (err) {
+        if (requestId !== translationRequestRef.current) return;
+        console.warn('No se pudo traducir la letra:', err);
+        setTranslationStatus('error');
+        setTranslationError(
+          err instanceof Error
+            ? err.message
+            : 'No se pudo traducir la letra en este momento.'
+        );
+      }
+    },
+    [
+      currentSong,
+      effectiveLyricsLrc,
+      activeVersionId,
+      translationLang,
+      translationSourceLang,
+    ]
+  );
 
   const togglePlayPause = useCallback(() => {
     const audio = audioRef.current;
-    if (!audio || !currentSong) return;
+    if (!audio || !currentSong || isVideoMode) return;
 
     if (isPlaying) {
       audio.pause();
@@ -374,7 +720,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setPlaybackError('No se pudo reanudar la reproducción. Inténtalo de nuevo.');
       });
     }
-  }, [isPlaying, currentSong]);
+  }, [isPlaying, currentSong, isVideoMode]);
 
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
@@ -539,6 +885,30 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       rightPanelTab,
       isCenterLyricsOpen,
       isFullscreenNowPlaying,
+      activeVersionId,
+      activeVersionLabel,
+      availableVersions,
+      setActiveVersion,
+      isKaraoke,
+      hasInstrumental,
+      toggleKaraoke,
+      isVideoMode,
+      videoUrl,
+      openVideo,
+      closeVideo,
+      translatedLyrics,
+      lyricsDisplayMode,
+      setLyricsDisplayMode,
+      translationLang,
+      setTranslationLang,
+      translationSourceLang,
+      setTranslationSourceLang,
+      translationStatus,
+      translationError,
+      translationProvider,
+      translationUpdatedAt,
+      translateCurrentLyrics,
+      clearTranslation,
       playSong,
       togglePlayPause,
       seek,
@@ -572,6 +942,30 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       rightPanelTab,
       isCenterLyricsOpen,
       isFullscreenNowPlaying,
+      activeVersionId,
+      activeVersionLabel,
+      availableVersions,
+      setActiveVersion,
+      isKaraoke,
+      hasInstrumental,
+      toggleKaraoke,
+      isVideoMode,
+      videoUrl,
+      openVideo,
+      closeVideo,
+      translatedLyrics,
+      lyricsDisplayMode,
+      setLyricsDisplayMode,
+      translationLang,
+      setTranslationLang,
+      translationSourceLang,
+      setTranslationSourceLang,
+      translationStatus,
+      translationError,
+      translationProvider,
+      translationUpdatedAt,
+      translateCurrentLyrics,
+      clearTranslation,
       playSong,
       togglePlayPause,
       seek,

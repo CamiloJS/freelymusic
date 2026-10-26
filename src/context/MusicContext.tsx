@@ -66,9 +66,13 @@ interface MusicContextType {
 
   // User Play Counts & Analytics
   recordSongPlay: (songId: string) => void;
+  recordListeningTime: (songId: string, artist: string, seconds: number) => void;
   getUserSongPlayCount: (songId: string) => number;
   userPlayCounts: Record<string, number>;
   userPlayHistory: PlayEvent[];
+  userTotalListenSeconds: number;
+  userSongListenSeconds: Record<string, number>;
+  userArtistListenSeconds: Record<string, number>;
 
   // Offline caching
   downloadedSongIds: string[];
@@ -655,6 +659,33 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [mutateUserData]
   );
 
+  const recordListeningTime = useCallback(
+    (songId: string, artist: string, seconds: number) => {
+      const safeSeconds = Math.floor(Number(seconds));
+      if (!songId || !Number.isFinite(safeSeconds) || safeSeconds < 1) return;
+
+      const primaryArtist =
+        (artist || 'Artista desconocido')
+          .split(/[,&/]|feat\.|ft\./i)[0]
+          .trim() || 'Artista desconocido';
+
+      mutateUserData((previous) => ({
+        ...previous,
+        totalListenSeconds: (previous.totalListenSeconds || 0) + safeSeconds,
+        songListenSeconds: {
+          ...(previous.songListenSeconds || {}),
+          [songId]: (previous.songListenSeconds?.[songId] || 0) + safeSeconds,
+        },
+        artistListenSeconds: {
+          ...(previous.artistListenSeconds || {}),
+          [primaryArtist]:
+            (previous.artistListenSeconds?.[primaryArtist] || 0) + safeSeconds,
+        },
+      }));
+    },
+    [mutateUserData]
+  );
+
   const getUserSongPlayCount = useCallback(
     (songId: string): number => {
       return userData?.playCounts?.[songId] || 0;
@@ -685,9 +716,13 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         getArtistProfile,
         updateArtistProfile,
         recordSongPlay,
+        recordListeningTime,
         getUserSongPlayCount,
         userPlayCounts: userData.playCounts || {},
         userPlayHistory: userData.playHistory || [],
+        userTotalListenSeconds: userData.totalListenSeconds || 0,
+        userSongListenSeconds: userData.songListenSeconds || {},
+        userArtistListenSeconds: userData.artistListenSeconds || {},
         downloadedSongIds,
         isDownloaded,
         toggleDownloadSong,

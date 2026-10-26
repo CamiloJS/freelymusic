@@ -59,6 +59,51 @@ export function getActiveLyricIndex(lyrics: LyricLine[], currentTime: number): n
   return 0;
 }
 
+export interface DisplayLyricLine extends LyricLine {
+  translation?: string;
+}
+
+export function buildDisplayLyrics(
+  original: LyricLine[],
+  translated: LyricLine[],
+  mode: 'original' | 'translation' | 'both'
+): DisplayLyricLine[] {
+  if (original.length === 0) return [];
+
+  if (mode === 'original' || translated.length === 0) {
+    return original;
+  }
+
+  if (mode === 'translation') {
+    return original.map((line, index) => ({
+      time: line.time,
+      text: translated[index]?.text || line.text,
+    }));
+  }
+
+  return original.map((line, index) => ({
+    time: line.time,
+    text: line.text,
+    translation: translated[index]?.text || undefined,
+  }));
+}
+
+/**
+ * Formats a listening time for the personal statistics view.
+ */
+export function formatListeningTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '0 min';
+
+  const totalMinutes = Math.floor(seconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours} h ${minutes} min` : `${hours} h`;
+  }
+  return `${Math.max(1, minutes)} min`;
+}
+
 /**
  * Formats duration in seconds into mm:ss or hh:mm:ss
  */

@@ -11,7 +11,8 @@ import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import Edit3 from 'lucide-react/dist/esm/icons/pen-line.mjs';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
-import { formatTime } from '../utils/lyrics';
+import { buildDisplayLyrics, formatTime } from '../utils/lyrics';
+import { LyricsTranslationControls } from './LyricsTranslationControls';
 
 export const LyricsModal: React.FC = () => {
   const {
@@ -28,8 +29,11 @@ export const LyricsModal: React.FC = () => {
     showLyricsView,
     setShowLyricsView,
     parsedLyrics,
+    translatedLyrics,
+    lyricsDisplayMode,
   } = useAudio();
   const { currentTime, duration, activeLyricIndex } = useAudioTime();
+  const displayLyrics = buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode);
 
   const { isFavorite, toggleFavorite } = useMusic();
   const activeLineRef = useRef<HTMLDivElement | null>(null);
@@ -80,6 +84,12 @@ export const LyricsModal: React.FC = () => {
         </button>
       </header>
 
+      {parsedLyrics.length > 0 && (
+        <div className="relative z-10 px-4 md:px-8 py-2 border-b border-white/5">
+          <LyricsTranslationControls compact />
+        </div>
+      )}
+
       {/* Main Content Area: Split View on Desktop (Artwork Left, Scrolling Lyrics Right) */}
       <div className="relative z-10 flex-1 flex flex-col md:flex-row overflow-hidden max-w-7xl mx-auto w-full p-4 md:p-8 gap-8">
         {/* Left Side: Large Album Cover & Metadata */}
@@ -120,7 +130,7 @@ export const LyricsModal: React.FC = () => {
               </p>
             </div>
           ) : (
-            parsedLyrics.map((line, index) => {
+            displayLyrics.map((line, index) => {
               const isActive = index === activeLyricIndex;
               const isPast = index < activeLyricIndex;
 
@@ -138,6 +148,11 @@ export const LyricsModal: React.FC = () => {
                   }`}
                 >
                   <p className="leading-snug tracking-tight">{line.text || '♪ ♪ ♪'}</p>
+                  {line.translation && (
+                    <p className="text-sm md:text-base text-sky-200/75 font-semibold leading-snug mt-1">
+                      {line.translation}
+                    </p>
+                  )}
                 </div>
               );
             })

@@ -15,7 +15,14 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, Auth } from 'firebase/auth';
-import { Song, UserProfile, UserLibraryData, FirebaseConfigOptions, ArtistProfile } from '../types';
+import {
+  Song,
+  UserProfile,
+  UserLibraryData,
+  FirebaseConfigOptions,
+  ArtistProfile,
+  LyricsTranslation,
+} from '../types';
 import {
   getStoredFirebaseConfig,
   normalizeSong,
@@ -377,10 +384,73 @@ export function subscribeToCatalogUpdates(
   }, onError);
 }
 
-// Global App Customization Settings (App Name & Admin Icon Gallery)
+// AI/machine translations of synchronized lyrics, cached globally.
+export async function getLyricsTranslation(
+  translationId: string
+): Promise<LyricsTranslation | null> {
+  if (!db) return null;
+  try {
+    await ensureAuth();
+    const snapshot = await getDoc(
+      doc(db, ...BASE_PATH, 'translations', translationId)
+    );
+    if (!snapshot.exists()) return null;
+
+    const raw = snapshot.data() as Partial<LyricsTranslation>;
+    if (
+      !raw ||
+      !Array.isArray(raw.lines) ||
+      typeof raw.sourceHash !== 'string' ||
+      typeof raw.lang !== 'string'
+    ) {
+      return null;
+    }
+
+    return {
+      id: translationId,
+      songId: typeof raw.songId === 'string' ? raw.songId : '',
+      versionId: typeof raw.versionId === 'string' ? raw.versionId : 'original',
+      lang: raw.lang,
+      sourceLang: typeof raw.sourceLang === 'string' ? raw.sourceLang : 'auto',
+      sourceHash: raw.sourceHash,
+      lines: raw.lines
+        .filter(
+          (line) =>
+            line && typeof line.time === 'number' && typeof line.text === 'string'
+        )
+        .map((line) => ({ time: line.time, text: line.text })),
+      provider: typeof raw.provider === 'string' ? raw.provider : 'MyMemory',
+      updatedAt:
+        typeof raw.updatedAt === 'string' ? raw.updatedAt : new Date().toISOString(),
+    };
+  } catch (err) {
+    console.warn('Error reading cached translation:', err);
+    return null;
+  }
+}
+
+export async function saveLyricsTranslation(
+  translation: LyricsTranslation
+): Promise<void> {
+  if (!db) return;
+  try {
+    await ensureAuth();
+    await setDoc(
+      doc(db, ...BASE_PATH, 'translations', translation.id),
+      translation,
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Error saving lyrics translation:', err);
+  }
+}
+
+// Global App Customization Settings (App Name, icon gallery & stats API key)
 export interface GlobalAppSettings {
   globalAppName?: string;
   globalIcons?: string[];
+  lastfmApiKey?: string;
+  statsProvider?: 'auto' | 'lastfm' | 'deezer';
 }
 
 export async function syncGlobalSettingsFromFirestore(): Promise<GlobalAppSettings | null> {

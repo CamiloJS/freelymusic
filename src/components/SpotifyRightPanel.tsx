@@ -9,12 +9,14 @@ import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
 import ExternalLink from 'lucide-react/dist/esm/icons/external-link.mjs';
 import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right.mjs';
 import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
+import Video from 'lucide-react/dist/esm/icons/video.mjs';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
 import { Song, Album } from '../types';
 import { getAlbumsFromCatalog } from '../utils/albums';
 import { ArtistLinks } from './ArtistLinks';
+import { SongVersionSelector } from './SongVersionSelector';
 
 interface SpotifyRightPanelProps {
   onSelectArtist?: (artistName: string) => void;
@@ -38,6 +40,8 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
     setIsFullscreenNowPlaying,
     playSong,
     parsedLyrics,
+    videoUrl,
+    openVideo,
   } = useAudio();
   const { activeLyricIndex } = useAudioTime();
 
@@ -145,9 +149,21 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
                 <p className="text-xs text-neutral-400 truncate mt-0.5">
                   <ArtistLinks artists={currentSong.artist} onSelectArtist={onSelectArtist} />
                 </p>
+                <div className="mt-2">
+                  <SongVersionSelector compact />
+                </div>
               </div>
 
               <div className="flex items-center gap-1.5 flex-shrink-0">
+                {videoUrl && (
+                  <button
+                    onClick={openVideo}
+                    className="p-1.5 rounded-full text-neutral-400 hover:text-emerald-400 transition-colors"
+                    title="Ver videoclip"
+                  >
+                    <Video className="w-5 h-5" />
+                  </button>
+                )}
                 <button
                   onClick={() => toggleFavorite(currentSong.id)}
                   className={`p-1.5 rounded-full transition-transform active:scale-90 ${

@@ -23,6 +23,7 @@ import ChevronLeft from 'lucide-react/dist/esm/icons/chevron-left.mjs';
 import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right.mjs';
 import ArrowDownCircle from 'lucide-react/dist/esm/icons/circle-arrow-down.mjs';
 import Settings from 'lucide-react/dist/esm/icons/settings.mjs';
+import UserRound from 'lucide-react/dist/esm/icons/user-round.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 
 // Views and modals are split into separate chunks: the first paint no longer
@@ -48,12 +49,20 @@ const AddMusicView = lazy(() =>
 const ArtistProfileView = lazy(() =>
   import('./views/ArtistProfileView').then((module) => ({ default: module.ArtistProfileView }))
 );
+const ProfileView = lazy(() =>
+  import('./views/ProfileView').then((module) => ({ default: module.ProfileView }))
+);
 const CenterLyricsView = lazy(() =>
   import('./components/CenterLyricsView').then((module) => ({ default: module.CenterLyricsView }))
 );
 const FullscreenNowPlayingModal = lazy(() =>
   import('./components/FullscreenNowPlayingModal').then((module) => ({
     default: module.FullscreenNowPlayingModal,
+  }))
+);
+const MusicVideoModal = lazy(() =>
+  import('./components/MusicVideoModal').then((module) => ({
+    default: module.MusicVideoModal,
   }))
 );
 const ProfileSwitcherModal = lazy(() =>
@@ -103,6 +112,7 @@ const MainLayout: React.FC = () => {
     setIsCenterLyricsOpen,
     currentSong,
     isFullscreenNowPlaying,
+    isVideoMode,
   } = useAudio();
   const { appName, appIcon } = useCustomization();
 
@@ -311,6 +321,17 @@ const MainLayout: React.FC = () => {
             <HardDriveDownload className="w-4 h-4 text-emerald-400" />
             Modo Sin Conexión
           </button>
+          <button
+            onClick={() => {
+              setCurrentTab('profile');
+              setIsCenterLyricsOpen(false);
+              setIsMobileMenuOpen(false);
+            }}
+            className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-950 text-sm font-bold text-white"
+          >
+            <UserRound className="w-4 h-4 text-emerald-400" />
+            Mi Perfil y Estadísticas
+          </button>
           {isAdmin && (
             <button
               onClick={() => {
@@ -401,6 +422,18 @@ const MainLayout: React.FC = () => {
                   />
                 )}
 
+                {currentTab === 'profile' && (
+                  <ProfileView
+                    onSelectPlaylist={handleSelectPlaylist}
+                    onSelectArtist={handleSelectArtist}
+                    onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
+                    onNavigate={(tab) => {
+                      setCurrentTab(tab);
+                      if (tab !== 'library') setSelectedPlaylist(null);
+                    }}
+                  />
+                )}
+
                 {currentTab === 'offline' && <OfflineView />}
 
                 {currentTab === 'admin' && <AdminView />}
@@ -427,6 +460,12 @@ const MainLayout: React.FC = () => {
       {isFullscreenNowPlaying && (
         <Suspense fallback={null}>
           <FullscreenNowPlayingModal onSelectArtist={handleSelectArtist} />
+        </Suspense>
+      )}
+
+      {isVideoMode && (
+        <Suspense fallback={null}>
+          <MusicVideoModal />
         </Suspense>
       )}
 

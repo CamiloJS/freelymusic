@@ -8,12 +8,15 @@ import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
-import { formatTime } from '../utils/lyrics';
+import { buildDisplayLyrics, formatTime } from '../utils/lyrics';
+import { LyricsTranslationControls } from './LyricsTranslationControls';
 
 export const CenterLyricsView: React.FC = () => {
   const {
     currentSong,
     parsedLyrics,
+    translatedLyrics,
+    lyricsDisplayMode,
     seek,
     playbackSource,
     setIsCenterLyricsOpen,
@@ -37,6 +40,11 @@ export const CenterLyricsView: React.FC = () => {
   if (!currentSong) return null;
 
   const sourceName = playbackSource?.name || 'Tus me gusta';
+  const displayLyrics = buildDisplayLyrics(
+    parsedLyrics,
+    translatedLyrics,
+    lyricsDisplayMode
+  );
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gradient-to-b from-sky-950/70 via-slate-950 to-neutral-950 relative overflow-hidden select-none animate-in fade-in duration-300">
@@ -78,6 +86,12 @@ export const CenterLyricsView: React.FC = () => {
         </div>
       </div>
 
+      {parsedLyrics.length > 0 && (
+        <div className="px-4 md:px-6 py-2 border-b border-white/10 bg-black/20 flex-shrink-0">
+          <LyricsTranslationControls compact />
+        </div>
+      )}
+
       {/* Scrolling Lyrics Area */}
       <div
         ref={scrollContainerRef}
@@ -92,7 +106,7 @@ export const CenterLyricsView: React.FC = () => {
             </p>
           </div>
         ) : (
-          parsedLyrics.map((line, index) => {
+          displayLyrics.map((line, index) => {
             const isActive = index === activeLyricIndex;
             const isPast = index < activeLyricIndex;
 
@@ -112,6 +126,17 @@ export const CenterLyricsView: React.FC = () => {
                 <p className="leading-tight transition-transform group-hover:translate-x-1">
                   {line.text || '♪'}
                 </p>
+                {line.translation && (
+                  <p
+                    className={`mt-1 leading-snug font-semibold transition-colors ${
+                      isActive
+                        ? 'text-sky-200/90 text-sm md:text-lg'
+                        : 'text-sky-300/45 text-xs md:text-base'
+                    }`}
+                  >
+                    {line.translation}
+                  </p>
+                )}
               </div>
             );
           })

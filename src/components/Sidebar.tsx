@@ -17,6 +17,7 @@ import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import ArrowDownCircle from 'lucide-react/dist/esm/icons/circle-arrow-down.mjs';
 import Search from 'lucide-react/dist/esm/icons/search.mjs';
+import UserRound from 'lucide-react/dist/esm/icons/user-round.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -66,6 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'home', label: 'Inicio', icon: Home },
     { id: 'cloud', label: 'Explorar la Nube', icon: Compass },
     { id: 'add-music', label: 'Añadir Música', icon: UploadCloud },
+    { id: 'profile', label: 'Mi Perfil', icon: UserRound },
   ];
 
   const { appName, appIcon: contextIcon } = useCustomization();

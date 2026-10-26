@@ -1,4 +1,13 @@
-import { Song, UserProfile, UserLibraryData, FirebaseConfigOptions, Playlist, ArtistProfile } from '../types';
+import {
+  Song,
+  SongVersion,
+  SongVersionType,
+  UserProfile,
+  UserLibraryData,
+  FirebaseConfigOptions,
+  Playlist,
+  ArtistProfile,
+} from '../types';
 
 const DB_NAME = 'sonora-audio-cache';
 const DB_VERSION = 1;
@@ -257,6 +266,66 @@ function safeRemoveItem(key: string): void {
 // Normalizers (protect the UI from malformed cloud/legacy data)
 // ---------------------------------------------------------------------------
 
+const VERSION_TYPES: SongVersionType[] = [
+  'original',
+  'cover',
+  'instrumental',
+  'remix',
+  'live',
+  'other',
+];
+
+export function normalizeSongVersion(
+  raw: Partial<SongVersion> | null | undefined,
+  index = 0
+): SongVersion | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const audioUrl = typeof raw.audioUrl === 'string' ? raw.audioUrl.trim() : '';
+  if (!audioUrl) return null;
+
+  const id =
+    typeof raw.id === 'string' && raw.id.trim()
+      ? raw.id.trim()
+      : `version-${index + 1}`;
+  const duration = Number(raw.duration);
+  const offset = Number(raw.instrumentalOffset);
+  const type = VERSION_TYPES.includes(raw.type as SongVersionType)
+    ? (raw.type as SongVersionType)
+    : 'other';
+
+  return {
+    id,
+    label:
+      typeof raw.label === 'string' && raw.label.trim()
+        ? raw.label.trim()
+        : type === 'cover'
+        ? 'Cover'
+        : type === 'instrumental'
+        ? 'Instrumental'
+        : `Versión ${index + 1}`,
+    type,
+    audioUrl,
+    duration: Number.isFinite(duration) && duration > 0 ? duration : undefined,
+    lyricsLrc: typeof raw.lyricsLrc === 'string' ? raw.lyricsLrc : undefined,
+    plainLyrics: typeof raw.plainLyrics === 'string' ? raw.plainLyrics : undefined,
+    videoUrl: typeof raw.videoUrl === 'string' && raw.videoUrl.trim() ? raw.videoUrl.trim() : undefined,
+    instrumentalUrl:
+      typeof raw.instrumentalUrl === 'string' && raw.instrumentalUrl.trim()
+        ? raw.instrumentalUrl.trim()
+        : undefined,
+    instrumentalLyricsLrc:
+      typeof raw.instrumentalLyricsLrc === 'string'
+        ? raw.instrumentalLyricsLrc
+        : undefined,
+    instrumentalOffset: Number.isFinite(offset) ? offset : undefined,
+    language:
+      typeof raw.language === 'string' && raw.language.trim()
+        ? raw.language.trim().toLowerCase()
+        : undefined,
+    createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : undefined,
+  };
+}
+
 export function normalizeSong(raw: Partial<Song> | null | undefined): Song | null {
   if (!raw || typeof raw !== 'object') return null;
   const id = typeof raw.id === 'string' ? raw.id.trim() : '';
@@ -264,6 +333,12 @@ export function normalizeSong(raw: Partial<Song> | null | undefined): Song | nul
 
   const duration = Number(raw.duration);
   const trackNumber = Number(raw.trackNumber);
+  const instrumentalOffset = Number(raw.instrumentalOffset);
+  const versions = Array.isArray(raw.versions)
+    ? raw.versions
+        .map((version, index) => normalizeSongVersion(version, index))
+        .filter((version): version is SongVersion => Boolean(version))
+    : [];
 
   return {
     id,
@@ -292,6 +367,22 @@ export function normalizeSong(raw: Partial<Song> | null | undefined): Song | nul
       typeof raw.createdAt === 'string' && raw.createdAt
         ? raw.createdAt
         : new Date().toISOString(),
+    videoUrl:
+      typeof raw.videoUrl === 'string' && raw.videoUrl.trim() ? raw.videoUrl.trim() : undefined,
+    instrumentalUrl:
+      typeof raw.instrumentalUrl === 'string' && raw.instrumentalUrl.trim()
+        ? raw.instrumentalUrl.trim()
+        : undefined,
+    instrumentalLyricsLrc:
+      typeof raw.instrumentalLyricsLrc === 'string' ? raw.instrumentalLyricsLrc : undefined,
+    instrumentalOffset: Number.isFinite(instrumentalOffset) ? instrumentalOffset : undefined,
+    versions: versions.length > 0 ? versions : undefined,
+    isrc: typeof raw.isrc === 'string' && raw.isrc.trim() ? raw.isrc.trim() : undefined,
+    needsReview: raw.needsReview === true ? true : undefined,
+    enrichmentNote:
+      typeof raw.enrichmentNote === 'string' && raw.enrichmentNote.trim()
+        ? raw.enrichmentNote.trim()
+        : undefined,
   };
 }
 
@@ -369,12 +460,33 @@ export function normalizeUserData(raw: Partial<UserLibraryData> | null | undefin
         .slice(0, 200)
     : [];
 
+  const normalizeSecondsMap = (value: unknown): Record<string, number> => {
+    const result: Record<string, number> = {};
+    if (value && typeof value === 'object') {
+      Object.entries(value as Record<string, unknown>).forEach(([key, rawSeconds]) => {
+        const seconds = Number(rawSeconds);
+        if (key && Number.isFinite(seconds) && seconds > 0) {
+          result[key] = Math.floor(seconds);
+        }
+      });
+    }
+    return result;
+  };
+
+  const totalListenSeconds = Number(source.totalListenSeconds);
+
   return {
     favoriteSongIds,
     historySongIds,
     playlists,
     playCounts,
     playHistory,
+    totalListenSeconds:
+      Number.isFinite(totalListenSeconds) && totalListenSeconds > 0
+        ? Math.floor(totalListenSeconds)
+        : 0,
+    songListenSeconds: normalizeSecondsMap(source.songListenSeconds),
+    artistListenSeconds: normalizeSecondsMap(source.artistListenSeconds),
     updatedAt:
       typeof source.updatedAt === 'string' && source.updatedAt ? source.updatedAt : undefined,
   };
@@ -569,6 +681,9 @@ export function createDefaultUserData(userId: string): UserLibraryData {
     ],
     playCounts: {},
     playHistory: [],
+    totalListenSeconds: 0,
+    songListenSeconds: {},
+    artistListenSeconds: {},
   };
 }
 

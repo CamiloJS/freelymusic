@@ -15,10 +15,12 @@ import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 import AlertCircle from 'lucide-react/dist/esm/icons/circle-alert.mjs';
+import Video from 'lucide-react/dist/esm/icons/video.mjs';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
 import { ArtistLinks } from './ArtistLinks';
+import { SongVersionSelector } from './SongVersionSelector';
 
 interface PlayerBarProps {
   onSelectArtist?: (artistName: string) => void;
@@ -30,6 +32,10 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
     isPlaying,
     isBuffering,
     playbackError,
+    isVideoMode,
+    videoUrl,
+    openVideo,
+    activeVersionLabel,
     volume,
     isMuted,
     repeatMode,
@@ -151,6 +157,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
           <span className="text-xs text-neutral-400 truncate block">
             <ArtistLinks artists={currentSong.artist} onSelectArtist={onSelectArtist} />
           </span>
+          <SongVersionSelector compact className="mt-1" />
         </div>
 
         {/* Favorite button */}
@@ -319,6 +326,20 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
             className="w-18 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
           />
         </div>
+
+        {videoUrl && (
+          <button
+            onClick={openVideo}
+            className={`p-2 rounded-xl transition-colors ${
+              isVideoMode
+                ? 'bg-emerald-500/20 text-emerald-400'
+                : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+            }`}
+            title="Ver videoclip"
+          >
+            <Video className="w-4 h-4" />
+          </button>
+        )}
 
         {/* Fullscreen Artwork Button (Pantalla Completa - Spotify Style) */}
         <button

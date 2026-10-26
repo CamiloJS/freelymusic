@@ -25,6 +25,7 @@ import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
 import { parseLrc, formatTime } from '../utils/lyrics';
 import { compressImage } from '../utils/imageCompressor';
+import { SongMediaEditor, SongMediaValue, EMPTY_SONG_MEDIA } from '../components/SongMediaEditor';
 import { Song, LyricLine } from '../types';
 
 interface AddMusicViewProps {
@@ -80,6 +81,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   const [detectedDuration, setDetectedDuration] = useState<number>(180);
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectStatus, setDetectStatus] = useState<string | null>(null);
+  const [songMedia, setSongMedia] = useState<SongMediaValue>({ ...EMPTY_SONG_MEDIA });
 
   // Album Form State
   const [albumTitle, setAlbumTitle] = useState('');
@@ -369,6 +371,21 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         duration: detectedDuration || 180,
         lyricsLrc: lyricsLrc.trim() || undefined,
         isExplicit: isExplicit,
+        videoUrl: songMedia.videoUrl.trim() || undefined,
+        instrumentalUrl: songMedia.instrumentalUrl.trim() || undefined,
+        instrumentalOffset: songMedia.instrumentalOffset || undefined,
+        instrumentalLyricsLrc: songMedia.instrumentalLyricsLrc.trim() || undefined,
+        versions: songMedia.versions
+          .filter((version) => version.audioUrl.trim())
+          .map((version) => ({
+            ...version,
+            audioUrl: version.audioUrl.trim(),
+            label: version.label.trim() || 'Versión',
+            lyricsLrc: version.lyricsLrc?.trim() || undefined,
+            videoUrl: version.videoUrl?.trim() || undefined,
+            instrumentalUrl: version.instrumentalUrl?.trim() || undefined,
+            instrumentalLyricsLrc: version.instrumentalLyricsLrc?.trim() || undefined,
+          })),
       });
 
       setSuccessMessage(`¡"${newSong.title}" guardada exitosamente en el repositorio en la nube!`);
@@ -388,6 +405,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
       setIsExplicit(false);
       setLyricsLrc('');
       setDetectStatus(null);
+      setSongMedia({ ...EMPTY_SONG_MEDIA });
 
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err: unknown) {
@@ -849,6 +867,8 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                   </div>
                 )}
               </div>
+
+              <SongMediaEditor value={songMedia} onChange={setSongMedia} />
 
               {/* Submit Button */}
               <div className="pt-2">

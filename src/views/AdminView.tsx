@@ -23,6 +23,7 @@ import { Song, UserRole, FirebaseConfigOptions } from '../types';
 import { saveStoredFirebaseConfig, getStoredFirebaseConfig } from '../services/storage';
 import { isFirebaseConnected } from '../services/firebase';
 import { compressImage } from '../utils/imageCompressor';
+import { SongMediaEditor, SongMediaValue, EMPTY_SONG_MEDIA } from '../components/SongMediaEditor';
 
 export const AdminView: React.FC = () => {
   const { currentUser, allUsers, createProfile, deleteProfile, isAdmin } = useAuth();
@@ -77,6 +78,7 @@ export const AdminView: React.FC = () => {
   const [editIsExplicit, setEditIsExplicit] = useState(false);
   const [editTrackNumber, setEditTrackNumber] = useState<number | undefined>(undefined);
   const [editDuration, setEditDuration] = useState(180);
+  const [editMedia, setEditMedia] = useState<SongMediaValue>({ ...EMPTY_SONG_MEDIA });
   const editCoverFileInputRef = useRef<HTMLInputElement | null>(null);
   const editLrcFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -95,6 +97,13 @@ export const AdminView: React.FC = () => {
     setEditLyricsLrc(song.lyricsLrc || song.plainLyrics || '');
     setEditIsExplicit(Boolean(song.isExplicit));
     setEditDuration(song.duration || 180);
+    setEditMedia({
+      videoUrl: song.videoUrl || '',
+      instrumentalUrl: song.instrumentalUrl || '',
+      instrumentalOffset: song.instrumentalOffset || 0,
+      instrumentalLyricsLrc: song.instrumentalLyricsLrc || '',
+      versions: song.versions || [],
+    });
   };
 
   const handleSaveEditSong = (e: React.FormEvent) => {
@@ -121,6 +130,21 @@ export const AdminView: React.FC = () => {
       lyricsLrc: editLyricsLrc.trim() || undefined,
       isExplicit: editIsExplicit,
       duration: editDuration,
+      videoUrl: editMedia.videoUrl.trim() || undefined,
+      instrumentalUrl: editMedia.instrumentalUrl.trim() || undefined,
+      instrumentalOffset: editMedia.instrumentalOffset || undefined,
+      instrumentalLyricsLrc: editMedia.instrumentalLyricsLrc.trim() || undefined,
+      versions: editMedia.versions
+        .filter((version) => version.audioUrl.trim())
+        .map((version) => ({
+          ...version,
+          audioUrl: version.audioUrl.trim(),
+          label: version.label.trim() || 'Versión',
+          lyricsLrc: version.lyricsLrc?.trim() || undefined,
+          videoUrl: version.videoUrl?.trim() || undefined,
+          instrumentalUrl: version.instrumentalUrl?.trim() || undefined,
+          instrumentalLyricsLrc: version.instrumentalLyricsLrc?.trim() || undefined,
+        })),
     };
 
     updateCatalogTrack(updated);
@@ -1147,6 +1171,8 @@ export const AdminView: React.FC = () => {
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
+
+                  <SongMediaEditor value={editMedia} onChange={setEditMedia} />
 
                   {/* Action buttons */}
                   <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-800">

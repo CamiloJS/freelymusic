@@ -11,10 +11,13 @@ import Minimize2 from 'lucide-react/dist/esm/icons/minimize-2.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
+import Video from 'lucide-react/dist/esm/icons/video.mjs';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
-import { formatTime } from '../utils/lyrics';
+import { buildDisplayLyrics, formatTime } from '../utils/lyrics';
 import { ArtistLinks } from './ArtistLinks';
+import { LyricsTranslationControls } from './LyricsTranslationControls';
+import { SongVersionSelector } from './SongVersionSelector';
 
 interface FullscreenNowPlayingModalProps {
   onSelectArtist?: (artistName: string) => void;
@@ -38,9 +41,15 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
     isFullscreenNowPlaying,
     setIsFullscreenNowPlaying,
     parsedLyrics,
+    translatedLyrics,
+    lyricsDisplayMode,
+    activeVersionLabel,
+    videoUrl,
+    openVideo,
     setIsCenterLyricsOpen,
   } = useAudio();
   const { currentTime, duration, activeLyricIndex } = useAudioTime();
+  const displayLyrics = buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode);
 
   const { isFavorite, toggleFavorite } = useMusic();
 
@@ -48,7 +57,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
 
   const liked = isFavorite(currentSong.id);
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-  const currentLine = parsedLyrics[activeLyricIndex];
+  const currentLine = displayLyrics[activeLyricIndex];
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between p-8 md:p-14 select-none overflow-hidden animate-in fade-in duration-300">
@@ -102,7 +111,26 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
             </p>
             <p className="text-xs text-neutral-500 mt-0.5">
               {currentSong.album} • {currentSong.year || '2026'}
+              {activeVersionLabel !== 'Original' ? ` • ${activeVersionLabel}` : ''}
             </p>
+
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1">
+              <SongVersionSelector compact />
+              {videoUrl && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFullscreenNowPlaying(false);
+                    openVideo();
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[10px] font-black transition-colors"
+                  title="Ver el videoclip de esta canción"
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  Ver videoclip
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Current Live Lyric Snippet */}
@@ -121,6 +149,17 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
               <p className="text-xl md:text-2xl font-black text-white leading-snug">
                 {currentLine.text}
               </p>
+              {currentLine.translation && (
+                <p className="text-sm md:text-base text-sky-200/80 font-semibold leading-snug mt-1">
+                  {currentLine.translation}
+                </p>
+              )}
+            </div>
+          )}
+
+          {parsedLyrics.length > 0 && (
+            <div className="flex justify-center md:justify-start">
+              <LyricsTranslationControls compact />
             </div>
           )}
         </div>
