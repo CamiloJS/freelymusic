@@ -114,7 +114,15 @@ export const PlayerBar: React.FC = () => {
         </div>
 
         <div className="truncate flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {currentSong.isExplicit && (
+              <span
+                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-black text-[9px] font-black flex-shrink-0 select-none leading-none"
+                title="Contenido explícito"
+              >
+                E
+              </span>
+            )}
             <span
               onClick={handleToggleNowPlaying}
               className="text-sm font-bold text-white hover:underline cursor-pointer truncate block"

@@ -52,10 +52,11 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   // Form State
   const [audioUrl, setAudioUrl] = useState('');
   const [title, setTitle] = useState('');
-  const [artist, setArtist] = useState('');
+  const [artistList, setArtistList] = useState<string[]>(['']);
   const [album, setAlbum] = useState('');
   const [genre, setGenre] = useState('');
   const [year, setYear] = useState('2026');
+  const [isExplicit, setIsExplicit] = useState<boolean>(false);
   const [coverUrl, setCoverUrl] = useState(
     'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80'
   );
@@ -63,6 +64,24 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   const [detectedDuration, setDetectedDuration] = useState<number>(180);
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectStatus, setDetectStatus] = useState<string | null>(null);
+
+  const handleAddArtist = () => {
+    setArtistList([...artistList, '']);
+  };
+
+  const handleRemoveArtist = (index: number) => {
+    if (artistList.length <= 1) {
+      setArtistList(['']);
+    } else {
+      setArtistList(artistList.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleArtistChange = (index: number, val: string) => {
+    const updated = [...artistList];
+    updated[index] = val;
+    setArtistList(updated);
+  };
 
   // In-page Audio Preview
   const [previewAudio, setPreviewAudio] = useState<HTMLAudioElement | null>(null);
@@ -103,7 +122,10 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         // If name has "Artist - Song", separate them
         if (cleanName.includes(' - ')) {
           const parts = cleanName.split(' - ');
-          if (parts[0] && !artist) setArtist(parts[0].trim());
+          if (parts[0]) {
+            const splitArtists = parts[0].split(/[,&]/).map((a) => a.trim()).filter(Boolean);
+            if (splitArtists.length > 0) setArtistList(splitArtists);
+          }
           if (parts[1]) setTitle(parts[1].trim());
         } else {
           setTitle(cleanName);
@@ -217,8 +239,9 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   // Save track to repository
   const handleSaveTrack = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!audioUrl.trim() || !title.trim() || !artist.trim()) {
-      setErrorMessage('Por favor completa el enlace de audio, título y artista.');
+    const finalArtist = artistList.map((a) => a.trim()).filter(Boolean).join(', ');
+    if (!audioUrl.trim() || !title.trim() || !finalArtist) {
+      setErrorMessage('Por favor completa el enlace de audio, título y al menos un artista.');
       setTimeout(() => setErrorMessage(''), 4000);
       return;
     }
@@ -226,7 +249,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     try {
       const newSong = addTrackToCatalog({
         title: title.trim(),
-        artist: artist.trim(),
+        artist: finalArtist,
         album: album.trim() || 'Sencillo',
         genre: genre.trim() || 'General',
         year: year.trim() || '2026',
@@ -234,6 +257,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         audioUrl: audioUrl.trim(),
         duration: detectedDuration || 180,
         lyricsLrc: lyricsLrc.trim() || undefined,
+        isExplicit: isExplicit,
       });
 
       setSuccessMessage(`¡"${newSong.title}" guardada exitosamente en el repositorio en la nube!`);
@@ -247,9 +271,10 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
       // Reset form
       setAudioUrl('');
       setTitle('');
-      setArtist('');
+      setArtistList(['']);
       setAlbum('');
       setGenre('');
+      setIsExplicit(false);
       setLyricsLrc('');
       setDetectStatus(null);
 
@@ -386,7 +411,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                 2. Metadata e Información del Tema
               </label>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold text-neutral-300 mb-1.5">
                     Título de la Canción *
@@ -401,17 +426,77 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-neutral-300 mb-1.5">
-                    Artista / Banda *
-                  </label>
+                {/* Multiple Artists List (User requirement: botón añadir artista separado por comas) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-neutral-300">
+                      Artistas y Colaboradores *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddArtist}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-emerald-400 text-xs font-bold transition-colors border border-neutral-800"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Añadir artista</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {artistList.map((art, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          required={idx === 0}
+                          value={art}
+                          onChange={(e) => handleArtistChange(idx, e.target.value)}
+                          placeholder={idx === 0 ? "Artista principal (Ej. Aitana)" : "Artista colaborador (Ej. Kenia OS)"}
+                          className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                        />
+                        {artistList.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveArtist(idx)}
+                            className="p-2.5 rounded-xl bg-neutral-900 hover:bg-red-950/40 text-neutral-400 hover:text-red-400 border border-neutral-800 transition-colors"
+                            title="Quitar artista"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {artistList.filter(Boolean).length > 1 && (
+                    <p className="text-[11px] text-neutral-500">
+                      Se guardará como: <span className="text-emerald-400 font-semibold">{artistList.filter(Boolean).join(', ')}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Explicit Content Toggle (E) */}
+                <div
+                  onClick={() => setIsExplicit(!isExplicit)}
+                  className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                    isExplicit
+                      ? 'bg-neutral-900 border-neutral-700 shadow-md'
+                      : 'bg-neutral-950/60 border-neutral-800/80 hover:border-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-neutral-600 text-black text-xs font-black select-none">
+                      E
+                    </span>
+                    <div>
+                      <span className="text-xs font-bold text-white block">Contenido Explícito (E)</span>
+                      <span className="text-[11px] text-neutral-400 block">Indica con una insignia "E" si la canción contiene letras explícitas</span>
+                    </div>
+                  </div>
                   <input
-                    type="text"
-                    required
-                    value={artist}
-                    onChange={(e) => setArtist(e.target.value)}
-                    placeholder="Ej. The Weeknd"
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    type="checkbox"
+                    checked={isExplicit}
+                    onChange={(e) => setIsExplicit(e.target.checked)}
+                    className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
                   />
                 </div>
               </div>
@@ -652,15 +737,25 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                           className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                         />
                         <div className="truncate">
-                          <span
-                            className={`block font-bold text-xs truncate ${
-                              isCurrent ? 'text-emerald-400' : 'text-white'
-                            }`}
-                          >
-                            {song.title}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {song.isExplicit && (
+                              <span
+                                className="inline-flex items-center justify-center w-3 h-3 rounded bg-neutral-600/80 text-black text-[8px] font-black flex-shrink-0 select-none leading-none"
+                                title="Contenido explícito"
+                              >
+                                E
+                              </span>
+                            )}
+                            <span
+                              className={`block font-bold text-xs truncate ${
+                                isCurrent ? 'text-emerald-400' : 'text-white'
+                              }`}
+                            >
+                              {song.title}
+                            </span>
+                          </div>
                           <span className="block text-[10px] text-neutral-400 truncate">
-                            {song.artist} • {song.genre || 'General'}
+                            {song.artist}
                           </span>
                         </div>
                       </div>

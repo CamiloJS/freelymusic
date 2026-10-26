@@ -480,16 +480,44 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                       </div>
 
                       <div className="truncate">
-                        <span
-                          className={`block text-sm font-bold truncate ${
-                            isCurrent ? 'text-emerald-400' : 'text-white'
-                          }`}
-                        >
-                          {song.title}
-                        </span>
-                        <span className="block text-xs text-neutral-400 truncate mt-0.5">
-                          {song.artist} {song.year ? `• ${song.year}` : ''}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {song.isExplicit && (
+                            <span
+                              className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-black text-[9px] font-black flex-shrink-0 select-none leading-none"
+                              title="Contenido explícito"
+                            >
+                              E
+                            </span>
+                          )}
+                          <span
+                            className={`block text-sm font-bold truncate ${
+                              isCurrent ? 'text-emerald-400' : 'text-white'
+                            }`}
+                          >
+                            {song.title}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1 text-xs text-neutral-400 truncate mt-0.5">
+                          {song.artist.split(',').map((art, aIdx, arr) => {
+                            const trimmed = art.trim();
+                            return (
+                              <React.Fragment key={aIdx}>
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSelectQuery(trimmed);
+                                  }}
+                                  className="hover:text-emerald-400 hover:underline cursor-pointer"
+                                  title={`Ver todas las canciones y colaboraciones de ${trimmed}`}
+                                >
+                                  {trimmed}
+                                </span>
+                                {aIdx < arr.length - 1 && <span>,</span>}
+                              </React.Fragment>
+                            );
+                          })}
+                          {song.year ? <span>• {song.year}</span> : ''}
+                        </div>
 
                         {lyricMatchSnippet && (
                           <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400/90 font-medium truncate mt-1 bg-emerald-500/10 px-2 py-0.5 rounded-md">

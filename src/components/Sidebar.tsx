@@ -99,17 +99,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </div>
         </div>
-
-        {/* Network indicator */}
-        <div
-          title={isOnline ? 'Conectado a la nube' : 'Modo fuera de línea'}
-          className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-            isOnline ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60' : 'bg-amber-950/80 text-amber-400 border border-amber-800/60'
-          }`}
-        >
-          {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-          <span>{isOnline ? 'Online' : 'Offline'}</span>
-        </div>
       </div>
 
       {/* Main Navigation (Inicio, Explorar la Nube, Añadir Música) */}

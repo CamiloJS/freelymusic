@@ -15,7 +15,9 @@ import {
   Sparkles,
   KeyRound,
   Download,
-  FileCode
+  FileCode,
+  Pencil,
+  X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
@@ -33,10 +35,11 @@ export const AdminView: React.FC = () => {
   // Tab 1: Upload song state
   const [audioUrl, setAudioUrl] = useState('');
   const [title, setTitle] = useState('');
-  const [artist, setArtist] = useState('');
+  const [artistList, setArtistList] = useState<string[]>(['']);
   const [album, setAlbum] = useState('');
   const [genre, setGenre] = useState('');
   const [year, setYear] = useState('2026');
+  const [adminIsExplicit, setAdminIsExplicit] = useState(false);
   const [coverUrl, setCoverUrl] = useState(
     'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80'
   );
@@ -61,6 +64,64 @@ export const AdminView: React.FC = () => {
   const [fbStorageBucket, setFbStorageBucket] = useState(() => getStoredFirebaseConfig()?.storageBucket || '');
   const [fbAppId, setFbAppId] = useState(() => getStoredFirebaseConfig()?.appId || '');
   const [fbStatusMessage, setFbStatusMessage] = useState('');
+
+  // Tab 3: Song Configuration & Editing in Global Catalog
+  const [editingSong, setEditingSong] = useState<Song | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editArtistList, setEditArtistList] = useState<string[]>(['']);
+  const [editAlbum, setEditAlbum] = useState('');
+  const [editGenre, setEditGenre] = useState('');
+  const [editYear, setEditYear] = useState('2026');
+  const [editCoverUrl, setEditCoverUrl] = useState('');
+  const [editAudioUrl, setEditAudioUrl] = useState('');
+  const [editLyricsLrc, setEditLyricsLrc] = useState('');
+  const [editIsExplicit, setEditIsExplicit] = useState(false);
+  const [editDuration, setEditDuration] = useState(180);
+  const editCoverFileInputRef = useRef<HTMLInputElement | null>(null);
+  const editLrcFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleOpenEditSong = (song: Song) => {
+    setEditingSong(song);
+    setEditTitle(song.title);
+    const split = song.artist ? song.artist.split(',').map((a) => a.trim()).filter(Boolean) : [''];
+    setEditArtistList(split.length > 0 ? split : ['']);
+    setEditAlbum(song.album || '');
+    setEditGenre(song.genre || '');
+    setEditYear(song.year || '2026');
+    setEditCoverUrl(song.coverUrl);
+    setEditAudioUrl(song.audioUrl);
+    setEditLyricsLrc(song.lyricsLrc || song.plainLyrics || '');
+    setEditIsExplicit(Boolean(song.isExplicit));
+    setEditDuration(song.duration || 180);
+  };
+
+  const handleSaveEditSong = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSong) return;
+
+    const finalArtist = editArtistList.map((a) => a.trim()).filter(Boolean).join(', ');
+    if (!editTitle.trim() || !finalArtist || !editAudioUrl.trim()) {
+      alert('El título, al menos un artista y el enlace de audio son requeridos.');
+      return;
+    }
+
+    const updated: Song = {
+      ...editingSong,
+      title: editTitle.trim(),
+      artist: finalArtist,
+      album: editAlbum.trim() || 'Sencillo',
+      genre: editGenre.trim() || 'General',
+      year: editYear.trim() || '2026',
+      coverUrl: editCoverUrl.trim(),
+      audioUrl: editAudioUrl.trim(),
+      lyricsLrc: editLyricsLrc.trim() || undefined,
+      isExplicit: editIsExplicit,
+      duration: editDuration,
+    };
+
+    updateCatalogTrack(updated);
+    setEditingSong(null);
+  };
 
   const lrcFileInputRef = useRef<HTMLInputElement | null>(null);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -168,11 +229,12 @@ export const AdminView: React.FC = () => {
   // Save Track to Catalog
   const handleSaveTrack = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!audioUrl || !title || !artist) return;
+    const finalArtist = artistList.map((a) => a.trim()).filter(Boolean).join(', ');
+    if (!audioUrl || !title || !finalArtist) return;
 
     addTrackToCatalog({
       title: title.trim(),
-      artist: artist.trim(),
+      artist: finalArtist,
       album: album.trim() || 'Sencillo',
       genre: genre.trim() || 'General',
       year: year.trim() || '2026',
@@ -180,14 +242,16 @@ export const AdminView: React.FC = () => {
       audioUrl: audioUrl.trim(),
       duration: detectedDuration || 180,
       lyricsLrc: lyricsLrc.trim() || undefined,
+      isExplicit: adminIsExplicit,
     });
 
     setUploadSuccess(true);
     setTitle('');
-    setArtist('');
+    setArtistList(['']);
     setAlbum('');
     setAudioUrl('');
     setLyricsLrc('');
+    setAdminIsExplicit(false);
 
     if (previewAudio) {
       previewAudio.pause();
@@ -384,7 +448,7 @@ export const AdminView: React.FC = () => {
             </div>
 
             {/* Title & Artist */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
                   Título de la Canción *
@@ -399,17 +463,74 @@ export const AdminView: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
-                  Artista *
-                </label>
+              {/* Multiple Artists List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider">
+                    Artistas y Colaboradores *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setArtistList([...artistList, ''])}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-emerald-400 text-xs font-bold border border-neutral-800"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Añadir artista</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {artistList.map((art, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        required={idx === 0}
+                        value={art}
+                        onChange={(e) => {
+                          const updated = [...artistList];
+                          updated[idx] = e.target.value;
+                          setArtistList(updated);
+                        }}
+                        placeholder={idx === 0 ? "Artista principal (Ej. Aitana)" : "Artista colaborador (Ej. Kenia OS)"}
+                        className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      />
+                      {artistList.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setArtistList(artistList.filter((_, i) => i !== idx))}
+                          className="p-2.5 rounded-xl bg-neutral-900 hover:bg-red-950/40 text-neutral-400 hover:text-red-400 border border-neutral-800"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Explicit Content Toggle (E) */}
+              <div
+                onClick={() => setAdminIsExplicit(!adminIsExplicit)}
+                className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                  adminIsExplicit
+                    ? 'bg-neutral-900 border-neutral-700 shadow-md'
+                    : 'bg-neutral-950/60 border-neutral-800/80 hover:border-neutral-700'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-neutral-600 text-black text-xs font-black select-none">
+                    E
+                  </span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Contenido Explícito (E)</span>
+                    <span className="text-[11px] text-neutral-400 block">Indica si la canción contiene letras explícitas con la insignia "E"</span>
+                  </div>
+                </div>
                 <input
-                  type="text"
-                  required
-                  value={artist}
-                  onChange={(e) => setArtist(e.target.value)}
-                  placeholder="Ej: The Weeknd, Daft Punk..."
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  type="checkbox"
+                  checked={adminIsExplicit}
+                  onChange={(e) => setAdminIsExplicit(e.target.checked)}
+                  className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
                 />
               </div>
             </div>
@@ -720,9 +841,9 @@ export const AdminView: React.FC = () => {
         <div className="bg-neutral-900/40 border border-neutral-800/80 rounded-3xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-extrabold text-white text-lg">Catálogo Global de FreelyMusic</h3>
+              <h3 className="font-extrabold text-white text-lg">Catálogo Global de Música</h3>
               <p className="text-xs text-neutral-400">
-                Pistas agregadas por enlaces que están disponibles para la búsqueda en la nube.
+                Configura cada canción, modifica sus artistas colaboradores, ajusta sus letras sincronizadas o marca si es explícita (E).
               </p>
             </div>
           </div>
@@ -740,21 +861,40 @@ export const AdminView: React.FC = () => {
                     className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                   />
                   <div className="truncate">
-                    <span className="block font-bold text-sm text-white truncate">{song.title}</span>
+                    <div className="flex items-center gap-1.5">
+                      {song.isExplicit && (
+                        <span
+                          className="inline-flex items-center justify-center w-3 h-3 rounded bg-neutral-600/80 text-black text-[8px] font-black flex-shrink-0 select-none leading-none"
+                          title="Contenido explícito"
+                        >
+                          E
+                        </span>
+                      )}
+                      <span className="block font-bold text-sm text-white truncate">{song.title}</span>
+                    </div>
                     <span className="block text-xs text-neutral-400 truncate">
                       {song.artist} • {song.album}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOpenEditSong(song)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-emerald-500 hover:text-black text-neutral-300 font-bold text-xs transition-colors"
+                    title="Editar y configurar canción"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>Configurar</span>
+                  </button>
+
                   <a
                     href={song.audioUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-emerald-400 hover:underline font-mono truncate max-w-[200px] hidden sm:block"
+                    className="text-xs text-emerald-400 hover:underline font-mono truncate max-w-[120px] hidden sm:block px-2"
                   >
-                    Ver URL
+                    URL
                   </a>
 
                   <button
@@ -772,6 +912,238 @@ export const AdminView: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* EDIT SONG MODAL */}
+          {editingSong && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-5 shadow-2xl animate-in fade-in zoom-in-95">
+                <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
+                  <div>
+                    <h3 className="text-lg font-extrabold text-white">Configurar Canción</h3>
+                    <p className="text-xs text-neutral-400">Modifica la metadata, artistas, letra o estado explícito</p>
+                  </div>
+                  <button
+                    onClick={() => setEditingSong(null)}
+                    className="p-1.5 text-neutral-400 hover:text-white rounded-full hover:bg-neutral-800"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveEditSong} className="space-y-4">
+                  {/* Title */}
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-300 mb-1.5">Título</label>
+                    <input
+                      type="text"
+                      required
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Multiple Artists */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-neutral-300">
+                        Artistas y Colaboradores
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setEditArtistList([...editArtistList, ''])}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-emerald-400 text-xs font-bold"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Añadir artista</span>
+                      </button>
+                    </div>
+
+                    {editArtistList.map((art, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          required={idx === 0}
+                          value={art}
+                          onChange={(e) => {
+                            const updated = [...editArtistList];
+                            updated[idx] = e.target.value;
+                            setEditArtistList(updated);
+                          }}
+                          placeholder={idx === 0 ? "Artista principal" : "Artista colaborador"}
+                          className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                        />
+                        {editArtistList.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setEditArtistList(editArtistList.filter((_, i) => i !== idx))}
+                            className="p-2 text-neutral-400 hover:text-red-400"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Album & Year */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-300 mb-1.5">Álbum</label>
+                      <input
+                        type="text"
+                        value={editAlbum}
+                        onChange={(e) => setEditAlbum(e.target.value)}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-300 mb-1.5">Año</label>
+                      <input
+                        type="text"
+                        value={editYear}
+                        onChange={(e) => setEditYear(e.target.value)}
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Explicit Toggle (E) */}
+                  <div
+                    onClick={() => setEditIsExplicit(!editIsExplicit)}
+                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer ${
+                      editIsExplicit ? 'bg-neutral-950 border-neutral-700' : 'bg-neutral-950/60 border-neutral-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-neutral-600 text-black text-[9px] font-black">
+                        E
+                      </span>
+                      <span className="text-xs font-bold text-white">Contenido Explícito (E)</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={editIsExplicit}
+                      onChange={(e) => setEditIsExplicit(e.target.checked)}
+                      className="w-4 h-4 accent-emerald-500"
+                    />
+                  </div>
+
+                  {/* Cover Art Preview & Upload */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-neutral-300">Carátula</label>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={editCoverUrl || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80'}
+                        alt="Preview"
+                        className="w-14 h-14 rounded-xl object-cover ring-1 ring-neutral-700"
+                      />
+                      <div className="flex-1 space-y-1.5">
+                        <input
+                          type="file"
+                          ref={editCoverFileInputRef}
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              const compressed = await compressImage(file, 500, 0.8);
+                              if (compressed) setEditCoverUrl(compressed);
+                            } catch (err) {
+                              console.warn(err);
+                            }
+                          }}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => editCoverFileInputRef.current?.click()}
+                          className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-emerald-400 font-bold text-xs"
+                        >
+                          Subir carátula desde PC
+                        </button>
+                        <input
+                          type="url"
+                          value={editCoverUrl}
+                          onChange={(e) => setEditCoverUrl(e.target.value)}
+                          placeholder="O pegar URL de imagen"
+                          className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Audio URL */}
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-300 mb-1.5">Enlace de Audio (URL directa)</label>
+                    <input
+                      type="url"
+                      required
+                      value={editAudioUrl}
+                      onChange={(e) => setEditAudioUrl(e.target.value)}
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Lyrics LRC */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-neutral-300">
+                        Letras sincronizadas (.lrc) o texto
+                      </label>
+                      <input
+                        type="file"
+                        ref={editLrcFileInputRef}
+                        accept=".lrc,.txt"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            const txt = ev.target?.result as string;
+                            if (txt) setEditLyricsLrc(txt);
+                          };
+                          reader.readAsText(file);
+                        }}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => editLrcFileInputRef.current?.click()}
+                        className="text-xs text-emerald-400 hover:underline"
+                      >
+                        Cargar archivo .lrc
+                      </button>
+                    </div>
+                    <textarea
+                      rows={5}
+                      value={editLyricsLrc}
+                      onChange={(e) => setEditLyricsLrc(e.target.value)}
+                      placeholder="[00:05.00] Letra aquí..."
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-800">
+                    <button
+                      type="button"
+                      onClick={() => setEditingSong(null)}
+                      className="px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs shadow-lg shadow-emerald-500/20"
+                    >
+                      Guardar Cambios
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

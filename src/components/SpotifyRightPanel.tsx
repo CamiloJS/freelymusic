@@ -44,9 +44,10 @@ export const SpotifyRightPanel: React.FC = () => {
   const currentIndex = queue.findIndex((s) => s.id === currentSong.id);
   const upcomingSongs = currentIndex >= 0 ? queue.slice(currentIndex + 1) : queue;
 
-  // Active lyric line snippet for "Muestra de la letra" card
+  // Visible lyric lines for "Letra" card (at least 5-6 lines around active line)
+  const startLyricIndex = Math.max(0, activeLyricIndex - 1);
   const lyricSnippet = parsedLyrics.length > 0
-    ? parsedLyrics.slice(Math.max(0, activeLyricIndex - 1), activeLyricIndex + 2)
+    ? parsedLyrics.slice(startLyricIndex, startLyricIndex + 6)
     : [];
 
   const sourceName = playbackSource?.name || 'Tus me gusta';
@@ -119,10 +120,20 @@ export const SpotifyRightPanel: React.FC = () => {
 
             {/* Title & Artist */}
             <div className="flex items-center justify-between gap-3">
-              <div className="truncate">
-                <h3 className="font-extrabold text-lg text-white truncate block">
-                  {currentSong.title}
-                </h3>
+              <div className="truncate flex-1">
+                <div className="flex items-center gap-1.5">
+                  {currentSong.isExplicit && (
+                    <span
+                      className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-black text-[9px] font-black flex-shrink-0 select-none leading-none"
+                      title="Contenido explícito"
+                    >
+                      E
+                    </span>
+                  )}
+                  <h3 className="font-extrabold text-base text-white truncate block">
+                    {currentSong.title}
+                  </h3>
+                </div>
                 <p className="text-xs text-neutral-400 truncate mt-0.5">
                   {currentSong.artist}
                 </p>
@@ -141,7 +152,7 @@ export const SpotifyRightPanel: React.FC = () => {
               </div>
             </div>
 
-            {/* Muestra de la letra Card (Spotify Image 5) */}
+            {/* Letra Card */}
             <div
               onClick={() => setIsCenterLyricsOpen(true)}
               className="bg-gradient-to-br from-cyan-950 via-sky-950 to-neutral-950 border border-sky-900/40 p-4 rounded-2xl cursor-pointer group hover:border-sky-500/50 transition-all shadow-xl space-y-2 relative overflow-hidden"
@@ -149,7 +160,7 @@ export const SpotifyRightPanel: React.FC = () => {
               <div className="flex items-center justify-between text-sky-400 text-xs font-bold">
                 <span className="flex items-center gap-1.5">
                   <Mic2 className="w-3.5 h-3.5" />
-                  Muestra de la letra
+                  Letra
                 </span>
                 <span className="text-[10px] uppercase font-bold text-sky-300 group-hover:underline flex items-center gap-0.5">
                   Ver completa <ChevronRight className="w-3 h-3" />
@@ -157,19 +168,23 @@ export const SpotifyRightPanel: React.FC = () => {
               </div>
 
               {lyricSnippet.length > 0 ? (
-                <div className="space-y-1 pt-1">
-                  {lyricSnippet.map((line, idx) => (
-                    <p
-                      key={idx}
-                      className={`text-sm font-black tracking-tight transition-colors line-clamp-1 ${
-                        idx === 1
-                          ? 'text-white scale-102 font-extrabold'
-                          : 'text-sky-300/60'
-                      }`}
-                    >
-                      {line.text}
-                    </p>
-                  ))}
+                <div className="space-y-1.5 pt-1 max-h-56 overflow-hidden">
+                  {lyricSnippet.map((line, idx) => {
+                    const actualIdx = startLyricIndex + idx;
+                    const isActive = actualIdx === activeLyricIndex;
+                    return (
+                      <p
+                        key={idx}
+                        className={`text-xs md:text-sm leading-relaxed transition-all ${
+                          isActive
+                            ? 'text-white font-extrabold scale-101 origin-left'
+                            : 'text-sky-300/60 font-medium'
+                        }`}
+                      >
+                        {line.text}
+                      </p>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-xs text-neutral-400 pt-1">

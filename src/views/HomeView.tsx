@@ -150,13 +150,23 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </div>
 
                 <div className="flex-1 truncate">
-                  <span
-                    className={`block font-bold text-sm truncate ${
-                      isCurrent ? 'text-emerald-400' : 'text-white'
-                    }`}
-                  >
-                    {song.title}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {song.isExplicit && (
+                      <span
+                        className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-black text-[9px] font-black flex-shrink-0 select-none leading-none"
+                        title="Contenido explícito"
+                      >
+                        E
+                      </span>
+                    )}
+                    <span
+                      className={`block font-bold text-sm truncate ${
+                        isCurrent ? 'text-emerald-400' : 'text-white'
+                      }`}
+                    >
+                      {song.title}
+                    </span>
+                  </div>
                   <span className="block text-xs text-neutral-400 truncate mt-0.5">
                     {song.artist}
                   </span>
@@ -181,18 +191,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </div>
       </div>
 
-      {/* Recommended by AI by Genre Carousel/Grid */}
+      {/* Genre Mixes */}
       {genreMixes.map((mix) => (
         <div key={mix.genre} className="space-y-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-xl font-bold text-white">
-                Recomendado por IA · {mix.genre}
+            <div>
+              <h2 className="text-xl font-bold text-white capitalize">
+                {mix.genre}
               </h2>
-              <span className="text-[10px] uppercase font-extrabold tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                IA Match
-              </span>
             </div>
             <button
               onClick={() => onNavigate('cloud')}
@@ -228,19 +234,26 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     </div>
                   </div>
 
-                  <h3
-                    className={`font-bold text-xs truncate ${
-                      isCurrent ? 'text-emerald-400' : 'text-white'
-                    }`}
-                  >
-                    {song.title}
-                  </h3>
+                  <div className="flex items-center gap-1.5">
+                    {song.isExplicit && (
+                      <span
+                        className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-black text-[9px] font-black flex-shrink-0 select-none leading-none"
+                        title="Contenido explícito"
+                      >
+                        E
+                      </span>
+                    )}
+                    <h3
+                      className={`font-bold text-xs truncate ${
+                        isCurrent ? 'text-emerald-400' : 'text-white'
+                      }`}
+                    >
+                      {song.title}
+                    </h3>
+                  </div>
                   <p className="text-[11px] text-neutral-400 truncate mt-0.5">
                     {song.artist}
                   </p>
-                  <span className="inline-block mt-2 text-[9px] uppercase font-bold text-neutral-500 bg-neutral-950 px-1.5 py-0.5 rounded">
-                    {song.genre || 'General'}
-                  </span>
                 </div>
               );
             })}

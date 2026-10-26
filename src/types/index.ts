@@ -22,6 +22,7 @@ export interface Song {
   plainLyrics?: string;
   genre?: string;
   year?: string;
+  isExplicit?: boolean;
   addedBy?: string;
   createdAt: string;
 }

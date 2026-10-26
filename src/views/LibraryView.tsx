@@ -334,13 +334,23 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                           className="w-10 h-10 rounded-lg object-cover flex-shrink-0 shadow"
                         />
                         <div className="truncate">
-                          <span
-                            className={`block font-bold text-sm truncate ${
-                              isCurrent ? 'text-emerald-400' : 'text-white'
-                            }`}
-                          >
-                            {song.title}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {song.isExplicit && (
+                              <span
+                                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-black text-[9px] font-black flex-shrink-0 select-none leading-none"
+                                title="Contenido explícito"
+                              >
+                                E
+                              </span>
+                            )}
+                            <span
+                              className={`block font-bold text-sm truncate ${
+                                isCurrent ? 'text-emerald-400' : 'text-white'
+                              }`}
+                            >
+                              {song.title}
+                            </span>
+                          </div>
                           <span className="block text-xs text-neutral-400 truncate mt-0.5">
                             {song.artist}
                           </span>
