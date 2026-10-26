@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="neonGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1ed760" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#0a0a0a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1ed760"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="discGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262626"/>
+      <stop offset="50%" stop-color="#121212"/>
+      <stop offset="100%" stop-color="#080808"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="128" fill="#0c0d0e"/>
+  <circle cx="256" cy="256" r="230" fill="url(#neonGlow)"/>
+
+  <!-- Vinyl grooves -->
+  <circle cx="256" cy="256" r="180" fill="url(#discGrad)" stroke="#1ed760" stroke-width="4" stroke-opacity="0.3"/>
+  <circle cx="256" cy="256" r="145" fill="none" stroke="#ffffff" stroke-width="2" stroke-opacity="0.08"/>
+  <circle cx="256" cy="256" r="110" fill="none" stroke="#ffffff" stroke-width="2" stroke-opacity="0.08"/>
+
+  <!-- Center Core -->
+  <circle cx="256" cy="256" r="75" fill="url(#brandGrad)" filter="drop-shadow(0 0 25px rgba(30, 215, 96, 0.6))"/>
+  <circle cx="256" cy="256" r="24" fill="#0c0d0e"/>
+
+  <!-- Equalizer soundwaves -->
+  <path d="M 230 256 Q 230 210 256 210 Q 282 210 282 256" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+  <path d="M 210 256 Q 210 180 256 180 Q 302 180 302 256" fill="none" stroke="#1ed760" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+</svg>
