@@ -81,7 +81,7 @@ export const OfflineView: React.FC = () => {
 
                   <img
                     src={song.coverUrl}
-                    alt={song.title}
+                    alt={song.title} loading="lazy" decoding="async"
                     className="w-11 h-11 rounded-xl object-cover flex-shrink-0 shadow"
                   />
 

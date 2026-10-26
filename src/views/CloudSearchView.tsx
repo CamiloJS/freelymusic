@@ -488,7 +488,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                       <div className="w-11 h-11 rounded-xl bg-neutral-800 overflow-hidden flex-shrink-0 shadow relative">
                         <img
                           src={song.coverUrl}
-                          alt={song.title}
+                          alt={song.title} loading="lazy" decoding="async"
                           className="w-full h-full object-cover"
                         />
                       </div>

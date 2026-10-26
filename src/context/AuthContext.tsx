@@ -45,28 +45,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Firestore initial sync & live updates
   useEffect(() => {
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
     const localProfiles = getStoredProfiles();
+
     syncProfilesFromFirestore().then(async (cloudProfiles) => {
+      if (cancelled) return;
+
       if (cloudProfiles && cloudProfiles.length > 0) {
         setAllUsers(cloudProfiles);
         saveStoredProfiles(cloudProfiles);
       } else {
         // First time initializing Firestore database with profiles
-        for (const p of localProfiles) {
-          await saveProfileToFirestore(p);
+        for (const profile of localProfiles) {
+          await saveProfileToFirestore(profile);
         }
       }
     });
 
-    const unsubscribe = subscribeToProfilesUpdates((cloudProfiles) => {
-      if (cloudProfiles && cloudProfiles.length > 0) {
-        setAllUsers(cloudProfiles);
-        saveStoredProfiles(cloudProfiles);
+    subscribeToProfilesUpdates(
+      (cloudProfiles) => {
+        if (cancelled) return;
+        if (cloudProfiles && cloudProfiles.length > 0) {
+          setAllUsers(cloudProfiles);
+          saveStoredProfiles(cloudProfiles);
+        }
+      },
+      (err) => console.warn('No se pudieron sincronizar los perfiles:', err)
+    ).then((unsub) => {
+      if (cancelled) {
+        unsub?.();
+      } else {
+        unsubscribe = unsub;
       }
     });
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      cancelled = true;
+      unsubscribe?.();
     };
   }, []);
 

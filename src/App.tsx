@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { MusicProvider, useMusic } from './context/MusicContext';
 import { AudioProvider, useAudio } from './context/AudioContext';
@@ -6,20 +6,7 @@ import { CustomizationProvider, useCustomization } from './context/Customization
 import { Sidebar } from './components/Sidebar';
 import { PlayerBar } from './components/PlayerBar';
 import { SpotifyRightPanel } from './components/SpotifyRightPanel';
-import { CenterLyricsView } from './components/CenterLyricsView';
-import { FullscreenNowPlayingModal } from './components/FullscreenNowPlayingModal';
 import { InstallPrompt } from './components/InstallPrompt';
-import { ProfileSwitcherModal } from './components/ProfileSwitcherModal';
-import { AddToPlaylistModal } from './components/AddToPlaylistModal';
-import { CreatePlaylistModal } from './components/CreatePlaylistModal';
-import { LoginLockScreen } from './components/LoginLockScreen';
-import { HomeView } from './views/HomeView';
-import { CloudSearchView } from './views/CloudSearchView';
-import { LibraryView } from './views/LibraryView';
-import { OfflineView } from './views/OfflineView';
-import { AdminView } from './views/AdminView';
-import { AddMusicView } from './views/AddMusicView';
-import { ArtistProfileView } from './views/ArtistProfileView';
 import { Playlist, Song, Album } from './types';
 import { getCustomAppIcon, applyAppIcon } from './utils/appIcon';
 import { DEFAULT_AVATAR } from './services/storage';
@@ -37,11 +24,72 @@ import {
   ChevronRight,
   ArrowDownCircle,
   Settings,
-  Sparkles
+  Loader2
 } from 'lucide-react';
+
+// Views and modals are split into separate chunks: the first paint no longer
+// has to download Admin, Add Music, the artist page or every modal.
+const HomeView = lazy(() =>
+  import('./views/HomeView').then((module) => ({ default: module.HomeView }))
+);
+const CloudSearchView = lazy(() =>
+  import('./views/CloudSearchView').then((module) => ({ default: module.CloudSearchView }))
+);
+const LibraryView = lazy(() =>
+  import('./views/LibraryView').then((module) => ({ default: module.LibraryView }))
+);
+const OfflineView = lazy(() =>
+  import('./views/OfflineView').then((module) => ({ default: module.OfflineView }))
+);
+const AdminView = lazy(() =>
+  import('./views/AdminView').then((module) => ({ default: module.AdminView }))
+);
+const AddMusicView = lazy(() =>
+  import('./views/AddMusicView').then((module) => ({ default: module.AddMusicView }))
+);
+const ArtistProfileView = lazy(() =>
+  import('./views/ArtistProfileView').then((module) => ({ default: module.ArtistProfileView }))
+);
+const CenterLyricsView = lazy(() =>
+  import('./components/CenterLyricsView').then((module) => ({ default: module.CenterLyricsView }))
+);
+const FullscreenNowPlayingModal = lazy(() =>
+  import('./components/FullscreenNowPlayingModal').then((module) => ({
+    default: module.FullscreenNowPlayingModal,
+  }))
+);
+const ProfileSwitcherModal = lazy(() =>
+  import('./components/ProfileSwitcherModal').then((module) => ({
+    default: module.ProfileSwitcherModal,
+  }))
+);
+const AddToPlaylistModal = lazy(() =>
+  import('./components/AddToPlaylistModal').then((module) => ({
+    default: module.AddToPlaylistModal,
+  }))
+);
+const CreatePlaylistModal = lazy(() =>
+  import('./components/CreatePlaylistModal').then((module) => ({
+    default: module.CreatePlaylistModal,
+  }))
+);
+const LoginLockScreen = lazy(() =>
+  import('./components/LoginLockScreen').then((module) => ({ default: module.LoginLockScreen }))
+);
+
+const ViewLoader: React.FC<{ compact?: boolean }> = ({ compact = false }) => (
+  <div
+    className={`flex items-center justify-center text-emerald-400 ${
+      compact ? 'h-32' : 'h-full min-h-[240px]'
+    }`}
+  >
+    <Loader2 className="w-6 h-6 animate-spin" />
+  </div>
+);
 
 const MainLayout: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('home');
+  const previousTabRef = useRef<string>('home');
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | 'favorites' | Album | null>(null);
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [songToAddToPlaylist, setSongToAddToPlaylist] = useState<Song | null>(null);
@@ -52,7 +100,12 @@ const MainLayout: React.FC = () => {
 
   const { currentUser, isAdmin } = useAuth();
   const { downloadingState } = useMusic();
-  const { isCenterLyricsOpen, setIsCenterLyricsOpen, currentSong } = useAudio();
+  const {
+    isCenterLyricsOpen,
+    setIsCenterLyricsOpen,
+    currentSong,
+    isFullscreenNowPlaying,
+  } = useAudio();
   const { appName, appIcon } = useCustomization();
 
   // Listen to network status & initialize custom app icon
@@ -85,9 +138,16 @@ const MainLayout: React.FC = () => {
   };
 
   const handleSelectArtist = (artistName: string) => {
+    if (currentTab !== 'artist') {
+      previousTabRef.current = currentTab;
+    }
     setSelectedArtist(artistName);
     setCurrentTab('artist');
     setIsCenterLyricsOpen(false);
+  };
+
+  const handleBackFromArtist = () => {
+    setCurrentTab(previousTabRef.current || 'home');
   };
 
   const handleSelectAlbum = (album: Album) => {
@@ -104,7 +164,15 @@ const MainLayout: React.FC = () => {
         <div className="flex items-center gap-2">
           <div className="hidden sm:flex items-center gap-1">
             <button
-              onClick={() => window.history.back()}
+              onClick={() => {
+                if (currentTab === 'artist') {
+                  handleBackFromArtist();
+                } else if (currentTab === 'library' && selectedPlaylist) {
+                  setSelectedPlaylist(null);
+                } else {
+                  window.history.back();
+                }
+              }}
               className="w-8 h-8 rounded-full bg-neutral-900 hover:bg-neutral-800 text-neutral-300 flex items-center justify-center transition-colors"
               title="Atrás"
             >
@@ -283,57 +351,62 @@ const MainLayout: React.FC = () => {
         <main className="flex-1 flex flex-col h-full min-w-0 bg-neutral-950 overflow-hidden relative">
           {isCenterLyricsOpen && currentSong ? (
             /* Lyrics View docked in center area */
-            <CenterLyricsView />
+            <Suspense fallback={<ViewLoader />}>
+              <CenterLyricsView />
+            </Suspense>
           ) : (
             /* Normal Center Content Views */
             <div className="flex-1 overflow-y-auto">
-              {currentTab === 'home' && (
-                <HomeView
-                  onNavigate={(tab) => {
-                    setCurrentTab(tab);
-                    if (tab !== 'library') setSelectedPlaylist(null);
-                  }}
-                  onSelectPlaylist={handleSelectPlaylist}
-                  onOpenAddToPlaylist={handleOpenAddToPlaylist}
-                  onSelectArtist={handleSelectArtist}
-                />
-              )}
+              <Suspense fallback={<ViewLoader />}>
+                {currentTab === 'home' && (
+                  <HomeView
+                    onNavigate={(tab) => {
+                      setCurrentTab(tab);
+                      if (tab !== 'library') setSelectedPlaylist(null);
+                    }}
+                    onSelectPlaylist={handleSelectPlaylist}
+                    onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                    onSelectArtist={handleSelectArtist}
+                  />
+                )}
 
-              {currentTab === 'cloud' && (
-                <CloudSearchView
-                  onOpenAddToPlaylist={handleOpenAddToPlaylist}
-                  onOpenAddMusic={() => setCurrentTab('add-music')}
-                  onSelectArtist={handleSelectArtist}
-                  onSelectAlbum={handleSelectAlbum}
-                />
-              )}
+                {currentTab === 'cloud' && (
+                  <CloudSearchView
+                    onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                    onOpenAddMusic={() => setCurrentTab('add-music')}
+                    onSelectArtist={handleSelectArtist}
+                    onSelectAlbum={handleSelectAlbum}
+                  />
+                )}
 
-              {currentTab === 'add-music' && (
-                <AddMusicView onNavigate={setCurrentTab} />
-              )}
+                {currentTab === 'add-music' && (
+                  <AddMusicView onNavigate={setCurrentTab} />
+                )}
 
-              {currentTab === 'library' && (
-                <LibraryView
-                  selectedPlaylist={selectedPlaylist}
-                  setSelectedPlaylist={setSelectedPlaylist}
-                  onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
-                  onOpenAddToPlaylist={handleOpenAddToPlaylist}
-                  onSelectArtist={handleSelectArtist}
-                />
-              )}
+                {currentTab === 'library' && (
+                  <LibraryView
+                    selectedPlaylist={selectedPlaylist}
+                    setSelectedPlaylist={setSelectedPlaylist}
+                    onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
+                    onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                    onSelectArtist={handleSelectArtist}
+                  />
+                )}
 
-              {currentTab === 'artist' && selectedArtist && (
-                <ArtistProfileView
-                  artistName={selectedArtist}
-                  onSelectArtist={handleSelectArtist}
-                  onSelectAlbum={handleSelectAlbum}
-                  onOpenAddToPlaylist={handleOpenAddToPlaylist}
-                />
-              )}
+                {currentTab === 'artist' && selectedArtist && (
+                  <ArtistProfileView
+                    artistName={selectedArtist}
+                    onSelectArtist={handleSelectArtist}
+                    onSelectAlbum={handleSelectAlbum}
+                    onOpenAddToPlaylist={handleOpenAddToPlaylist}
+                    onBack={handleBackFromArtist}
+                  />
+                )}
 
-              {currentTab === 'offline' && <OfflineView />}
+                {currentTab === 'offline' && <OfflineView />}
 
-              {currentTab === 'admin' && <AdminView />}
+                {currentTab === 'admin' && <AdminView />}
+              </Suspense>
             </div>
           )}
         </main>
@@ -350,35 +423,49 @@ const MainLayout: React.FC = () => {
       {/* Spotify Bottom Player Bar */}
       <PlayerBar onSelectArtist={handleSelectArtist} />
 
-      {/* Fullscreen Now Playing View Modal (Bottom right expand button) */}
-      <FullscreenNowPlayingModal onSelectArtist={handleSelectArtist} />
-
       {/* PWA Install Banner */}
       <InstallPrompt />
 
-      {/* Settings / Profile Preferences Modal */}
-      <ProfileSwitcherModal
-        isOpen={isProfileSwitcherOpen}
-        onClose={() => setIsProfileSwitcherOpen(false)}
-        onOpenCreateProfile={() => {
-          setCurrentTab('admin');
-        }}
-        onNavigateAddMusic={() => {
-          setCurrentTab('add-music');
-        }}
-      />
+      {isFullscreenNowPlaying && (
+        <Suspense fallback={null}>
+          <FullscreenNowPlayingModal onSelectArtist={handleSelectArtist} />
+        </Suspense>
+      )}
 
-      <AddToPlaylistModal
-        song={songToAddToPlaylist}
-        isOpen={Boolean(songToAddToPlaylist)}
-        onClose={() => setSongToAddToPlaylist(null)}
-        onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
-      />
+      {isProfileSwitcherOpen && (
+        <Suspense fallback={null}>
+          <ProfileSwitcherModal
+            isOpen={isProfileSwitcherOpen}
+            onClose={() => setIsProfileSwitcherOpen(false)}
+            onOpenCreateProfile={() => {
+              setCurrentTab('admin');
+            }}
+            onNavigateAddMusic={() => {
+              setCurrentTab('add-music');
+            }}
+          />
+        </Suspense>
+      )}
 
-      <CreatePlaylistModal
-        isOpen={isCreatePlaylistOpen}
-        onClose={() => setIsCreatePlaylistOpen(false)}
-      />
+      {songToAddToPlaylist && (
+        <Suspense fallback={null}>
+          <AddToPlaylistModal
+            song={songToAddToPlaylist}
+            isOpen
+            onClose={() => setSongToAddToPlaylist(null)}
+            onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
+          />
+        </Suspense>
+      )}
+
+      {isCreatePlaylistOpen && (
+        <Suspense fallback={null}>
+          <CreatePlaylistModal
+            isOpen={isCreatePlaylistOpen}
+            onClose={() => setIsCreatePlaylistOpen(false)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };
@@ -386,7 +473,11 @@ const MainLayout: React.FC = () => {
 const AuthenticatedApp: React.FC = () => {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) {
-    return <LoginLockScreen />;
+    return (
+      <Suspense fallback={<ViewLoader />}>
+        <LoginLockScreen />
+      </Suspense>
+    );
   }
   return <MainLayout />;
 };

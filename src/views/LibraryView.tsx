@@ -371,7 +371,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       <div className="col-span-5 md:col-span-6 flex items-center gap-3 truncate">
                         <img
                           src={song.coverUrl}
-                          alt={song.title}
+                          alt={song.title} loading="lazy" decoding="async"
                           className="w-10 h-10 rounded-lg object-cover flex-shrink-0 shadow"
                         />
                         <div className="truncate">

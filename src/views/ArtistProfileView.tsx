@@ -11,10 +11,8 @@ import {
   CheckCircle2,
   X,
   Sparkles,
-  ArrowDownCircle,
-  Eye,
-  SlidersHorizontal,
-  Flame
+  Flame,
+  ArrowLeft
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
@@ -22,6 +20,7 @@ import { useAudio } from '../context/AudioContext';
 import { Song, Album, ArtistProfile } from '../types';
 import { formatTime } from '../utils/lyrics';
 import { getAlbumsFromCatalog } from '../utils/albums';
+import { compressImage } from '../utils/imageCompressor';
 import { ArtistLinks } from '../components/ArtistLinks';
 
 interface ArtistProfileViewProps {
@@ -29,6 +28,7 @@ interface ArtistProfileViewProps {
   onSelectArtist: (artistName: string) => void;
   onSelectAlbum: (album: Album) => void;
   onOpenAddToPlaylist: (song: Song) => void;
+  onBack?: () => void;
 }
 
 export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
@@ -36,6 +36,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
   onSelectArtist,
   onSelectAlbum,
   onOpenAddToPlaylist,
+  onBack,
 }) => {
   const { currentUser, isAdmin } = useAuth();
   const {
@@ -97,7 +98,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
     setIsEditModalOpen(true);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -106,14 +107,17 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        setEditAvatarUrl(result);
+    try {
+      // Raw FileReader base64 could be several MB and exceed Firestore's 1 MB
+      // document limit. Compress it like the other image uploads.
+      const compressed = await compressImage(file, 500, 0.8);
+      if (compressed) {
+        setEditAvatarUrl(compressed);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error comprimiendo la foto del artista:', err);
+      alert('No se pudo procesar la imagen. Intenta con otra foto.');
+    }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -162,6 +166,16 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
     <div className="pb-36 select-none animate-in fade-in duration-200">
       {/* Hero Header with Background Banner / Overlay */}
       <div className="relative min-h-[320px] md:min-h-[380px] bg-gradient-to-b from-neutral-800 via-neutral-900 to-black p-6 md:p-10 flex flex-col justify-end overflow-hidden">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="absolute top-5 left-5 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 hover:bg-black/70 border border-white/10 text-white text-xs font-bold backdrop-blur-md transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Volver</span>
+          </button>
+        )}
+
         {/* Background Image Banner if exists */}
         {profile?.headerUrl ? (
           <div
@@ -301,7 +315,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                     <div className="col-span-6 md:col-span-5 flex items-center gap-3 truncate">
                       <img
                         src={song.coverUrl}
-                        alt={song.title}
+                        alt={song.title} loading="lazy" decoding="async"
                         className="w-10 h-10 rounded-lg object-cover flex-shrink-0 bg-neutral-800 shadow"
                       />
                       <div className="truncate">

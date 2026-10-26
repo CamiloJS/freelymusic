@@ -1,13 +1,17 @@
-import JSZip from 'jszip';
 import { Song, UserProfile, UserLibraryData, FirebaseConfigOptions, Playlist, ArtistProfile } from '../types';
 
 const DB_NAME = 'sonora-audio-cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'audio-blobs';
 
-// IndexedDB Helper
+// IndexedDB Helper (one shared connection: opening a new one for every
+// playback/read was adding latency on mobile devices).
+let dbPromise: Promise<IDBDatabase> | null = null;
+
 function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -15,9 +19,23 @@ function openDB(): Promise<IDBDatabase> {
         db.createObjectStore(STORE_NAME);
       }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
     request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error('IndexedDB bloqueada por otra pestaña'));
   });
+
+  dbPromise.catch(() => {
+    dbPromise = null;
+  });
+
+  return dbPromise;
 }
 
 export async function storeSongBlob(songId: string, blob: Blob): Promise<void> {
@@ -124,6 +142,9 @@ export async function downloadPlaylistAsZip(
 ): Promise<void> {
   if (songs.length === 0) return;
 
+  // JSZip is only needed for this action, so it is loaded on demand instead
+  // of shipping ~100 KB in the initial application bundle.
+  const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
   const folder = zip.folder(playlist.name.replace(/[\\/:*?"<>|]/g, '_')) || zip;
 
@@ -201,40 +222,284 @@ export const INITIAL_PROFILES: UserProfile[] = [
 
 export const INITIAL_CATALOG: Song[] = [];
 
+// ---------------------------------------------------------------------------
+// Safe localStorage helpers
+// ---------------------------------------------------------------------------
+
+function safeGetItem(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSetItem(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    // QuotaExceededError or private-mode restrictions must never crash the app
+    console.warn(`No se pudo guardar ${key} en localStorage:`, err);
+    return false;
+  }
+}
+
+function safeRemoveItem(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Normalizers (protect the UI from malformed cloud/legacy data)
+// ---------------------------------------------------------------------------
+
+export function normalizeSong(raw: Partial<Song> | null | undefined): Song | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = typeof raw.id === 'string' ? raw.id.trim() : '';
+  if (!id) return null;
+
+  const duration = Number(raw.duration);
+  const trackNumber = Number(raw.trackNumber);
+
+  return {
+    id,
+    title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : 'Sin título',
+    artist:
+      typeof raw.artist === 'string' && raw.artist.trim()
+        ? raw.artist.trim()
+        : 'Artista desconocido',
+    album: typeof raw.album === 'string' && raw.album.trim() ? raw.album.trim() : 'Sencillo',
+    albumArtist:
+      typeof raw.albumArtist === 'string' && raw.albumArtist.trim()
+        ? raw.albumArtist.trim()
+        : undefined,
+    coverUrl: typeof raw.coverUrl === 'string' ? raw.coverUrl : '',
+    audioUrl: typeof raw.audioUrl === 'string' ? raw.audioUrl : '',
+    duration: Number.isFinite(duration) && duration > 0 ? duration : 0,
+    lyricsLrc: typeof raw.lyricsLrc === 'string' ? raw.lyricsLrc : undefined,
+    plainLyrics: typeof raw.plainLyrics === 'string' ? raw.plainLyrics : undefined,
+    genre: typeof raw.genre === 'string' && raw.genre.trim() ? raw.genre.trim() : 'General',
+    year: typeof raw.year === 'string' ? raw.year : undefined,
+    trackNumber:
+      Number.isFinite(trackNumber) && trackNumber > 0 ? trackNumber : undefined,
+    isExplicit: Boolean(raw.isExplicit),
+    addedBy: typeof raw.addedBy === 'string' ? raw.addedBy : undefined,
+    createdAt:
+      typeof raw.createdAt === 'string' && raw.createdAt
+        ? raw.createdAt
+        : new Date().toISOString(),
+  };
+}
+
+function normalizePlaylist(raw: Partial<Playlist> | null | undefined): Playlist | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = typeof raw.id === 'string' ? raw.id.trim() : '';
+  if (!id) return null;
+
+  const songIds = Array.isArray(raw.songIds)
+    ? raw.songIds.filter((songId): songId is string => typeof songId === 'string' && Boolean(songId))
+    : [];
+
+  return {
+    id,
+    name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim() : 'Playlist',
+    description: typeof raw.description === 'string' ? raw.description : undefined,
+    coverUrl: typeof raw.coverUrl === 'string' ? raw.coverUrl : undefined,
+    userId: typeof raw.userId === 'string' ? raw.userId : 'user',
+    songIds: Array.from(new Set(songIds)),
+    createdAt:
+      typeof raw.createdAt === 'string' && raw.createdAt
+        ? raw.createdAt
+        : new Date().toISOString(),
+    updatedAt:
+      typeof raw.updatedAt === 'string' && raw.updatedAt
+        ? raw.updatedAt
+        : new Date().toISOString(),
+  };
+}
+
+export function normalizeUserData(raw: Partial<UserLibraryData> | null | undefined): UserLibraryData {
+  const source = raw && typeof raw === 'object' ? raw : {};
+
+  const favoriteSongIds = Array.isArray(source.favoriteSongIds)
+    ? Array.from(
+        new Set(
+          source.favoriteSongIds.filter(
+            (songId): songId is string => typeof songId === 'string' && Boolean(songId)
+          )
+        )
+      )
+    : [];
+
+  const historySongIds = Array.isArray(source.historySongIds)
+    ? source.historySongIds.filter(
+        (songId): songId is string => typeof songId === 'string' && Boolean(songId)
+      )
+    : [];
+
+  const playlists = Array.isArray(source.playlists)
+    ? source.playlists
+        .map((playlist) => normalizePlaylist(playlist))
+        .filter((playlist): playlist is Playlist => Boolean(playlist))
+    : [];
+
+  const playCounts: Record<string, number> = {};
+  if (source.playCounts && typeof source.playCounts === 'object') {
+    Object.entries(source.playCounts).forEach(([songId, value]) => {
+      const count = Number(value);
+      if (songId && Number.isFinite(count) && count > 0) {
+        playCounts[songId] = Math.floor(count);
+      }
+    });
+  }
+
+  const playHistory = Array.isArray(source.playHistory)
+    ? source.playHistory
+        .filter(
+          (event) =>
+            event &&
+            typeof event === 'object' &&
+            typeof event.songId === 'string' &&
+            typeof event.playedAt === 'string'
+        )
+        .slice(0, 200)
+    : [];
+
+  return {
+    favoriteSongIds,
+    historySongIds,
+    playlists,
+    playCounts,
+    playHistory,
+    updatedAt:
+      typeof source.updatedAt === 'string' && source.updatedAt ? source.updatedAt : undefined,
+  };
+}
+
+// The old bundled avatar was a 64 KB base64 string inside the JS bundle and in
+// every profile document. It now lives in /public and legacy copies are migrated
+// when they are read.
+const LEGACY_CAMILO_AVATAR_PREFIX =
+  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QK+RXhpZgAATU0AKgAAAAgAAodpAAQAAAABAAABMuocAAcAAAEMAAAAJgAAAAAc6gAAA';
+
+export function normalizeAvatarUrl(value?: string | null): string {
+  const url = typeof value === 'string' ? value.trim() : '';
+  if (
+    !url ||
+    url.includes('photo-1534528741775-53994a69daeb') ||
+    url.startsWith(LEGACY_CAMILO_AVATAR_PREFIX)
+  ) {
+    return CAMILO_SAVED_AVATAR;
+  }
+  return url;
+}
+
+export function normalizeUserProfile(
+  raw: Partial<UserProfile> | null | undefined
+): UserProfile | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = typeof raw.id === 'string' ? raw.id.trim() : '';
+  if (!id) return null;
+
+  return {
+    id,
+    username:
+      typeof raw.username === 'string' && raw.username.trim()
+        ? raw.username.trim()
+        : id,
+    displayName:
+      typeof raw.displayName === 'string' && raw.displayName.trim()
+        ? raw.displayName.trim()
+        : 'Usuario',
+    avatarUrl: normalizeAvatarUrl(raw.avatarUrl),
+    role: raw.role === 'admin' ? 'admin' : 'member',
+    pin: typeof raw.pin === 'string' && raw.pin.trim() ? raw.pin.trim() : undefined,
+    createdAt:
+      typeof raw.createdAt === 'string' && raw.createdAt
+        ? raw.createdAt
+        : new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Catalog & profile storage
+// ---------------------------------------------------------------------------
+
 const DELETED_SONGS_KEY = 'sonora_deleted_song_ids';
+const PENDING_SONGS_KEY = 'sonora_pending_songs';
 
 export function getStoredDeletedSongIds(): Set<string> {
   try {
-    const raw = localStorage.getItem(DELETED_SONGS_KEY);
+    const raw = safeGetItem(DELETED_SONGS_KEY);
     if (!raw) return new Set<string>();
-    return new Set(JSON.parse(raw));
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : []);
   } catch {
     return new Set<string>();
   }
 }
 
 export function addStoredDeletedSongId(id: string): void {
+  const current = getStoredDeletedSongIds();
+  current.add(id);
+  safeSetItem(DELETED_SONGS_KEY, JSON.stringify(Array.from(current)));
+}
+
+export function removeStoredDeletedSongId(id: string): void {
+  const current = getStoredDeletedSongIds();
+  if (!current.has(id)) return;
+  current.delete(id);
+  safeSetItem(DELETED_SONGS_KEY, JSON.stringify(Array.from(current)));
+}
+
+// Songs created while offline (or whose cloud write failed) are kept in a small
+// outbox. Only these are retried against Firestore, so a stale local catalog
+// can never resurrect a song that was deleted from another device.
+export function getStoredPendingSongs(): Song[] {
   try {
-    const current = getStoredDeletedSongIds();
-    current.add(id);
-    localStorage.setItem(DELETED_SONGS_KEY, JSON.stringify(Array.from(current)));
+    const raw = safeGetItem(PENDING_SONGS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((song) => normalizeSong(song))
+      .filter((song): song is Song => Boolean(song));
   } catch {
-    // ignore
+    return [];
   }
 }
 
-// LocalStorage Handlers
+export function addStoredPendingSong(song: Song): void {
+  const current = getStoredPendingSongs().filter((item) => item.id !== song.id);
+  safeSetItem(PENDING_SONGS_KEY, JSON.stringify([song, ...current].slice(0, 100)));
+}
+
+export function removeStoredPendingSong(songId: string): void {
+  const current = getStoredPendingSongs().filter((song) => song.id !== songId);
+  safeSetItem(PENDING_SONGS_KEY, JSON.stringify(current));
+}
+
 export function getStoredCatalog(): Song[] {
   try {
-    const raw = localStorage.getItem(KEYS.CATALOG);
-    if (!raw) {
-      return [];
-    }
-    const parsed: Song[] = JSON.parse(raw);
+    const raw = safeGetItem(KEYS.CATALOG);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
     const deleted = getStoredDeletedSongIds();
-    return parsed.filter(
-      (s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3' && !deleted.has(s.id)
-    );
+    return parsed
+      .map((song) => normalizeSong(song))
+      .filter(
+        (song): song is Song =>
+          song !== null &&
+          song.id !== 'track-1' &&
+          song.id !== 'track-2' &&
+          song.id !== 'track-3' &&
+          !deleted.has(song.id)
+      );
   } catch {
     return [];
   }
@@ -242,94 +507,119 @@ export function getStoredCatalog(): Song[] {
 
 export function saveStoredCatalog(songs: Song[]): void {
   const deleted = getStoredDeletedSongIds();
-  const cleaned = songs.filter(
-    (s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3' && !deleted.has(s.id)
-  );
-  localStorage.setItem(KEYS.CATALOG, JSON.stringify(cleaned));
+  const cleaned = songs
+    .map((song) => normalizeSong(song))
+    .filter(
+      (song): song is Song =>
+        song !== null &&
+        song.id !== 'track-1' &&
+        song.id !== 'track-2' &&
+        song.id !== 'track-3' &&
+        !deleted.has(song.id)
+    );
+  safeSetItem(KEYS.CATALOG, JSON.stringify(cleaned));
 }
 
 export function getStoredProfiles(): UserProfile[] {
   try {
-    const raw = localStorage.getItem(KEYS.PROFILES);
+    const raw = safeGetItem(KEYS.PROFILES);
     if (!raw) {
-      localStorage.setItem(KEYS.PROFILES, JSON.stringify(INITIAL_PROFILES));
+      safeSetItem(KEYS.PROFILES, JSON.stringify(INITIAL_PROFILES));
       return INITIAL_PROFILES;
     }
-    const parsed: UserProfile[] = JSON.parse(raw);
-    return parsed.map((p) => {
-      // If profile had the unwanted lady photo, replace with Camilo's real avatar
-      if (!p.avatarUrl || p.avatarUrl.includes('photo-1534528741775-53994a69daeb')) {
-        return { ...p, avatarUrl: CAMILO_SAVED_AVATAR };
-      }
-      return p;
-    });
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return INITIAL_PROFILES;
+    const profiles = parsed
+      .map((profile) => normalizeUserProfile(profile))
+      .filter((profile): profile is UserProfile => Boolean(profile));
+    return profiles.length > 0 ? profiles : INITIAL_PROFILES;
   } catch {
     return INITIAL_PROFILES;
   }
 }
 
 export function saveStoredProfiles(profiles: UserProfile[]): void {
-  localStorage.setItem(KEYS.PROFILES, JSON.stringify(profiles));
+  safeSetItem(KEYS.PROFILES, JSON.stringify(profiles));
 }
 
 export function getStoredActiveUserId(): string {
-  return localStorage.getItem(KEYS.ACTIVE_USER) || 'camilo-admin';
+  return safeGetItem(KEYS.ACTIVE_USER) || 'camilo-admin';
 }
 
 export function saveStoredActiveUserId(userId: string): void {
-  localStorage.setItem(KEYS.ACTIVE_USER, userId);
+  safeSetItem(KEYS.ACTIVE_USER, userId);
+}
+
+export function createDefaultUserData(userId: string): UserLibraryData {
+  return {
+    favoriteSongIds: [],
+    historySongIds: [],
+    playlists: [
+      {
+        id: `pl-${userId}-1`,
+        name: 'Favoritos de Sonora',
+        description: 'Mis canciones destacadas guardadas de la nube',
+        coverUrl:
+          'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80',
+        userId,
+        songIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ],
+    playCounts: {},
+    playHistory: [],
+  };
 }
 
 export function getStoredUserData(userId: string): UserLibraryData {
   try {
-    const raw = localStorage.getItem(`${KEYS.USER_DATA_PREFIX}${userId}`);
+    const raw = safeGetItem(`${KEYS.USER_DATA_PREFIX}${userId}`);
     if (!raw) {
-      const defaultData: UserLibraryData = {
-        favoriteSongIds: [],
-        historySongIds: [],
-        playlists: [
-          {
-            id: `pl-${userId}-1`,
-            name: 'Favoritos de Sonora',
-            description: 'Mis canciones destacadas guardadas de la nube',
-            coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80',
-            userId: userId,
-            songIds: [],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
-        ],
-      };
-      localStorage.setItem(`${KEYS.USER_DATA_PREFIX}${userId}`, JSON.stringify(defaultData));
+      const defaultData = createDefaultUserData(userId);
+      safeSetItem(`${KEYS.USER_DATA_PREFIX}${userId}`, JSON.stringify(defaultData));
       return defaultData;
     }
-    return JSON.parse(raw);
+    return normalizeUserData(JSON.parse(raw));
   } catch {
-    return {
-      favoriteSongIds: [],
-      historySongIds: [],
-      playlists: [],
-    };
+    return createDefaultUserData(userId);
   }
 }
 
 export function saveStoredUserData(userId: string, data: UserLibraryData): void {
-  localStorage.setItem(`${KEYS.USER_DATA_PREFIX}${userId}`, JSON.stringify(data));
+  safeSetItem(`${KEYS.USER_DATA_PREFIX}${userId}`, JSON.stringify(data));
 }
 
 // Artist Profiles storage
 export function getStoredArtistProfiles(): ArtistProfile[] {
   try {
-    const raw = localStorage.getItem(KEYS.ARTIST_PROFILES);
+    const raw = safeGetItem(KEYS.ARTIST_PROFILES);
     if (!raw) return [];
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (artist): artist is ArtistProfile =>
+          artist &&
+          typeof artist === 'object' &&
+          typeof artist.name === 'string' &&
+          Boolean(artist.name.trim())
+      )
+      .map((artist) => ({
+        ...artist,
+        id:
+          typeof artist.id === 'string' && artist.id.trim()
+            ? artist.id.trim().toLowerCase()
+            : artist.name.trim().toLowerCase(),
+        name: artist.name.trim(),
+      }));
   } catch {
     return [];
   }
 }
 
 export function saveStoredArtistProfiles(artists: ArtistProfile[]): void {
-  localStorage.setItem(KEYS.ARTIST_PROFILES, JSON.stringify(artists));
+  safeSetItem(KEYS.ARTIST_PROFILES, JSON.stringify(artists));
 }
 
 export function getStoredArtistProfile(artistName: string): ArtistProfile | null {
@@ -353,9 +643,10 @@ export function saveStoredArtistProfile(artist: ArtistProfile): void {
 
 export function getStoredFirebaseConfig(): FirebaseConfigOptions | null {
   try {
-    const raw = localStorage.getItem(KEYS.FIREBASE_CONFIG);
+    const raw = safeGetItem(KEYS.FIREBASE_CONFIG);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
   } catch {
     return null;
   }
@@ -363,32 +654,34 @@ export function getStoredFirebaseConfig(): FirebaseConfigOptions | null {
 
 export function saveStoredFirebaseConfig(config: FirebaseConfigOptions | null): void {
   if (config) {
-    localStorage.setItem(KEYS.FIREBASE_CONFIG, JSON.stringify(config));
+    safeSetItem(KEYS.FIREBASE_CONFIG, JSON.stringify(config));
   } else {
-    localStorage.removeItem(KEYS.FIREBASE_CONFIG);
+    safeRemoveItem(KEYS.FIREBASE_CONFIG);
   }
 }
 
 // Session Lock / Authentication storage
 export function getStoredActiveSessionUserId(): string | null {
-  return localStorage.getItem(KEYS.SESSION_USER);
+  return safeGetItem(KEYS.SESSION_USER);
 }
 
 export function saveStoredActiveSessionUserId(userId: string | null): void {
   if (userId) {
-    localStorage.setItem(KEYS.SESSION_USER, userId);
+    safeSetItem(KEYS.SESSION_USER, userId);
   } else {
-    localStorage.removeItem(KEYS.SESSION_USER);
+    safeRemoveItem(KEYS.SESSION_USER);
   }
 }
 
 // Recent searches storage (max 10 recent searches)
 export function getRecentSearches(): string[] {
   try {
-    const raw = localStorage.getItem(KEYS.RECENT_SEARCHES);
+    const raw = safeGetItem(KEYS.RECENT_SEARCHES);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.slice(0, 10) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((term): term is string => typeof term === 'string').slice(0, 10)
+      : [];
   } catch {
     return [];
   }
@@ -401,26 +694,18 @@ export function saveRecentSearch(term: string): string[] {
   const current = getRecentSearches();
   const filtered = current.filter((item) => item.toLowerCase() !== clean.toLowerCase());
   const updated = [clean, ...filtered].slice(0, 10);
-  try {
-    localStorage.setItem(KEYS.RECENT_SEARCHES, JSON.stringify(updated));
-  } catch {
-    // ignore
-  }
+  safeSetItem(KEYS.RECENT_SEARCHES, JSON.stringify(updated));
   return updated;
 }
 
 export function removeRecentSearch(term: string): string[] {
   const current = getRecentSearches();
   const updated = current.filter((item) => item.toLowerCase() !== term.toLowerCase());
-  try {
-    localStorage.setItem(KEYS.RECENT_SEARCHES, JSON.stringify(updated));
-  } catch {
-    // ignore
-  }
+  safeSetItem(KEYS.RECENT_SEARCHES, JSON.stringify(updated));
   return updated;
 }
 
 export function clearRecentSearches(): void {
-  localStorage.removeItem(KEYS.RECENT_SEARCHES);
+  safeRemoveItem(KEYS.RECENT_SEARCHES);
 }
 

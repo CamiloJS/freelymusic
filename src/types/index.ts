@@ -69,6 +69,7 @@ export interface UserLibraryData {
   playlists: Playlist[];
   playCounts?: Record<string, number>; // songId -> user play count
   playHistory?: PlayEvent[]; // user play history for Top tracks / Wrapped
+  updatedAt?: string; // last local write, used for cross-device conflict resolution
 }
 
 export interface LyricLine {

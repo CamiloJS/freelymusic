@@ -33,9 +33,17 @@ export async function compressImage(file: File, maxDimension = 400, quality = 0.
         }
 
         ctx.drawImage(img, 0, 0, width, height);
-        // Export as JPEG with controlled quality
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(compressedDataUrl);
+
+        // Prefer WebP (30-50% smaller than JPEG at the same quality). If the
+        // browser cannot encode it, toDataURL silently returns a PNG, so fall
+        // back to JPEG in that case.
+        const webp = canvas.toDataURL('image/webp', quality);
+        if (webp.startsWith('data:image/webp')) {
+          resolve(webp);
+          return;
+        }
+
+        resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.src = e.target?.result as string;
     };

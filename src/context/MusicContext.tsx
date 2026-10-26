@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import { Song, Playlist, UserLibraryData, ArtistProfile, PlayEvent } from '../types';
 import { useAuth } from './AuthContext';
 import {
@@ -8,6 +16,9 @@ import {
   saveStoredUserData,
   getStoredDeletedSongIds,
   addStoredDeletedSongId,
+  getStoredPendingSongs,
+  addStoredPendingSong,
+  removeStoredPendingSong,
   getStoredArtistProfiles,
   saveStoredArtistProfiles,
   saveStoredArtistProfile,
@@ -16,15 +27,16 @@ import {
   getAllDownloadedSongIds,
   downloadSongFile,
   downloadPlaylistAsZip,
+  normalizeSong,
+  normalizeUserData,
 } from '../services/storage';
 import {
-  syncCatalogFromFirestore,
   saveSongToFirestore,
+  saveSongsToFirestore,
   deleteSongFromFirestore,
-  syncUserDataFromFirestore,
   saveUserDataToFirestore,
   subscribeToCatalogUpdates,
-  syncArtistProfilesFromFirestore,
+  subscribeToUserDataUpdates,
   saveArtistProfileToFirestore,
   subscribeToArtistProfilesUpdates,
 } from '../services/firebase';
@@ -37,6 +49,7 @@ export interface DownloadingState {
 
 interface MusicContextType {
   catalog: Song[];
+  isCatalogReady: boolean;
   addTrackToCatalog: (song: Omit<Song, 'id' | 'createdAt' | 'addedBy'>) => Song;
   addMultipleTracksToCatalog: (songs: Omit<Song, 'id' | 'createdAt' | 'addedBy'>[]) => Promise<Song[]>;
   updateCatalogTrack: (song: Song) => void;
@@ -81,92 +94,195 @@ interface MusicContextType {
 const MusicContext = createContext<MusicContextType | undefined>(undefined);
 
 export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, isAuthenticated } = useAuth();
   const [catalog, setCatalog] = useState<Song[]>(() => getStoredCatalog());
   const [userData, setUserData] = useState<UserLibraryData>(() => getStoredUserData(currentUser.id));
-  const [artistProfiles, setArtistProfiles] = useState<ArtistProfile[]>(() => getStoredArtistProfiles());
+  const [artistProfiles, setArtistProfiles] = useState<ArtistProfile[]>(() =>
+    getStoredArtistProfiles()
+  );
   const [downloadedSongIds, setDownloadedSongIds] = useState<string[]>([]);
   const [downloadingState, setDownloadingState] = useState<DownloadingState | null>(null);
+  const [isCatalogReady, setIsCatalogReady] = useState<boolean>(
+    () => getStoredCatalog().length > 0
+  );
 
-  // Sync Artist Profiles from Firestore & realtime listener
+  const userDataRef = useRef(userData);
+  const userSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    syncArtistProfilesFromFirestore().then((cloudArtists) => {
-      if (cloudArtists && cloudArtists.length > 0) {
-        setArtistProfiles(cloudArtists);
-        saveStoredArtistProfiles(cloudArtists);
-      }
-    });
+    userDataRef.current = userData;
+  }, [userData]);
 
-    const unsubscribe = subscribeToArtistProfilesUpdates((cloudArtists) => {
-      if (cloudArtists) {
-        setArtistProfiles(cloudArtists);
-        saveStoredArtistProfiles(cloudArtists);
+  // Persist local changes immediately and coalesce cloud writes so actions
+  // such as "favorite + add to playlist" do not fire several document writes.
+  const scheduleUserDataSave = useCallback((userId: string, data: UserLibraryData) => {
+    if (userSaveTimerRef.current) {
+      clearTimeout(userSaveTimerRef.current);
+    }
+    userSaveTimerRef.current = setTimeout(() => {
+      userSaveTimerRef.current = null;
+      void saveUserDataToFirestore(userId, data);
+    }, 700);
+  }, []);
+
+  const mutateUserData = useCallback(
+    (updater: (previous: UserLibraryData) => UserLibraryData) => {
+      const previous = userDataRef.current;
+      const next = normalizeUserData({
+        ...updater(previous),
+        updatedAt: new Date().toISOString(),
+      });
+
+      userDataRef.current = next;
+      setUserData(next);
+      saveStoredUserData(currentUser.id, next);
+      scheduleUserDataSave(currentUser.id, next);
+    },
+    [currentUser.id, scheduleUserDataSave]
+  );
+
+  // Keep this user's library in sync across devices. Local (unflushed) data
+  // wins when it has a newer updatedAt, so an offline edit is never lost.
+  useEffect(() => {
+    // Library data is private: do not read it from the cloud until the user
+    // has actually unlocked this device.
+    if (!isAuthenticated) return;
+
+    const local = getStoredUserData(currentUser.id);
+    userDataRef.current = local;
+    setUserData(local);
+
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
+
+    const applyCloudData = (cloudRaw: UserLibraryData) => {
+      const cloud = normalizeUserData(cloudRaw);
+      const currentLocal = userDataRef.current;
+
+      if (cloud.updatedAt && cloud.updatedAt === currentLocal.updatedAt) {
+        return;
+      }
+
+      const cloudTime = Date.parse(cloud.updatedAt || '') || 0;
+      const localTime = Date.parse(currentLocal.updatedAt || '') || 0;
+
+      if (!cloud.updatedAt || cloudTime >= localTime) {
+        userDataRef.current = cloud;
+        setUserData(cloud);
+        saveStoredUserData(currentUser.id, cloud);
+      } else {
+        void saveUserDataToFirestore(currentUser.id, currentLocal);
+      }
+    };
+
+    subscribeToUserDataUpdates(currentUser.id, applyCloudData, (err) => {
+      console.warn('No se pudo sincronizar la biblioteca del usuario:', err);
+    }).then((unsub) => {
+      if (cancelled) {
+        unsub?.();
+      } else {
+        unsubscribe = unsub;
       }
     });
 
     return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, []);
+      cancelled = true;
+      unsubscribe?.();
 
-  // Refresh user data when active user changes
-  useEffect(() => {
-    const data = getStoredUserData(currentUser.id);
-    setUserData(data);
-
-    // Sync user data from Firestore if available
-    syncUserDataFromFirestore(currentUser.id).then((cloudData) => {
-      if (cloudData) {
-        setUserData(cloudData);
-        saveStoredUserData(currentUser.id, cloudData);
+      if (userSaveTimerRef.current) {
+        clearTimeout(userSaveTimerRef.current);
+        userSaveTimerRef.current = null;
+        void saveUserDataToFirestore(currentUser.id, userDataRef.current);
       }
-    });
-  }, [currentUser.id]);
+    };
+  }, [currentUser.id, isAuthenticated]);
 
-  // Sync catalog from Firestore & setup listener with resilient merging
+  // Catalog: one realtime listener is the single source of truth. Local songs
+  // are only kept in a small outbox, so a deleted track can never be
+  // resurrected by another device's stale cache.
   useEffect(() => {
-    const mergeSongs = (cloudSongs: Song[]) => {
+    if (!isAuthenticated) return;
+
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
+    const readyTimer = setTimeout(() => setIsCatalogReady(true), 5000);
+
+    const applyCatalog = (cloudSongs: Song[]) => {
       const deletedIds = getStoredDeletedSongIds();
-      setCatalog((current) => {
-        const map = new Map<string, Song>();
-        // Add cloud songs first
-        cloudSongs.forEach((s) => {
-          if (!deletedIds.has(s.id) && s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3') {
-            map.set(s.id, s);
-          }
+      const pendingSongs = getStoredPendingSongs();
+      const map = new Map<string, Song>();
+
+      cloudSongs.forEach((song) => {
+        if (!deletedIds.has(song.id)) map.set(song.id, song);
+      });
+
+      // Pending songs (new or edited while offline) take precedence locally.
+      pendingSongs.forEach((song) => {
+        if (!deletedIds.has(song.id)) map.set(song.id, song);
+      });
+
+      const merged = Array.from(map.values());
+      setCatalog(merged);
+      saveStoredCatalog(merged);
+      setIsCatalogReady(true);
+      clearTimeout(readyTimer);
+
+      // Retry the outbox outside of the state updater.
+      pendingSongs.forEach((song) => {
+        if (deletedIds.has(song.id)) {
+          removeStoredPendingSong(song.id);
+          return;
+        }
+        void saveSongToFirestore(song).then((ok) => {
+          if (ok) removeStoredPendingSong(song.id);
         });
-        // Preserve any local songs that were not deleted
-        current.forEach((s) => {
-          if (!deletedIds.has(s.id) && s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3') {
-            if (!map.has(s.id)) {
-              map.set(s.id, s);
-              // Ensure it gets safely persisted to Firestore
-              saveSongToFirestore(s);
-            }
-          }
-        });
-        const merged = Array.from(map.values());
-        saveStoredCatalog(merged);
-        return merged;
       });
     };
 
-    syncCatalogFromFirestore().then((cloudSongs) => {
-      if (cloudSongs !== null) {
-        mergeSongs(cloudSongs);
-      }
-    });
-
-    const unsubscribe = subscribeToCatalogUpdates((updatedCatalog) => {
-      if (updatedCatalog !== null) {
-        mergeSongs(updatedCatalog);
+    subscribeToCatalogUpdates(applyCatalog, (err) => {
+      console.warn('No se pudo sincronizar el catálogo:', err);
+      setIsCatalogReady(true);
+    }).then((unsub) => {
+      if (cancelled) {
+        unsub?.();
+      } else {
+        unsubscribe = unsub;
       }
     });
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      cancelled = true;
+      unsubscribe?.();
+      clearTimeout(readyTimer);
     };
-  }, []);
+  }, [isAuthenticated]);
+
+  // Artist profiles (realtime)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
+
+    subscribeToArtistProfilesUpdates(
+      (cloudArtists) => {
+        setArtistProfiles(cloudArtists);
+        saveStoredArtistProfiles(cloudArtists);
+      },
+      (err) => console.warn('No se pudieron sincronizar los artistas:', err)
+    ).then((unsub) => {
+      if (cancelled) {
+        unsub?.();
+      } else {
+        unsubscribe = unsub;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [isAuthenticated]);
 
   // Sync offline downloaded song IDs
   const refreshDownloadedIds = useCallback(async () => {
@@ -191,58 +307,108 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       createdAt: new Date().toISOString(),
     };
 
-    setCatalog((prev) => {
-      const updated = [newSong, ...prev.filter((s) => s.id !== newSong.id)];
+    const cleanSong = normalizeSong(newSong);
+    if (!cleanSong) {
+      throw new Error('No se pudo crear la canción: datos inválidos.');
+    }
+
+    addStoredPendingSong(cleanSong);
+    setCatalog((previous) => {
+      const updated = [cleanSong, ...previous.filter((song) => song.id !== cleanSong.id)];
       saveStoredCatalog(updated);
       return updated;
     });
 
-    saveSongToFirestore(newSong);
-    return newSong;
+    void saveSongToFirestore(cleanSong).then((ok) => {
+      if (ok) removeStoredPendingSong(cleanSong.id);
+    });
+
+    return cleanSong;
   };
 
   const addMultipleTracksToCatalog = async (
     songsData: Omit<Song, 'id' | 'createdAt' | 'addedBy'>[]
   ): Promise<Song[]> => {
     const now = Date.now();
-    const newSongs: Song[] = songsData.map((songData, idx) => ({
-      ...songData,
-      id: `song-${now}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
-      addedBy: currentUser.id,
-      createdAt: new Date(now + idx).toISOString(),
-    }));
+    const newSongs: Song[] = songsData
+      .map((songData, idx) => {
+        const song: Song = {
+          ...songData,
+          id: `song-${now}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+          addedBy: currentUser.id,
+          createdAt: new Date(now + idx).toISOString(),
+        };
+        return normalizeSong(song);
+      })
+      .filter((song): song is Song => Boolean(song));
 
-    setCatalog((prev) => {
-      const updated = [...newSongs, ...prev];
+    if (newSongs.length === 0) return [];
+
+    newSongs.forEach((song) => addStoredPendingSong(song));
+
+    setCatalog((previous) => {
+      const existing = new Set(previous.map((song) => song.id));
+      const updated = [...newSongs.filter((song) => !existing.has(song.id)), ...previous];
       saveStoredCatalog(updated);
       return updated;
     });
 
-    for (const song of newSongs) {
-      await saveSongToFirestore(song);
+    // One batch instead of N sequential round-trips.
+    const saved = await saveSongsToFirestore(newSongs);
+    if (saved) {
+      newSongs.forEach((song) => removeStoredPendingSong(song.id));
     }
+
     return newSongs;
   };
 
   const updateCatalogTrack = (song: Song) => {
-    setCatalog((prev) => {
-      const updated = prev.map((s) => (s.id === song.id ? song : s));
+    const cleanSong = normalizeSong(song);
+    if (!cleanSong) return;
+
+    addStoredPendingSong(cleanSong);
+    setCatalog((previous) => {
+      const updated = previous.map((item) => (item.id === cleanSong.id ? cleanSong : item));
       saveStoredCatalog(updated);
       return updated;
     });
-    saveSongToFirestore(song);
+
+    void saveSongToFirestore(cleanSong).then((ok) => {
+      if (ok) removeStoredPendingSong(cleanSong.id);
+    });
   };
 
   const deleteCatalogTrack = (songId: string) => {
     addStoredDeletedSongId(songId);
-    setCatalog((prev) => {
-      const updated = prev.filter((s) => s.id !== songId);
+    removeStoredPendingSong(songId);
+
+    setCatalog((previous) => {
+      const updated = previous.filter((song) => song.id !== songId);
       saveStoredCatalog(updated);
       return updated;
     });
-    deleteSongFromFirestore(songId);
-    deleteSongBlob(songId);
+
+    void deleteSongFromFirestore(songId);
+    void deleteSongBlob(songId).catch((err) =>
+      console.warn('No se pudo borrar el audio local:', err)
+    );
     refreshDownloadedIds();
+
+    // Remove dangling references so playlists/favorites do not keep growing
+    // with IDs of songs that no longer exist.
+    mutateUserData((previous) => ({
+      ...previous,
+      favoriteSongIds: previous.favoriteSongIds.filter((id) => id !== songId),
+      historySongIds: previous.historySongIds.filter((id) => id !== songId),
+      playlists: previous.playlists.map((playlist) => ({
+        ...playlist,
+        songIds: playlist.songIds.filter((id) => id !== songId),
+      })),
+      playCounts: Object.fromEntries(
+        Object.entries(previous.playCounts || {}).filter(([id]) => id !== songId)
+      ),
+      playHistory: (previous.playHistory || []).filter((event) => event.songId !== songId),
+    }));
   };
 
   // User Library Favorites (with defensive fallback)
@@ -252,27 +418,20 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const toggleFavorite = (songId: string) => {
-    const currentFavs = userData?.favoriteSongIds || [];
-    const isFav = currentFavs.includes(songId);
-    const updatedFavorites = isFav
-      ? currentFavs.filter((id) => id !== songId)
-      : [...currentFavs, songId];
+    mutateUserData((previous) => {
+      const currentFavorites = previous.favoriteSongIds || [];
+      const nextFavorites = currentFavorites.includes(songId)
+        ? currentFavorites.filter((id) => id !== songId)
+        : [...currentFavorites, songId];
 
-    const updatedData: UserLibraryData = {
-      favoriteSongIds: updatedFavorites,
-      historySongIds: userData?.historySongIds || [],
-      playlists: userData?.playlists || [],
-    };
-
-    setUserData(updatedData);
-    if (currentUser?.id) {
-      saveStoredUserData(currentUser.id, updatedData);
-      saveUserDataToFirestore(currentUser.id, updatedData);
-    }
+      return { ...previous, favoriteSongIds: nextFavorites };
+    });
   };
 
-  const userFavoriteSongs = (catalog || []).filter((s) =>
-    (userData?.favoriteSongIds || []).includes(s?.id)
+  const userFavoriteSongs = useMemo(
+    () =>
+      (catalog || []).filter((song) => (userData?.favoriteSongIds || []).includes(song.id)),
+    [catalog, userData?.favoriteSongIds]
   );
 
   // User Playlists
@@ -294,56 +453,60 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       updatedAt: new Date().toISOString(),
     };
 
-    const updatedPlaylists = [...userData.playlists, newPlaylist];
-    const updatedData = { ...userData, playlists: updatedPlaylists };
-    setUserData(updatedData);
-    saveStoredUserData(currentUser.id, updatedData);
-    saveUserDataToFirestore(currentUser.id, updatedData);
+    mutateUserData((previous) => ({
+      ...previous,
+      playlists: [...previous.playlists, newPlaylist],
+    }));
 
     return newPlaylist;
   };
 
   const updatePlaylist = (playlist: Playlist) => {
-    const updatedPlaylists = userData.playlists.map((p) =>
-      p.id === playlist.id ? { ...playlist, updatedAt: new Date().toISOString() } : p
-    );
-    const updatedData = { ...userData, playlists: updatedPlaylists };
-    setUserData(updatedData);
-    saveStoredUserData(currentUser.id, updatedData);
-    saveUserDataToFirestore(currentUser.id, updatedData);
+    mutateUserData((previous) => ({
+      ...previous,
+      playlists: previous.playlists.map((item) =>
+        item.id === playlist.id
+          ? { ...playlist, updatedAt: new Date().toISOString() }
+          : item
+      ),
+    }));
   };
 
   const deletePlaylist = (playlistId: string) => {
-    const updatedPlaylists = userData.playlists.filter((p) => p.id !== playlistId);
-    const updatedData = { ...userData, playlists: updatedPlaylists };
-    setUserData(updatedData);
-    saveStoredUserData(currentUser.id, updatedData);
-    saveUserDataToFirestore(currentUser.id, updatedData);
+    mutateUserData((previous) => ({
+      ...previous,
+      playlists: previous.playlists.filter((playlist) => playlist.id !== playlistId),
+    }));
   };
 
   const addSongToPlaylist = (playlistId: string, songId: string) => {
-    const targetPlaylist = userData.playlists.find((p) => p.id === playlistId);
-    if (!targetPlaylist) return;
-    if (targetPlaylist.songIds.includes(songId)) return;
-
-    const updatedPlaylist = {
-      ...targetPlaylist,
-      songIds: [...targetPlaylist.songIds, songId],
-      updatedAt: new Date().toISOString(),
-    };
-    updatePlaylist(updatedPlaylist);
+    mutateUserData((previous) => ({
+      ...previous,
+      playlists: previous.playlists.map((playlist) =>
+        playlist.id === playlistId && !playlist.songIds.includes(songId)
+          ? {
+              ...playlist,
+              songIds: [...playlist.songIds, songId],
+              updatedAt: new Date().toISOString(),
+            }
+          : playlist
+      ),
+    }));
   };
 
   const removeSongFromPlaylist = (playlistId: string, songId: string) => {
-    const targetPlaylist = userData.playlists.find((p) => p.id === playlistId);
-    if (!targetPlaylist) return;
-
-    const updatedPlaylist = {
-      ...targetPlaylist,
-      songIds: targetPlaylist.songIds.filter((id) => id !== songId),
-      updatedAt: new Date().toISOString(),
-    };
-    updatePlaylist(updatedPlaylist);
+    mutateUserData((previous) => ({
+      ...previous,
+      playlists: previous.playlists.map((playlist) =>
+        playlist.id === playlistId
+          ? {
+              ...playlist,
+              songIds: playlist.songIds.filter((id) => id !== songId),
+              updatedAt: new Date().toISOString(),
+            }
+          : playlist
+      ),
+    }));
   };
 
   // Offline Downloads
@@ -353,11 +516,13 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const toggleDownloadSong = async (song: Song): Promise<boolean> => {
-    if (isDownloaded(song.id)) {
-      await deleteSongBlob(song.id);
-      await refreshDownloadedIds();
-      return false;
-    } else {
+    try {
+      if (isDownloaded(song.id)) {
+        await deleteSongBlob(song.id);
+        await refreshDownloadedIds();
+        return false;
+      }
+
       setDownloadingState({ isDownloading: true, title: song.title });
       const ok = await cacheSongOffline(song);
       if (ok) {
@@ -365,6 +530,10 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       setTimeout(() => setDownloadingState(null), 1500);
       return ok;
+    } catch (err) {
+      console.warn('No se pudo actualizar la descarga offline:', err);
+      setTimeout(() => setDownloadingState(null), 1500);
+      return false;
     }
   };
 
@@ -379,13 +548,17 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     onProgress?: (percent: number, status: string) => void
   ) => {
     const songsInPlaylist = playlist.songIds
-      .map((id) => catalog.find((s) => s.id === id))
-      .filter((s): s is Song => Boolean(s));
+      .map((id) => catalog.find((song) => song.id === id))
+      .filter((song): song is Song => Boolean(song));
 
     setDownloadingState({ isDownloading: true, title: playlist.name, progress: 5 });
 
     await downloadPlaylistAsZip(playlist, songsInPlaylist, (percent, status) => {
-      setDownloadingState({ isDownloading: true, title: `${playlist.name} (${percent}%)`, progress: percent });
+      setDownloadingState({
+        isDownloading: true,
+        title: `${playlist.name} (${percent}%)`,
+        progress: percent,
+      });
       if (onProgress) onProgress(percent, status);
     });
 
@@ -396,7 +569,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const getArtistProfile = useCallback(
     (artistName: string): ArtistProfile | null => {
       const norm = artistName.trim().toLowerCase();
-      return artistProfiles.find((a) => a.id === norm || a.name.trim().toLowerCase() === norm) || null;
+      return (
+        artistProfiles.find(
+          (artist) => artist.id === norm || artist.name.trim().toLowerCase() === norm
+        ) || null
+      );
     },
     [artistProfiles]
   );
@@ -409,8 +586,8 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       updatedAt: new Date().toISOString(),
     };
 
-    setArtistProfiles((prev) => {
-      const filtered = prev.filter((a) => a.id !== norm);
+    setArtistProfiles((previous) => {
+      const filtered = previous.filter((item) => item.id !== norm);
       const next = [...filtered, updated];
       saveStoredArtistProfiles(next);
       return next;
@@ -423,31 +600,25 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // User Play Counts & Analytics Actions
   const recordSongPlay = useCallback(
     (songId: string) => {
-      setUserData((prev) => {
-        const currentCount = prev.playCounts?.[songId] || 0;
+      mutateUserData((previous) => {
+        const currentCount = previous.playCounts?.[songId] || 0;
         const updatedCounts = {
-          ...(prev.playCounts || {}),
+          ...(previous.playCounts || {}),
           [songId]: currentCount + 1,
         };
         const updatedHistory = [
           { songId, playedAt: new Date().toISOString() },
-          ...(prev.playHistory || []).slice(0, 999),
-        ];
+          ...(previous.playHistory || []),
+        ].slice(0, 200);
 
-        const updatedData: UserLibraryData = {
-          ...prev,
+        return {
+          ...previous,
           playCounts: updatedCounts,
           playHistory: updatedHistory,
         };
-
-        if (currentUser?.id) {
-          saveStoredUserData(currentUser.id, updatedData);
-          saveUserDataToFirestore(currentUser.id, updatedData);
-        }
-        return updatedData;
       });
     },
-    [currentUser?.id]
+    [mutateUserData]
   );
 
   const getUserSongPlayCount = useCallback(
@@ -461,6 +632,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <MusicContext.Provider
       value={{
         catalog,
+        isCatalogReady,
         addTrackToCatalog,
         addMultipleTracksToCatalog,
         updateCatalogTrack,

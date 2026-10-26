@@ -34,6 +34,7 @@ export const ACCENT_PRESETS: AccentColorPreset[] = [
 const THEME_STORAGE_KEY = 'musica_theme_mode';
 const ACCENT_STORAGE_KEY = 'musica_accent_color';
 const APP_NAME_STORAGE_KEY = 'musica_app_name';
+const GLOBAL_APP_NAME_KEY = 'musica_global_app_name';
 
 interface CustomizationContextType {
   themeMode: ThemeMode;
@@ -80,10 +81,14 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     return match ? match.hover : '#059669';
   });
 
-  // 3. App Name
+  // 3. App Name (local override -> cached global name -> default)
   const [appName, setAppName] = useState<string>(() => {
     try {
-      return localStorage.getItem(APP_NAME_STORAGE_KEY) || 'Música';
+      return (
+        localStorage.getItem(APP_NAME_STORAGE_KEY) ||
+        localStorage.getItem(GLOBAL_APP_NAME_KEY) ||
+        'Música'
+      );
     } catch {
       return 'Música';
     }
@@ -105,39 +110,62 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem(ACCENT_STORAGE_KEY, accentColor);
   }, [accentColor, accentHover]);
 
+  // Do not write the default name to localStorage here: doing so made a new
+  // device think the user had a local override and it never adopted the
+  // global app name from Firestore.
   useEffect(() => {
     document.title = appName || 'Música';
-    localStorage.setItem(APP_NAME_STORAGE_KEY, appName);
   }, [appName]);
 
   // Sync Global Settings from Firestore (Cloud Gallery & Global App Name)
   useEffect(() => {
-    syncGlobalSettingsFromFirestore().then((settings) => {
-      if (settings) {
-        if (settings.globalIcons && settings.globalIcons.length > 0) {
-          setGlobalIcons(settings.globalIcons);
-        }
-        if (settings.globalAppName && !localStorage.getItem(APP_NAME_STORAGE_KEY)) {
-          setAppName(settings.globalAppName);
-        }
-      }
-    });
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
 
-    const unsubscribe = subscribeToGlobalSettingsUpdates((settings: GlobalAppSettings) => {
+    const applyGlobalSettings = (settings: GlobalAppSettings) => {
+      if (cancelled) return;
+
       if (settings.globalIcons) {
         setGlobalIcons(settings.globalIcons);
       }
+
       if (settings.globalAppName) {
-        // If user hasn't explicitly overridden local name, adopt global name
-        const local = localStorage.getItem(APP_NAME_STORAGE_KEY);
+        try {
+          localStorage.setItem(GLOBAL_APP_NAME_KEY, settings.globalAppName);
+        } catch {
+          // ignore quota/private-mode errors
+        }
+
+        let local: string | null = null;
+        try {
+          local = localStorage.getItem(APP_NAME_STORAGE_KEY);
+        } catch {
+          // ignore
+        }
         if (!local || local === 'Música') {
           setAppName(settings.globalAppName);
         }
       }
+    };
+
+    syncGlobalSettingsFromFirestore().then((settings) => {
+      if (settings) applyGlobalSettings(settings);
+    });
+
+    subscribeToGlobalSettingsUpdates(
+      applyGlobalSettings,
+      (err) => console.warn('No se pudieron sincronizar los ajustes globales:', err)
+    ).then((unsub) => {
+      if (cancelled) {
+        unsub?.();
+      } else {
+        unsubscribe = unsub;
+      }
     });
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      cancelled = true;
+      unsubscribe?.();
     };
   }, []);
 
@@ -163,11 +191,22 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
   const setCustomAppName = (name: string) => {
     const clean = name.trim() || 'Música';
     setAppName(clean);
+    try {
+      localStorage.setItem(APP_NAME_STORAGE_KEY, clean);
+    } catch {
+      // ignore
+    }
   };
 
   const setGlobalAppName = async (name: string) => {
     const clean = name.trim() || 'Música';
     setAppName(clean);
+    try {
+      localStorage.setItem(APP_NAME_STORAGE_KEY, clean);
+      localStorage.setItem(GLOBAL_APP_NAME_KEY, clean);
+    } catch {
+      // ignore
+    }
     await saveGlobalSettingsToFirestore({ globalAppName: clean });
   };
 

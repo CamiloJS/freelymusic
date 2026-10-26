@@ -219,6 +219,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               Playlists
             </button>
+            <button
+              onClick={() => setLibraryFilter('albums')}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                libraryFilter === 'albums'
+                  ? 'bg-white text-black'
+                  : 'bg-neutral-900 text-neutral-300 hover:bg-neutral-800'
+              }`}
+            >
+              Álbumes
+            </button>
+          </div>
+
+          <div className="relative mt-2">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+            <input
+              type="text"
+              value={librarySearch}
+              onChange={(event) => setLibrarySearch(event.target.value)}
+              placeholder="Buscar en tu biblioteca..."
+              className="w-full bg-neutral-900 border border-neutral-800 rounded-lg pl-8 pr-3 py-1.5 text-[11px] text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500"
+            />
           </div>
         </div>
 

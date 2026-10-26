@@ -13,7 +13,9 @@ import {
   Mic2,
   ListMusic,
   CheckCircle2,
-  Maximize2
+  Maximize2,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
@@ -28,6 +30,8 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
   const {
     currentSong,
     isPlaying,
+    isBuffering,
+    playbackError,
     currentTime,
     duration,
     volume,
@@ -101,6 +105,13 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
 
   return (
     <footer className="h-22 bg-neutral-950/95 backdrop-blur-xl border-t border-neutral-900 px-4 md:px-6 flex items-center justify-between select-none z-40 relative">
+      {playbackError && (
+        <div className="absolute -top-11 left-1/2 -translate-x-1/2 max-w-[90vw] flex items-center gap-2 px-3.5 py-2 rounded-xl bg-red-950/95 border border-red-500/40 text-red-200 text-[11px] font-semibold shadow-xl">
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <span className="truncate">{playbackError}</span>
+        </div>
+      )}
+
       {/* Left: Track Info (Artwork, Title, Artist, Like / Check) */}
       <div className="flex items-center gap-3 w-1/4 min-w-[180px] max-w-[300px]">
         <div
@@ -187,9 +198,11 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
           <button
             onClick={togglePlayPause}
             className="w-10 h-10 rounded-full bg-white text-black hover:scale-105 active:scale-95 flex items-center justify-center shadow-lg transition-transform"
-            title={isPlaying ? 'Pausar' : 'Reproducir'}
+            title={isBuffering ? 'Cargando canción...' : isPlaying ? 'Pausar' : 'Reproducir'}
           >
-            {isPlaying ? (
+            {isBuffering ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : isPlaying ? (
               <Pause className="w-5 h-5 fill-current" />
             ) : (
               <Play className="w-5 h-5 fill-current ml-0.5" />

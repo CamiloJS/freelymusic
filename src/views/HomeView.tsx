@@ -10,7 +10,9 @@ import {
   Radio,
   Disc,
   Flame,
-  Shuffle
+  Shuffle,
+  Loader2,
+  Music2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
@@ -32,26 +34,32 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onSelectArtist,
 }) => {
   const { currentUser } = useAuth();
-  const { catalog, userFavoriteSongs, playlists, isFavorite, toggleFavorite } = useMusic();
+  const {
+    catalog,
+    isCatalogReady,
+    userFavoriteSongs,
+    playlists,
+    isFavorite,
+    toggleFavorite,
+    userPlayCounts,
+  } = useMusic();
   const { playSong, currentSong, isPlaying } = useAudio();
 
-  // AI-Driven Recommendations based on user favorites & catalog genres
+  // Recommendations based on genre affinity, personal plays and recency.
   const { aiRecommendations, genreMixes, topGenreName } = useMemo(() => {
     if (!catalog || catalog.length === 0) {
       return { aiRecommendations: [], genreMixes: [], topGenreName: 'Música' };
     }
 
-    // Calculate genre affinities from user favorites
     const genreScore: Record<string, number> = {};
-    (userFavoriteSongs || []).forEach((s) => {
-      const g = s?.genre || 'General';
-      genreScore[g] = (genreScore[g] || 0) + 2;
+    (userFavoriteSongs || []).forEach((song) => {
+      const genre = song?.genre || 'General';
+      genreScore[genre] = (genreScore[genre] || 0) + 2;
     });
 
-    // Also factor catalog genres
-    (catalog || []).forEach((s) => {
-      const g = s?.genre || 'General';
-      genreScore[g] = (genreScore[g] || 0) + 0.5;
+    (catalog || []).forEach((song) => {
+      const genre = song?.genre || 'General';
+      genreScore[genre] = (genreScore[genre] || 0) + 0.5;
     });
 
     const sortedGenres = Object.keys(genreScore).sort(
@@ -59,24 +67,30 @@ export const HomeView: React.FC<HomeViewProps> = ({
     );
 
     const primaryGenre = sortedGenres[0] || 'General';
+    const favoriteIds = new Set((userFavoriteSongs || []).map((song) => song.id));
+    const playCounts = userPlayCounts || {};
 
-    // AI recommended tracks (blended selection prioritizing favored genres)
-    const scoredSongs = [...catalog].sort((a, b) => {
-      const idA = String(a?.id || '');
-      const idB = String(b?.id || '');
-      const scoreA = (genreScore[a?.genre || 'General'] || 1) + Math.sin(idA.length);
-      const scoreB = (genreScore[b?.genre || 'General'] || 1) + Math.cos(idB.length);
-      return scoreB - scoreA;
-    });
+    const recommendations = [...catalog]
+      .map((song) => {
+        const genreAffinity = genreScore[song.genre || 'General'] || 0;
+        const favoriteBoost = favoriteIds.has(song.id) ? 2 : 0;
+        const plays = Math.min(playCounts[song.id] || 0, 20);
+        const createdAt = Date.parse(song.createdAt || '') || 0;
 
-    const recommendations = scoredSongs.slice(0, 10);
+        return {
+          song,
+          score: genreAffinity + favoriteBoost + plays * 0.35 + createdAt / 1e14,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map((entry) => entry.song);
 
-    // Group top genres for dedicated "Mix IA" cards
     const mixes: { genre: string; songs: Song[] }[] = [];
-    sortedGenres.slice(0, 3).forEach((g) => {
-      const gSongs = catalog.filter((s) => (s?.genre || 'General') === g);
-      if (gSongs.length > 0) {
-        mixes.push({ genre: g, songs: gSongs.slice(0, 6) });
+    sortedGenres.slice(0, 3).forEach((genre) => {
+      const genreSongs = catalog.filter((song) => (song.genre || 'General') === genre);
+      if (genreSongs.length > 0) {
+        mixes.push({ genre, songs: genreSongs.slice(0, 6) });
       }
     });
 
@@ -85,9 +99,73 @@ export const HomeView: React.FC<HomeViewProps> = ({
       genreMixes: mixes,
       topGenreName: primaryGenre,
     };
-  }, [catalog, userFavoriteSongs]);
+  }, [catalog, userFavoriteSongs, userPlayCounts]);
 
-  const recentSongs = catalog.slice(0, 6);
+  const recentSongs = useMemo(
+    () =>
+      [...catalog]
+        .sort(
+          (a, b) => (Date.parse(b.createdAt || '') || 0) - (Date.parse(a.createdAt || '') || 0)
+        )
+        .slice(0, 6),
+    [catalog]
+  );
+
+  // A new device used to show an empty page while Firestore was loading.
+  if (!isCatalogReady && catalog.length === 0) {
+    return (
+      <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-32 animate-pulse">
+        <div className="h-36 rounded-3xl bg-neutral-900/80 border border-neutral-800" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-16 rounded-xl bg-neutral-900/70 border border-neutral-800/60"
+            />
+          ))}
+        </div>
+        <div className="flex items-center justify-center gap-2 text-xs font-bold text-neutral-500 pt-6">
+          <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+          <span>Sincronizando tu música desde la nube...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (catalog.length === 0) {
+    return (
+      <div className="p-6 md:p-8 max-w-3xl mx-auto pb-32">
+        <div className="bg-neutral-900/40 border border-neutral-800/80 rounded-3xl p-10 text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+            <Music2 className="w-7 h-7" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-white">Tu biblioteca está vacía</h1>
+            <p className="text-sm text-neutral-400 mt-2 max-w-md mx-auto">
+              Añade tu primera canción con un enlace de audio o explora el repositorio
+              para empezar a escuchar.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => onNavigate('add-music')}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs shadow-lg transition-transform active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              Añadir música
+            </button>
+            <button
+              onClick={() => onNavigate('cloud')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs transition-colors"
+            >
+              <Compass className="w-4 h-4 text-emerald-400" />
+              Explorar la nube
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 md:p-8 space-y-9 max-w-7xl mx-auto pb-32">
@@ -144,7 +222,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 <div className="w-16 h-16 bg-neutral-800 flex-shrink-0 relative overflow-hidden">
                   <img
                     src={song.coverUrl}
-                    alt={song.title}
+                    alt={song.title} loading="lazy" decoding="async"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -181,6 +259,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     playSong(song, recentSongs);
                   }}
                   className="w-9 h-9 rounded-full bg-emerald-500 text-black flex items-center justify-center opacity-0 group-hover:opacity-100 hover:scale-105 active:scale-95 transition-all shadow-md flex-shrink-0"
+                  title={`Reproducir ${song.title}`}
+                  aria-label={`Reproducir ${song.title}`}
                 >
                   {isCurrent && isPlaying ? (
                     <span className="w-2.5 h-2.5 bg-black rounded-sm" />
@@ -223,7 +303,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow-md relative">
                     <img
                       src={song.coverUrl}
-                      alt={song.title}
+                      alt={song.title} loading="lazy" decoding="async"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -354,7 +434,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   <div className="flex items-center gap-3 truncate">
                     <img
                       src={song.coverUrl}
-                      alt={song.title}
+                      alt={song.title} loading="lazy" decoding="async"
                       className="w-12 h-12 rounded-lg object-cover flex-shrink-0 shadow"
                     />
                     <div className="truncate">
