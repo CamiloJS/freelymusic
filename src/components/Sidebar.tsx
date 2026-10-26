@@ -10,7 +10,6 @@ import Search from 'lucide-react/dist/esm/icons/search.mjs';
 import Settings from 'lucide-react/dist/esm/icons/settings.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
-import ArrowDownCircle from 'lucide-react/dist/esm/icons/circle-arrow-down.mjs';
 import WifiOff from 'lucide-react/dist/esm/icons/wifi-off.mjs';
 import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
 import { useAuth } from '../context/AuthContext';

@@ -101,7 +101,7 @@ export async function isSongDownloaded(songId: string): Promise<boolean> {
  */
 export async function cacheSongOffline(song: Song): Promise<boolean> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  const timeout = setTimeout(() => controller.abort(), 120000);
 
   try {
     const res = await fetch(song.audioUrl, { signal: controller.signal });
