@@ -9,7 +9,7 @@ import Volume2 from 'lucide-react/dist/esm/icons/volume-2.mjs';
 import VolumeX from 'lucide-react/dist/esm/icons/volume-x.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import Edit3 from 'lucide-react/dist/esm/icons/pen-line.mjs';
-import { useAudio } from '../context/AudioContext';
+import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
 
@@ -17,8 +17,6 @@ export const LyricsModal: React.FC = () => {
   const {
     currentSong,
     isPlaying,
-    currentTime,
-    duration,
     togglePlayPause,
     seek,
     nextTrack,
@@ -30,8 +28,8 @@ export const LyricsModal: React.FC = () => {
     showLyricsView,
     setShowLyricsView,
     parsedLyrics,
-    activeLyricIndex,
   } = useAudio();
+  const { currentTime, duration, activeLyricIndex } = useAudioTime();
 
   const { isFavorite, toggleFavorite } = useMusic();
   const activeLineRef = useRef<HTMLDivElement | null>(null);

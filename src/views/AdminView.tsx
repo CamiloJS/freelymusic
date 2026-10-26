@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { Song, UserRole, FirebaseConfigOptions } from '../types';
 import { saveStoredFirebaseConfig, getStoredFirebaseConfig } from '../services/storage';
-import { initFirebase, isFirebaseConnected } from '../services/firebase';
+import { isFirebaseConnected } from '../services/firebase';
 import { compressImage } from '../utils/imageCompressor';
 
 export const AdminView: React.FC = () => {
@@ -307,12 +307,10 @@ export const AdminView: React.FC = () => {
     };
 
     saveStoredFirebaseConfig(config);
-    const connected = initFirebase(config);
-    if (connected) {
-      setFbStatusMessage('¡Firebase Firestore conectado exitosamente! Sincronizando datos...');
-    } else {
-      setFbStatusMessage('Configuración guardada. Verificando conexión...');
-    }
+    // Firebase cannot be re-initialized in place with a different project.
+    // Reload so the SDK starts with the saved configuration.
+    setFbStatusMessage('Configuración guardada. Recargando para conectar...');
+    setTimeout(() => window.location.reload(), 700);
   };
 
   return (

@@ -9,7 +9,7 @@ import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
 import ExternalLink from 'lucide-react/dist/esm/icons/external-link.mjs';
 import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right.mjs';
 import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
-import { useAudio } from '../context/AudioContext';
+import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
 import { Song, Album } from '../types';
@@ -38,8 +38,8 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
     setIsFullscreenNowPlaying,
     playSong,
     parsedLyrics,
-    activeLyricIndex,
   } = useAudio();
+  const { activeLyricIndex } = useAudioTime();
 
   const { catalog, isFavorite, toggleFavorite, isDownloaded } = useMusic();
 

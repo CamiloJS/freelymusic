@@ -11,7 +11,7 @@ import Minimize2 from 'lucide-react/dist/esm/icons/minimize-2.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
-import { useAudio } from '../context/AudioContext';
+import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
 import { ArtistLinks } from './ArtistLinks';
@@ -26,8 +26,6 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
   const {
     currentSong,
     isPlaying,
-    currentTime,
-    duration,
     repeatMode,
     isShuffle,
     togglePlayPause,
@@ -40,9 +38,9 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
     isFullscreenNowPlaying,
     setIsFullscreenNowPlaying,
     parsedLyrics,
-    activeLyricIndex,
     setIsCenterLyricsOpen,
   } = useAudio();
+  const { currentTime, duration, activeLyricIndex } = useAudioTime();
 
   const { isFavorite, toggleFavorite } = useMusic();
 

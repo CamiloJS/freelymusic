@@ -180,10 +180,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ];
 
     const randomAvatar = defaultAvatars[Math.floor(Math.random() * defaultAvatars.length)];
+    const username = data.username.trim().toLowerCase().replace(/\s+/g, '_');
+
+    if (!username) {
+      throw new Error('El nombre de usuario es obligatorio.');
+    }
+
+    if (allUsers.some((user) => user.username.toLowerCase() === username)) {
+      throw new Error('Ese nombre de usuario ya existe. Elige otro.');
+    }
 
     const newProfile: UserProfile = {
       id: `user-${Date.now()}`,
-      username: data.username.toLowerCase().replace(/\s+/g, '_'),
+      username,
       displayName: data.displayName,
       avatarUrl: data.avatarUrl || randomAvatar,
       role: data.role,
@@ -223,6 +232,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     void loadFirebaseService()
       .then((firebase) => firebase.deleteProfileFromFirestore(userId))
       .catch((err) => console.warn('No se pudo borrar el perfil de la nube:', err));
+
+    // Do not keep the deleted profile's private library in the cloud.
+    void loadFirebaseService()
+      .then((firebase) => firebase.deleteUserDataFromFirestore(userId))
+      .catch((err) => console.warn('No se pudo borrar la biblioteca del perfil:', err));
 
     if (activeUserId === userId) {
       const fallback = updated[0].id;

@@ -316,6 +316,16 @@ export async function syncUserDataFromFirestore(userId: string): Promise<UserLib
   }
 }
 
+export async function deleteUserDataFromFirestore(userId: string): Promise<void> {
+  if (!db) return;
+  try {
+    await ensureAuth();
+    await deleteDoc(doc(db, ...BASE_PATH, 'usersData', userId));
+  } catch (err) {
+    console.warn('Error deleting user data from Firestore:', err);
+  }
+}
+
 export async function saveUserDataToFirestore(userId: string, data: UserLibraryData): Promise<void> {
   if (!db) return;
   try {

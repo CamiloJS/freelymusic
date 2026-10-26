@@ -15,7 +15,7 @@ import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 import AlertCircle from 'lucide-react/dist/esm/icons/circle-alert.mjs';
-import { useAudio } from '../context/AudioContext';
+import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
 import { ArtistLinks } from './ArtistLinks';
@@ -30,8 +30,6 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
     isPlaying,
     isBuffering,
     playbackError,
-    currentTime,
-    duration,
     volume,
     isMuted,
     repeatMode,
@@ -53,6 +51,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
     setIsFullscreenNowPlaying,
   } = useAudio();
 
+  const { currentTime, duration } = useAudioTime();
   const { isFavorite, toggleFavorite, isDownloaded } = useMusic();
   const [isHoveringProgress, setIsHoveringProgress] = useState(false);
 

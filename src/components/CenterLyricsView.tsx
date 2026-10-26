@@ -6,22 +6,20 @@ import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
-import { useAudio } from '../context/AudioContext';
+import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
 
 export const CenterLyricsView: React.FC = () => {
   const {
     currentSong,
-    currentTime,
-    duration,
     parsedLyrics,
-    activeLyricIndex,
     seek,
     playbackSource,
     setIsCenterLyricsOpen,
     setIsFullscreenNowPlaying,
   } = useAudio();
+  const { currentTime, duration, activeLyricIndex } = useAudioTime();
 
   const activeLineRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);

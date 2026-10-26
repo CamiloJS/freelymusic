@@ -46,14 +46,11 @@ interface AudioContextType {
   isPlaying: boolean;
   isBuffering: boolean;
   playbackError: string | null;
-  currentTime: number;
-  duration: number;
   volume: number;
   isMuted: boolean;
   repeatMode: RepeatMode;
   isShuffle: boolean;
   parsedLyrics: LyricLine[];
-  activeLyricIndex: number;
   showLyricsView: boolean;
   playbackSource: PlaybackSource | null;
   isRightPanelOpen: boolean;
@@ -79,7 +76,17 @@ interface AudioContextType {
   setIsFullscreenNowPlaying: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
+interface AudioTimeState {
+  currentTime: number;
+  duration: number;
+  activeLyricIndex: number;
+}
+
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
+// Time updates several times per second. Keeping them in a separate context
+// prevents the whole app (sidebar, views, player controls) from re-rendering
+// on every `timeupdate` event.
+const AudioTimeContext = createContext<AudioTimeState | undefined>(undefined);
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { recordSongPlay, isDownloaded } = useMusic();
@@ -435,18 +442,21 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [repeatMode, nextTrack]);
 
   // Volume controls
-  const setVolume = (val: number) => {
-    const clamped = Math.max(0, Math.min(1, val));
-    setVolumeState(clamped);
-    if (audioRef.current) {
-      audioRef.current.volume = clamped;
-    }
-    if (clamped > 0 && isMuted) {
-      setIsMuted(false);
-    }
-  };
+  const setVolume = useCallback(
+    (val: number) => {
+      const clamped = Math.max(0, Math.min(1, val));
+      setVolumeState(clamped);
+      if (audioRef.current) {
+        audioRef.current.volume = clamped;
+      }
+      if (clamped > 0 && isMuted) {
+        setIsMuted(false);
+      }
+    },
+    [isMuted]
+  );
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
     if (isMuted) {
@@ -456,19 +466,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       audio.volume = 0;
       setIsMuted(true);
     }
-  };
+  }, [isMuted, volume]);
 
-  const toggleRepeat = () => {
+  const toggleRepeat = useCallback(() => {
     setRepeatMode((prev) => {
       if (prev === 'off') return 'all';
       if (prev === 'all') return 'one';
       return 'off';
     });
-  };
+  }, []);
 
-  const toggleShuffle = () => {
+  const toggleShuffle = useCallback(() => {
     setIsShuffle((prev) => !prev);
-  };
+  }, []);
 
   // MediaSession API Integration (Lock Screen, Notification Controls, Car Bluetooth)
   useEffect(() => {
@@ -506,46 +516,79 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [currentSong, togglePlayPause, prevTrack, nextTrack, seek]);
 
+  const audioTimeValue = React.useMemo(
+    () => ({ currentTime, duration, activeLyricIndex }),
+    [currentTime, duration, activeLyricIndex]
+  );
+
+  const audioValue = React.useMemo(
+    () => ({
+      currentSong,
+      queue,
+      isPlaying,
+      isBuffering,
+      playbackError,
+      volume,
+      isMuted,
+      repeatMode,
+      isShuffle,
+      parsedLyrics,
+      showLyricsView,
+      playbackSource,
+      isRightPanelOpen,
+      rightPanelTab,
+      isCenterLyricsOpen,
+      isFullscreenNowPlaying,
+      playSong,
+      togglePlayPause,
+      seek,
+      nextTrack,
+      prevTrack,
+      setVolume,
+      toggleMute,
+      toggleRepeat,
+      toggleShuffle,
+      setShowLyricsView,
+      setPlaybackSource,
+      setIsRightPanelOpen,
+      setRightPanelTab,
+      setIsCenterLyricsOpen,
+      setIsFullscreenNowPlaying,
+    }),
+    [
+      currentSong,
+      queue,
+      isPlaying,
+      isBuffering,
+      playbackError,
+      volume,
+      isMuted,
+      repeatMode,
+      isShuffle,
+      parsedLyrics,
+      showLyricsView,
+      playbackSource,
+      isRightPanelOpen,
+      rightPanelTab,
+      isCenterLyricsOpen,
+      isFullscreenNowPlaying,
+      playSong,
+      togglePlayPause,
+      seek,
+      nextTrack,
+      prevTrack,
+      setVolume,
+      toggleMute,
+      toggleRepeat,
+      toggleShuffle,
+    ]
+  );
+
   return (
-    <AudioContext.Provider
-      value={{
-        currentSong,
-        queue,
-        isPlaying,
-        isBuffering,
-        playbackError,
-        currentTime,
-        duration,
-        volume,
-        isMuted,
-        repeatMode,
-        isShuffle,
-        parsedLyrics,
-        activeLyricIndex,
-        showLyricsView,
-        playbackSource,
-        isRightPanelOpen,
-        rightPanelTab,
-        isCenterLyricsOpen,
-        isFullscreenNowPlaying,
-        playSong,
-        togglePlayPause,
-        seek,
-        nextTrack,
-        prevTrack,
-        setVolume,
-        toggleMute,
-        toggleRepeat,
-        toggleShuffle,
-        setShowLyricsView,
-        setPlaybackSource,
-        setIsRightPanelOpen,
-        setRightPanelTab,
-        setIsCenterLyricsOpen,
-        setIsFullscreenNowPlaying,
-      }}
-    >
-      {children}
+    <AudioContext.Provider value={audioValue}>
+      <AudioTimeContext.Provider value={audioTimeValue}>
+        {children}
+      </AudioTimeContext.Provider>
     </AudioContext.Provider>
   );
 };
@@ -553,5 +596,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 export const useAudio = () => {
   const context = useContext(AudioContext);
   if (!context) throw new Error('useAudio must be used within an AudioProvider');
+  return context;
+};
+
+export const useAudioTime = () => {
+  const context = useContext(AudioTimeContext);
+  if (!context) throw new Error('useAudioTime must be used within an AudioProvider');
   return context;
 };
