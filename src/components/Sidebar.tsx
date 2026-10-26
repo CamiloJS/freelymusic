@@ -3,24 +3,32 @@ import {
   Home,
   Compass,
   Library,
+  UploadCloud,
   HardDriveDownload,
   ShieldAlert,
-  PlusCircle,
+  Plus,
   Music,
   UserCheck,
   Disc3,
   Wifi,
   WifiOff,
   Settings,
-  UploadCloud
+  Heart,
+  CheckCircle2,
+  ArrowDownCircle,
+  Search
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
+import { useAudio } from '../context/AudioContext';
 import { getCustomAppIcon } from '../utils/appIcon';
+import { Playlist } from '../types';
 
 interface SidebarProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
+  onSelectPlaylist: (playlist: Playlist | 'favorites') => void;
+  selectedPlaylist: Playlist | 'favorites' | null;
   onOpenCreatePlaylist: () => void;
   onOpenProfileSwitcher: () => void;
   isOnline: boolean;
@@ -29,13 +37,18 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   setCurrentTab,
+  onSelectPlaylist,
+  selectedPlaylist,
   onOpenCreatePlaylist,
   onOpenProfileSwitcher,
   isOnline,
 }) => {
   const { currentUser, isAdmin } = useAuth();
-  const { playlists, downloadedSongIds } = useMusic();
+  const { playlists, userFavoriteSongs, downloadedSongIds, isDownloaded } = useMusic();
+  const { setIsCenterLyricsOpen } = useAudio();
   const [appIcon, setAppIcon] = useState<string | null>(() => getCustomAppIcon());
+  const [libraryFilter, setLibraryFilter] = useState<'all' | 'playlists' | 'albums'>('all');
+  const [librarySearch, setLibrarySearch] = useState('');
 
   useEffect(() => {
     const handleIconChange = (e: Event) => {
@@ -51,27 +64,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'home', label: 'Inicio', icon: Home },
     { id: 'cloud', label: 'Explorar la Nube', icon: Compass },
     { id: 'add-music', label: 'Añadir Música', icon: UploadCloud },
-    { id: 'library', label: 'Tu Biblioteca', icon: Library },
-    { id: 'offline', label: 'Sin Conexión', icon: HardDriveDownload, badge: downloadedSongIds.length > 0 ? downloadedSongIds.length : null },
   ];
 
+  // Check if all favorites are downloaded
+  const areFavoritesDownloaded = userFavoriteSongs.length > 0 && userFavoriteSongs.every((s) => isDownloaded(s.id));
+
+  // Filter playlists
+  const filteredPlaylists = playlists.filter((pl) => {
+    if (!librarySearch) return true;
+    return pl.name.toLowerCase().includes(librarySearch.toLowerCase());
+  });
+
   return (
-    <aside className="w-64 bg-black/95 text-neutral-300 flex flex-col h-full border-r border-neutral-900 select-none flex-shrink-0">
+    <aside className="w-68 lg:w-76 bg-black text-neutral-300 flex flex-col h-full border-r border-neutral-900 select-none flex-shrink-0">
       {/* Brand Header */}
-      <div className="p-6 flex items-center justify-between">
+      <div className="p-5 flex items-center justify-between">
         <div
-          onClick={() => setCurrentTab('home')}
+          onClick={() => {
+            setIsCenterLyricsOpen(false);
+            setCurrentTab('home');
+          }}
           className="flex items-center gap-3 cursor-pointer group"
         >
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-green-400 to-teal-300 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-all overflow-hidden">
+          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-emerald-500 via-green-400 to-teal-300 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-all overflow-hidden flex-shrink-0">
             {appIcon ? (
               <img src={appIcon} alt="App Icon" className="w-full h-full object-cover" />
             ) : (
-              <Disc3 className="w-6 h-6 text-black animate-spin" style={{ animationDuration: '8s' }} />
+              <Disc3 className="w-5 h-5 text-black animate-spin" style={{ animationDuration: '8s' }} />
             )}
           </div>
           <div>
-            <span className="font-extrabold tracking-wider text-xl text-white block">
+            <span className="font-black tracking-wider text-lg text-white block">
               Música
             </span>
           </div>
@@ -79,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Network indicator */}
         <div
-          title={isOnline ? 'Conexión activa a internet' : 'Modo fuera de línea'}
+          title={isOnline ? 'Conectado a la nube' : 'Modo fuera de línea'}
           className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
             isOnline ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60' : 'bg-amber-950/80 text-amber-400 border border-amber-800/60'
           }`}
@@ -89,49 +112,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Navigation Links */}
+      {/* Main Navigation (Inicio, Explorar la Nube, Añadir Música) */}
       <div className="px-3 space-y-1">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = currentTab === item.id;
+          const isActive = currentTab === item.id && !selectedPlaylist;
           return (
             <button
               key={item.id}
-              onClick={() => setCurrentTab(item.id)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-150 ${
+              onClick={() => {
+                setIsCenterLyricsOpen(false);
+                setCurrentTab(item.id);
+              }}
+              className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all duration-150 ${
                 isActive
-                  ? 'bg-neutral-800/90 text-white font-bold shadow-sm'
+                  ? 'bg-neutral-800/90 text-white shadow-sm'
                   : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60'
               }`}
             >
-              <div className="flex items-center gap-3.5">
-                <Icon
-                  className={`w-5 h-5 ${
-                    isActive ? 'text-emerald-400' : 'text-neutral-400 group-hover:text-white'
-                  }`}
-                />
-                <span>{item.label}</span>
-              </div>
-              {item.badge && (
-                <span className="text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                  {item.badge}
-                </span>
-              )}
+              <Icon
+                className={`w-5 h-5 ${
+                  isActive ? 'text-emerald-400' : 'text-neutral-400 group-hover:text-white'
+                }`}
+              />
+              <span>{item.label}</span>
             </button>
           );
         })}
 
         {isAdmin && (
           <button
-            onClick={() => setCurrentTab('admin')}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl font-semibold text-sm transition-all duration-150 ${
+            onClick={() => {
+              setIsCenterLyricsOpen(false);
+              setCurrentTab('admin');
+            }}
+            className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl font-bold text-sm transition-all duration-150 ${
               currentTab === 'admin'
-                ? 'bg-emerald-950/60 text-emerald-300 font-bold border border-emerald-500/30'
+                ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30'
                 : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60'
             }`}
           >
             <div className="flex items-center gap-3.5">
-              <ShieldAlert className="w-5 h-5 text-emerald-400" />
+              <ShieldAlert className="w-4 h-4 text-emerald-400" />
               <span>Panel Admin</span>
             </div>
             <span className="text-[9px] uppercase tracking-wider font-black bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded">
@@ -141,67 +163,155 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* Playlists Section */}
-      <div className="mt-6 flex-1 flex flex-col min-h-0 border-t border-neutral-900/80 pt-4 px-3">
-        <div className="flex items-center justify-between px-3 mb-2">
-          <span className="text-xs uppercase tracking-wider text-neutral-500 font-bold">
-            Tus Playlists
-          </span>
-          <button
-            onClick={onOpenCreatePlaylist}
-            className="text-neutral-400 hover:text-white p-1 hover:bg-neutral-800/80 rounded-lg transition-colors"
-            title="Crear Playlist"
-          >
-            <PlusCircle className="w-4 h-4" />
-          </button>
+      {/* Spotify-style "Tu biblioteca" Section (Spotify Images 1, 2, 4) */}
+      <div className="mt-4 flex-1 flex flex-col min-h-0 bg-neutral-950/90 rounded-2xl mx-2 border border-neutral-900/90 overflow-hidden">
+        {/* Tu Biblioteca Header */}
+        <div className="p-3.5 pb-2 border-b border-neutral-900/80">
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => {
+                setIsCenterLyricsOpen(false);
+                setCurrentTab('library');
+              }}
+              className="flex items-center gap-2.5 text-neutral-300 hover:text-white font-extrabold text-sm transition-colors"
+            >
+              <Library className="w-5 h-5 text-neutral-400" />
+              <span>Tu biblioteca</span>
+            </button>
+
+            <button
+              onClick={onOpenCreatePlaylist}
+              className="text-neutral-400 hover:text-white p-1 hover:bg-neutral-800 rounded-full transition-colors"
+              title="Crear playlist"
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Filter Chips: Playlists, Álbumes */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <button
+              onClick={() => setLibraryFilter('all')}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                libraryFilter === 'all'
+                  ? 'bg-white text-black'
+                  : 'bg-neutral-900 text-neutral-300 hover:bg-neutral-800'
+              }`}
+            >
+              Todo
+            </button>
+            <button
+              onClick={() => setLibraryFilter('playlists')}
+              className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                libraryFilter === 'playlists'
+                  ? 'bg-white text-black'
+                  : 'bg-neutral-900 text-neutral-300 hover:bg-neutral-800'
+              }`}
+            >
+              Playlists
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-          {playlists.length === 0 ? (
-            <p className="text-xs text-neutral-600 px-3 py-2 italic">
-              Sin playlists aún. Haz clic en '+' para crear una.
-            </p>
-          ) : (
-            playlists.map((pl) => (
-              <button
+        {/* Scrollable Playlists List */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {/* Pinned: "Tus me gusta" (Spotify Image 1 & 2) */}
+          <div
+            onClick={() => {
+              setIsCenterLyricsOpen(false);
+              onSelectPlaylist('favorites');
+              setCurrentTab('library');
+            }}
+            className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all ${
+              selectedPlaylist === 'favorites' && currentTab === 'library'
+                ? 'bg-neutral-850 text-white'
+                : 'hover:bg-neutral-900/70 text-neutral-300'
+            }`}
+          >
+            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center flex-shrink-0 shadow-md">
+              <Heart className="w-5 h-5 text-white fill-white" />
+            </div>
+
+            <div className="truncate flex-1">
+              <span className={`block font-bold text-xs truncate ${selectedPlaylist === 'favorites' ? 'text-emerald-400' : 'text-white'}`}>
+                Tus me gusta
+              </span>
+              <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 truncate mt-0.5">
+                {areFavoritesDownloaded ? (
+                  <span title="Descargado en tu dispositivo">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400 text-black flex-shrink-0 inline" />
+                  </span>
+                ) : (
+                  <span title="Disponible para descargar">
+                    <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 inline" />
+                  </span>
+                )}
+                <span>Playlist • {currentUser?.displayName || 'Tú'} ({userFavoriteSongs.length})</span>
+              </div>
+            </div>
+          </div>
+
+          {/* User Playlists */}
+          {filteredPlaylists.map((pl) => {
+            const isSelected = selectedPlaylist !== 'favorites' && selectedPlaylist?.id === pl.id && currentTab === 'library';
+            const allSongsDownloaded = pl.songIds.length > 0 && pl.songIds.every((id) => isDownloaded(id));
+
+            return (
+              <div
                 key={pl.id}
                 onClick={() => {
+                  setIsCenterLyricsOpen(false);
+                  onSelectPlaylist(pl);
                   setCurrentTab('library');
                 }}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left text-sm text-neutral-400 hover:text-white hover:bg-neutral-900/50 transition-colors group truncate"
+                className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-all group ${
+                  isSelected
+                    ? 'bg-neutral-850 text-white'
+                    : 'hover:bg-neutral-900/70 text-neutral-300'
+                }`}
               >
-                <div className="w-8 h-8 rounded-lg overflow-hidden bg-neutral-800 flex-shrink-0 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-lg overflow-hidden bg-neutral-900 flex-shrink-0 shadow flex items-center justify-center">
                   {pl.coverUrl ? (
                     <img src={pl.coverUrl} alt={pl.name} className="w-full h-full object-cover" />
                   ) : (
-                    <Music className="w-4 h-4 text-neutral-500" />
+                    <Music className="w-5 h-5 text-neutral-600" />
                   )}
                 </div>
+
                 <div className="truncate flex-1">
-                  <span className="block truncate font-medium text-xs group-hover:text-white">
+                  <span className={`block font-bold text-xs truncate ${isSelected ? 'text-emerald-400' : 'text-white group-hover:text-white'}`}>
                     {pl.name}
                   </span>
-                  <span className="block text-[10px] text-neutral-600">
-                    {pl.songIds.length} canciones
-                  </span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 truncate mt-0.5">
+                    {allSongsDownloaded ? (
+                      <span title="Descargado">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400 text-black flex-shrink-0 inline" />
+                      </span>
+                    ) : (
+                      <span title="Descargar">
+                        <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 inline" />
+                      </span>
+                    )}
+                    <span>Playlist • {currentUser?.displayName || 'Tú'} ({pl.songIds.length})</span>
+                  </div>
                 </div>
-              </button>
-            ))
-          )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* User Profile Footer */}
-      <div className="p-3 border-t border-neutral-900 bg-neutral-950/70">
+      {/* User Profile Footer (Ajustes y Preferencias) */}
+      <div className="p-3 border-t border-neutral-900 bg-neutral-950/80">
         <button
           onClick={onOpenProfileSwitcher}
           className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-neutral-900 transition-colors text-left group"
-          title="Abrir Perfil y Ajustes"
+          title="Ajustes, preferencias y perfiles"
         >
           <img
             src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'}
             alt={currentUser?.displayName || 'Usuario'}
-            className="w-9 h-9 rounded-xl object-cover ring-2 ring-emerald-500/30 flex-shrink-0"
+            className="w-8 h-8 rounded-xl object-cover ring-2 ring-emerald-500/30 flex-shrink-0"
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
@@ -209,11 +319,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {currentUser?.displayName || 'Usuario'}
               </span>
               {isAdmin && (
-                <UserCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                <UserCheck className="w-3 h-3 text-emerald-400 flex-shrink-0" />
               )}
             </div>
             <span className="text-[10px] text-neutral-500 block truncate">
-              Ajustes y Perfiles
+              Ajustes y Cuenta
             </span>
           </div>
           <Settings className="w-4 h-4 text-neutral-500 group-hover:text-white transition-colors flex-shrink-0" />

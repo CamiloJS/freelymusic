@@ -11,7 +11,7 @@ import {
   VolumeX,
   Heart,
   Mic2,
-  Download,
+  ListMusic,
   CheckCircle2,
   Maximize2
 } from 'lucide-react';
@@ -37,23 +37,26 @@ export const PlayerBar: React.FC = () => {
     toggleMute,
     toggleRepeat,
     toggleShuffle,
-    showLyricsView,
-    setShowLyricsView,
+    isCenterLyricsOpen,
+    setIsCenterLyricsOpen,
+    isRightPanelOpen,
+    setIsRightPanelOpen,
+    rightPanelTab,
+    setRightPanelTab,
+    setIsFullscreenNowPlaying,
   } = useAudio();
 
-  const { isFavorite, toggleFavorite, isDownloaded, toggleDownloadSong, downloadSingleSongFile } =
-    useMusic();
-
+  const { isFavorite, toggleFavorite, isDownloaded } = useMusic();
   const [isHoveringProgress, setIsHoveringProgress] = useState(false);
 
   if (!currentSong) {
     return (
-      <footer className="h-20 bg-neutral-950 border-t border-neutral-900 flex items-center justify-between px-6 text-neutral-500 text-xs">
+      <footer className="h-20 bg-neutral-950 border-t border-neutral-900 flex items-center justify-between px-6 text-neutral-500 text-xs select-none">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-neutral-900 flex items-center justify-center">
+          <div className="w-11 h-11 rounded-xl bg-neutral-900 flex items-center justify-center">
             <Mic2 className="w-5 h-5 text-neutral-700" />
           </div>
-          <span>Selecciona una canción para comenzar la reproducción...</span>
+          <span>Selecciona una canción para comenzar a escuchar...</span>
         </div>
       </footer>
     );
@@ -63,13 +66,42 @@ export const PlayerBar: React.FC = () => {
   const downloaded = isDownloaded(currentSong.id);
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  // Toggle Lyrics in the center area
+  const handleToggleLyrics = () => {
+    setIsCenterLyricsOpen((prev) => !prev);
+  };
+
+  // Toggle Right Panel (Queue / Now Playing)
+  const handleToggleQueue = () => {
+    if (!isRightPanelOpen) {
+      setIsRightPanelOpen(true);
+      setRightPanelTab('queue');
+    } else if (rightPanelTab === 'now-playing') {
+      setRightPanelTab('queue');
+    } else {
+      setIsRightPanelOpen(false);
+    }
+  };
+
+  const handleToggleNowPlaying = () => {
+    if (!isRightPanelOpen) {
+      setIsRightPanelOpen(true);
+      setRightPanelTab('now-playing');
+    } else if (rightPanelTab === 'queue') {
+      setRightPanelTab('now-playing');
+    } else {
+      setIsRightPanelOpen(false);
+    }
+  };
+
   return (
-    <footer className="h-22 bg-neutral-950/95 backdrop-blur-xl border-t border-neutral-800/80 px-4 md:px-8 flex items-center justify-between select-none z-40 relative">
-      {/* Track Info (Left) */}
-      <div className="flex items-center gap-4 w-1/4 min-w-[180px] max-w-[320px]">
+    <footer className="h-22 bg-neutral-950/95 backdrop-blur-xl border-t border-neutral-900 px-4 md:px-6 flex items-center justify-between select-none z-40 relative">
+      {/* Left: Track Info (Artwork, Title, Artist, Like / Check) */}
+      <div className="flex items-center gap-3 w-1/4 min-w-[180px] max-w-[300px]">
         <div
-          onClick={() => setShowLyricsView(!showLyricsView)}
+          onClick={handleToggleNowPlaying}
           className="relative group cursor-pointer w-13 h-13 rounded-xl overflow-hidden shadow-md flex-shrink-0 bg-neutral-900"
+          title="Ver carátula y detalles en el panel derecho"
         >
           <img
             src={currentSong.coverUrl}
@@ -84,13 +116,13 @@ export const PlayerBar: React.FC = () => {
         <div className="truncate flex-1">
           <div className="flex items-center gap-2">
             <span
-              onClick={() => setShowLyricsView(!showLyricsView)}
+              onClick={handleToggleNowPlaying}
               className="text-sm font-bold text-white hover:underline cursor-pointer truncate block"
             >
               {currentSong.title}
             </span>
             {downloaded && (
-              <span title="Guardado sin conexión">
+              <span title="Descargado en tu dispositivo">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
               </span>
             )}
@@ -100,47 +132,36 @@ export const PlayerBar: React.FC = () => {
           </span>
         </div>
 
-        {/* Favorite & Direct Download button */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button
-            onClick={() => toggleFavorite(currentSong.id)}
-            className={`p-1.5 rounded-full transition-transform active:scale-90 ${
-              liked ? 'text-emerald-400' : 'text-neutral-500 hover:text-white'
-            }`}
-            title={liked ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-          >
-            <Heart className={`w-4 h-4 ${liked ? 'fill-emerald-400' : ''}`} />
-          </button>
-
-          <button
-            onClick={() => toggleDownloadSong(currentSong)}
-            className={`p-1.5 rounded-full transition-colors ${
-              downloaded
-                ? 'text-emerald-400 hover:text-emerald-300'
-                : 'text-neutral-500 hover:text-white'
-            }`}
-            title={downloaded ? 'Descargado sin conexión' : 'Guardar para escuchar sin conexión'}
-          >
-            <Download className="w-4 h-4" />
-          </button>
-        </div>
+        {/* Favorite button */}
+        <button
+          onClick={() => toggleFavorite(currentSong.id)}
+          className={`p-1.5 rounded-full transition-transform active:scale-90 flex-shrink-0 ${
+            liked ? 'text-emerald-400' : 'text-neutral-500 hover:text-white'
+          }`}
+          title={liked ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+        >
+          <Heart className={`w-4 h-4 ${liked ? 'fill-emerald-400' : ''}`} />
+        </button>
       </div>
 
-      {/* Main Playback Controls (Center) */}
-      <div className="flex flex-col items-center gap-1.5 flex-1 max-w-2xl px-4">
+      {/* Center: Main Playback Controls & Progress Bar (Spotify Style) */}
+      <div className="flex flex-col items-center gap-1.5 flex-1 max-w-xl px-4">
         <div className="flex items-center gap-5">
-          {/* Shuffle */}
+          {/* Shuffle (Aleatorio) */}
           <button
             onClick={toggleShuffle}
-            className={`transition-colors p-1 rounded-full ${
-              isShuffle ? 'text-emerald-400' : 'text-neutral-500 hover:text-white'
+            className={`transition-colors p-1 rounded-full relative ${
+              isShuffle ? 'text-emerald-400' : 'text-neutral-400 hover:text-white'
             }`}
-            title="Aleatorio"
+            title={isShuffle ? 'Desactivar aleatorio' : 'Activar aleatorio'}
           >
             <Shuffle className="w-4 h-4" />
+            {isShuffle && (
+              <span className="w-1 h-1 bg-emerald-400 rounded-full absolute -bottom-0.5 left-1/2 -translate-x-1/2" />
+            )}
           </button>
 
-          {/* Prev */}
+          {/* Previous Track */}
           <button
             onClick={prevTrack}
             className="text-neutral-300 hover:text-white transition-transform active:scale-90 p-1"
@@ -149,7 +170,7 @@ export const PlayerBar: React.FC = () => {
             <SkipBack className="w-5 h-5 fill-current" />
           </button>
 
-          {/* Play / Pause */}
+          {/* Play / Pause Circular Button */}
           <button
             onClick={togglePlayPause}
             className="w-10 h-10 rounded-full bg-white text-black hover:scale-105 active:scale-95 flex items-center justify-center shadow-lg transition-transform"
@@ -162,7 +183,7 @@ export const PlayerBar: React.FC = () => {
             )}
           </button>
 
-          {/* Next */}
+          {/* Next Track */}
           <button
             onClick={nextTrack}
             className="text-neutral-300 hover:text-white transition-transform active:scale-90 p-1"
@@ -171,18 +192,21 @@ export const PlayerBar: React.FC = () => {
             <SkipForward className="w-5 h-5 fill-current" />
           </button>
 
-          {/* Repeat */}
+          {/* Repeat Button (Repetir todo / Repetir 1 / Desactivar) */}
           <button
             onClick={toggleRepeat}
             className={`transition-colors p-1 rounded-full relative ${
-              repeatMode !== 'off' ? 'text-emerald-400' : 'text-neutral-500 hover:text-white'
+              repeatMode !== 'off' ? 'text-emerald-400' : 'text-neutral-400 hover:text-white'
             }`}
-            title={`Repetir: ${repeatMode}`}
+            title={`Repetición: ${repeatMode === 'one' ? 'Repitiendo esta canción' : repeatMode === 'all' ? 'Repitiendo todo' : 'Desactivada'}`}
           >
             {repeatMode === 'one' ? (
               <Repeat1 className="w-4 h-4" />
             ) : (
               <Repeat className="w-4 h-4" />
+            )}
+            {repeatMode !== 'off' && (
+              <span className="w-1 h-1 bg-emerald-400 rounded-full absolute -bottom-0.5 left-1/2 -translate-x-1/2" />
             )}
           </button>
         </div>
@@ -213,35 +237,45 @@ export const PlayerBar: React.FC = () => {
         </div>
       </div>
 
-      {/* Auxiliary Controls (Right) */}
-      <div className="flex items-center justify-end gap-3 w-1/4 min-w-[180px] max-w-[320px]">
-        {/* Toggle Lyrics */}
+      {/* Right: Auxiliary Controls (Lyrics in center, Queue, Volume, Fullscreen) */}
+      <div className="flex items-center justify-end gap-2.5 w-1/4 min-w-[180px] max-w-[300px]">
+        {/* Toggle Lyrics in Center View */}
         <button
-          onClick={() => setShowLyricsView(!showLyricsView)}
-          className={`p-2 rounded-xl transition-colors ${
-            showLyricsView
+          onClick={handleToggleLyrics}
+          className={`p-2 rounded-xl transition-colors relative ${
+            isCenterLyricsOpen
               ? 'bg-emerald-500/20 text-emerald-400'
               : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
           }`}
-          title="Letras en tiempo real (Apple Music Style)"
+          title={isCenterLyricsOpen ? 'Ocultar letras' : 'Ver letras sincronizadas'}
         >
           <Mic2 className="w-4 h-4" />
+          {isCenterLyricsOpen && (
+            <span className="w-1 h-1 bg-emerald-400 rounded-full absolute bottom-1 left-1/2 -translate-x-1/2" />
+          )}
         </button>
 
-        {/* Download file directly */}
+        {/* Toggle Queue / Now Playing Panel (Fila de reproducción) */}
         <button
-          onClick={() => downloadSingleSongFile(currentSong)}
-          className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors"
-          title="Descargar archivo MP3 al computador"
+          onClick={handleToggleQueue}
+          className={`p-2 rounded-xl transition-colors relative ${
+            isRightPanelOpen
+              ? 'bg-emerald-500/20 text-emerald-400'
+              : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+          }`}
+          title="Fila de reproducción y vista actual"
         >
-          <Download className="w-4 h-4" />
+          <ListMusic className="w-4 h-4" />
+          {isRightPanelOpen && (
+            <span className="w-1 h-1 bg-emerald-400 rounded-full absolute bottom-1 left-1/2 -translate-x-1/2" />
+          )}
         </button>
 
-        {/* Volume controls */}
-        <div className="flex items-center gap-2">
+        {/* Volume Controls */}
+        <div className="flex items-center gap-1.5">
           <button
             onClick={toggleMute}
-            className="text-neutral-400 hover:text-white transition-colors"
+            className="text-neutral-400 hover:text-white transition-colors p-1"
             title={isMuted ? 'Activar sonido' : 'Silenciar'}
           >
             {isMuted || volume === 0 ? (
@@ -257,15 +291,15 @@ export const PlayerBar: React.FC = () => {
             step="0.01"
             value={isMuted ? 0 : volume}
             onChange={(e) => setVolume(parseFloat(e.target.value))}
-            className="w-20 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+            className="w-18 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
           />
         </div>
 
-        {/* Expand / Maximize view */}
+        {/* Fullscreen Artwork Button (Pantalla Completa - Spotify Style) */}
         <button
-          onClick={() => setShowLyricsView(true)}
+          onClick={() => setIsFullscreenNowPlaying(true)}
           className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors hidden sm:block"
-          title="Pantalla completa"
+          title="Pantalla completa con carátula del artista"
         >
           <Maximize2 className="w-4 h-4" />
         </button>

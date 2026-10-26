@@ -5,8 +5,14 @@ import { getSongBlob } from '../services/storage';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
+export interface PlaybackSource {
+  type: 'playlist' | 'favorites' | 'catalog';
+  name: string;
+}
+
 interface AudioContextType {
   currentSong: Song | null;
+  queue: Song[];
   isPlaying: boolean;
   currentTime: number;
   duration: number;
@@ -17,9 +23,14 @@ interface AudioContextType {
   parsedLyrics: LyricLine[];
   activeLyricIndex: number;
   showLyricsView: boolean;
+  playbackSource: PlaybackSource | null;
+  isRightPanelOpen: boolean;
+  rightPanelTab: 'now-playing' | 'queue';
+  isCenterLyricsOpen: boolean;
+  isFullscreenNowPlaying: boolean;
 
   // Actions
-  playSong: (song: Song, newQueue?: Song[]) => void;
+  playSong: (song: Song, newQueue?: Song[], source?: PlaybackSource) => void;
   togglePlayPause: () => void;
   seek: (seconds: number) => void;
   nextTrack: () => void;
@@ -29,6 +40,11 @@ interface AudioContextType {
   toggleRepeat: () => void;
   toggleShuffle: () => void;
   setShowLyricsView: (show: boolean) => void;
+  setPlaybackSource: (source: PlaybackSource | null) => void;
+  setIsRightPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setRightPanelTab: (tab: 'now-playing' | 'queue') => void;
+  setIsCenterLyricsOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsFullscreenNowPlaying: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
@@ -47,6 +63,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
   const [isShuffle, setIsShuffle] = useState<boolean>(false);
   const [showLyricsView, setShowLyricsView] = useState<boolean>(false);
+  const [playbackSource, setPlaybackSource] = useState<PlaybackSource | null>(null);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState<boolean>(true);
+  const [rightPanelTab, setRightPanelTab] = useState<'now-playing' | 'queue'>('now-playing');
+  const [isCenterLyricsOpen, setIsCenterLyricsOpen] = useState<boolean>(false);
+  const [isFullscreenNowPlaying, setIsFullscreenNowPlaying] = useState<boolean>(false);
 
   // Initialize Audio element once
   useEffect(() => {
@@ -126,9 +147,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  // Play a specific song and optionally update queue
-  const playSong = useCallback((song: Song, newQueue?: Song[]) => {
+  // Play a specific song and optionally update queue and source
+  const playSong = useCallback((song: Song, newQueue?: Song[], source?: PlaybackSource) => {
     setCurrentSong(song);
+    if (source) {
+      setPlaybackSource(source);
+    }
     if (newQueue && newQueue.length > 0) {
       setQueue(newQueue);
     } else {
@@ -280,6 +304,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <AudioContext.Provider
       value={{
         currentSong,
+        queue,
         isPlaying,
         currentTime,
         duration,
@@ -290,6 +315,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         parsedLyrics,
         activeLyricIndex,
         showLyricsView,
+        playbackSource,
+        isRightPanelOpen,
+        rightPanelTab,
+        isCenterLyricsOpen,
+        isFullscreenNowPlaying,
         playSong,
         togglePlayPause,
         seek,
@@ -300,6 +330,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleRepeat,
         toggleShuffle,
         setShowLyricsView,
+        setPlaybackSource,
+        setIsRightPanelOpen,
+        setRightPanelTab,
+        setIsCenterLyricsOpen,
+        setIsFullscreenNowPlaying,
       }}
     >
       {children}

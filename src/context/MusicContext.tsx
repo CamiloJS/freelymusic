@@ -21,6 +21,12 @@ import {
   subscribeToCatalogUpdates,
 } from '../services/firebase';
 
+export interface DownloadingState {
+  isDownloading: boolean;
+  title?: string;
+  progress?: number;
+}
+
 interface MusicContextType {
   catalog: Song[];
   addTrackToCatalog: (song: Omit<Song, 'id' | 'createdAt' | 'addedBy'>) => Song;
@@ -49,6 +55,7 @@ interface MusicContextType {
     playlist: Playlist,
     onProgress?: (percent: number, status: string) => void
   ) => Promise<void>;
+  downloadingState: DownloadingState | null;
 }
 
 const MusicContext = createContext<MusicContextType | undefined>(undefined);
@@ -58,6 +65,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [catalog, setCatalog] = useState<Song[]>(() => getStoredCatalog());
   const [userData, setUserData] = useState<UserLibraryData>(() => getStoredUserData(currentUser.id));
   const [downloadedSongIds, setDownloadedSongIds] = useState<string[]>([]);
+  const [downloadingState, setDownloadingState] = useState<DownloadingState | null>(null);
 
   // Refresh user data when active user changes
   useEffect(() => {
@@ -252,16 +260,20 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       await refreshDownloadedIds();
       return false;
     } else {
+      setDownloadingState({ isDownloading: true, title: song.title });
       const ok = await cacheSongOffline(song);
       if (ok) {
         await refreshDownloadedIds();
       }
+      setTimeout(() => setDownloadingState(null), 1500);
       return ok;
     }
   };
 
   const downloadSingleSongFile = async (song: Song) => {
+    setDownloadingState({ isDownloading: true, title: song.title });
     await downloadSongFile(song);
+    setTimeout(() => setDownloadingState(null), 1500);
   };
 
   const downloadFullPlaylistZip = async (
@@ -272,7 +284,14 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .map((id) => catalog.find((s) => s.id === id))
       .filter((s): s is Song => Boolean(s));
 
-    await downloadPlaylistAsZip(playlist, songsInPlaylist, onProgress);
+    setDownloadingState({ isDownloading: true, title: playlist.name, progress: 5 });
+
+    await downloadPlaylistAsZip(playlist, songsInPlaylist, (percent, status) => {
+      setDownloadingState({ isDownloading: true, title: `${playlist.name} (${percent}%)`, progress: percent });
+      if (onProgress) onProgress(percent, status);
+    });
+
+    setTimeout(() => setDownloadingState(null), 2500);
   };
 
   return (
@@ -297,6 +316,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleDownloadSong,
         downloadSingleSongFile,
         downloadFullPlaylistZip,
+        downloadingState,
       }}
     >
       {children}
