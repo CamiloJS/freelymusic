@@ -2,8 +2,9 @@
 
 @layer base {
   :root {
-    --brand-green: #1ed760;
-    --brand-hover: #1fdf64;
+    --brand-color: #10b981;
+    --brand-hover: #059669;
+    --brand-green: var(--brand-color);
     --dark-bg: #121212;
     --dark-surface: #181818;
     --dark-elevated: #242424;
@@ -22,6 +23,115 @@
     margin: 0;
     padding: 0;
   }
+}
+
+/* Dynamic Accent Color Bindings */
+.bg-emerald-500, .bg-emerald-600 {
+  background-color: var(--brand-color) !important;
+}
+.hover\:bg-emerald-400:hover, .hover\:bg-emerald-500:hover {
+  background-color: var(--brand-hover) !important;
+}
+.text-emerald-400, .text-emerald-500 {
+  color: var(--brand-color) !important;
+}
+.fill-emerald-400, .fill-emerald-500 {
+  fill: var(--brand-color) !important;
+}
+.border-emerald-500, .border-emerald-400 {
+  border-color: var(--brand-color) !important;
+}
+.ring-emerald-500 {
+  --tw-ring-color: var(--brand-color) !important;
+}
+input[type="range"] {
+  accent-color: var(--brand-color) !important;
+}
+
+/* Light Mode Overrides */
+[data-theme="light"] {
+  --dark-bg: #f8fafc;
+  --dark-surface: #ffffff;
+  --dark-elevated: #f1f5f9;
+  --dark-highlight: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  color-scheme: light;
+}
+
+[data-theme="light"] body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .bg-black {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .bg-neutral-950 {
+  background-color: #f8fafc !important;
+}
+
+[data-theme="light"] .bg-neutral-900 {
+  background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .bg-neutral-900\/50,
+[data-theme="light"] .bg-neutral-900\/60,
+[data-theme="light"] .bg-neutral-900\/70,
+[data-theme="light"] .bg-neutral-900\/80,
+[data-theme="light"] .bg-neutral-900\/90 {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .bg-neutral-950\/60,
+[data-theme="light"] .bg-neutral-950\/70,
+[data-theme="light"] .bg-neutral-950\/80,
+[data-theme="light"] .bg-neutral-950\/90 {
+  background-color: #f8fafc !important;
+}
+
+[data-theme="light"] .border-neutral-900,
+[data-theme="light"] .border-neutral-900\/80,
+[data-theme="light"] .border-neutral-800,
+[data-theme="light"] .border-neutral-800\/80,
+[data-theme="light"] .border-neutral-800\/60 {
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .text-white {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .text-neutral-200,
+[data-theme="light"] .text-neutral-300 {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .text-neutral-400 {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .text-neutral-500 {
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] .hover\:bg-neutral-900:hover,
+[data-theme="light"] .hover\:bg-neutral-800:hover,
+[data-theme="light"] .hover\:bg-neutral-850:hover {
+  background-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] input,
+[data-theme="light"] textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .glass-panel {
+  background: rgba(255, 255, 255, 0.9) !important;
 }
 
 /* Custom scrollbars */

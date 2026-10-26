@@ -62,4 +62,63 @@ describe('Album management & sorting', () => {
     expect(sortedTracks[0].trackNumber).toBe(1);
     expect(sortedTracks[2].trackNumber).toBe(3);
   });
+
+  it('groups tracks into a single album even if songs have guest collaborators', () => {
+    const multiArtistSongs: Song[] = [
+      {
+        id: 's1',
+        title: 'Song 1',
+        artist: 'Aitana',
+        album: 'alpha',
+        coverUrl: 'https://example.com/alpha.jpg',
+        audioUrl: 'https://example.com/1.mp3',
+        duration: 180,
+        trackNumber: 1,
+        createdAt: '2026-10-26T12:00:00Z',
+      },
+      {
+        id: 's2',
+        title: 'Song 2',
+        artist: 'Aitana, Kenia Os',
+        album: 'alpha',
+        coverUrl: 'https://example.com/alpha.jpg',
+        audioUrl: 'https://example.com/2.mp3',
+        duration: 190,
+        trackNumber: 2,
+        createdAt: '2026-10-26T12:00:00Z',
+      },
+      {
+        id: 's3',
+        title: 'Song 3',
+        artist: 'Aitana, Danna Paola',
+        album: 'alpha',
+        coverUrl: 'https://example.com/alpha.jpg',
+        audioUrl: 'https://example.com/3.mp3',
+        duration: 200,
+        trackNumber: 3,
+        createdAt: '2026-10-26T12:00:00Z',
+      },
+    ];
+
+    const map = new Map<string, Album>();
+    multiArtistSongs.forEach((song) => {
+      const albumKey = song.album.trim().toLowerCase();
+      const primaryArtist = song.artist.split(',')[0].trim();
+      if (!map.has(albumKey)) {
+        map.set(albumKey, {
+          name: song.album.trim(),
+          artist: primaryArtist,
+          coverUrl: song.coverUrl,
+          songs: [],
+        });
+      }
+      map.get(albumKey)!.songs.push(song);
+    });
+
+    const albums = Array.from(map.values());
+    expect(albums).toHaveLength(1);
+    expect(albums[0].name).toBe('alpha');
+    expect(albums[0].artist).toBe('Aitana');
+    expect(albums[0].songs).toHaveLength(3);
+  });
 });

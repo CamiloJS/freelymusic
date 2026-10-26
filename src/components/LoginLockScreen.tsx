@@ -1,42 +1,37 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserProfile } from '../types';
-import { Shield, KeyRound, ArrowLeft, LogIn, Lock, Music2 } from 'lucide-react';
+import { useCustomization } from '../context/CustomizationContext';
+import { KeyRound, LogIn, Lock, Music2, User, Eye, EyeOff } from 'lucide-react';
 
 export const LoginLockScreen: React.FC = () => {
-  const { allUsers, login } = useAuth();
-  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const [pinInput, setPinInput] = useState('');
+  const { loginWithCredentials } = useAuth();
+  const { appName, appIcon } = useCustomization();
+
+  const [usernameInput, setUsernameInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleProfileClick = (user: UserProfile) => {
-    setErrorMsg('');
-    setPinInput('');
-    const requiredPin = user.pin || (user.id === 'camilo-admin' ? '2410' : undefined);
-    if (requiredPin && requiredPin.trim() !== '') {
-      setSelectedUser(user);
-    } else {
-      // Member without PIN
-      const result = login(user.id);
-      if (!result.success && result.error) {
-        setErrorMsg(result.error);
-      }
-    }
-  };
-
-  const handlePinSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUser) return;
+    setErrorMsg('');
 
-    if (!pinInput.trim()) {
-      setErrorMsg('Por favor introduce tu PIN.');
+    if (!usernameInput.trim()) {
+      setErrorMsg('Por favor ingresa tu nombre de usuario.');
       return;
     }
 
-    const result = login(selectedUser.id, pinInput);
+    if (!passwordInput.trim()) {
+      setErrorMsg('Por favor ingresa tu contraseña o PIN.');
+      return;
+    }
+
+    setIsLoading(true);
+    const result = loginWithCredentials(usernameInput, passwordInput);
     if (!result.success) {
-      setErrorMsg(result.error || 'PIN incorrecto. Acceso bloqueado.');
-      setPinInput('');
+      setErrorMsg(result.error || 'Usuario o contraseña incorrectos.');
+      setIsLoading(false);
     }
   };
 
@@ -47,127 +42,103 @@ export const LoginLockScreen: React.FC = () => {
 
       {/* Brand Header */}
       <div className="relative z-10 flex flex-col items-center text-center mb-8">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-2xl shadow-emerald-500/30 mb-3">
-          <Music2 className="w-8 h-8 text-black" />
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-2xl shadow-emerald-500/30 mb-3 overflow-hidden">
+          {appIcon ? (
+            <img src={appIcon} alt={appName} className="w-full h-full object-cover" />
+          ) : (
+            <Music2 className="w-8 h-8 text-black" />
+          )}
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">Música</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight text-white">{appName}</h1>
         <p className="text-xs uppercase tracking-widest text-emerald-400 font-bold mt-1">
-          Tu Repositorio Personal en la Nube
+          Tu Repositorio Personal de Música
         </p>
       </div>
 
-      <div className="relative z-10 w-full max-w-md">
-        {!selectedUser ? (
-          /* Profile Picker Screen */
-          <div className="text-center space-y-6">
-            <h2 className="text-xl md:text-2xl font-bold text-neutral-200">
-              ¿Quién está escuchando?
-            </h2>
+      <div className="relative z-10 w-full max-w-sm">
+        {/* Secure Credentials Login Box */}
+        <div className="bg-neutral-900/90 border border-neutral-800 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95">
+          <div className="text-center mb-6">
+            <h2 className="text-lg font-bold text-white">Iniciar Sesión</h2>
+            <p className="text-xs text-neutral-400 mt-1">
+              Ingresa tu usuario y contraseña para acceder
+            </p>
+          </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-2">
-              {allUsers.map((user) => (
+          <form onSubmit={handleLoginSubmit} className="space-y-4">
+            {/* Username Input */}
+            <div className="space-y-1.5 text-left">
+              <label className="block text-xs font-bold text-neutral-300">
+                Usuario
+              </label>
+              <div className="relative">
+                <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                <input
+                  type="text"
+                  autoFocus
+                  required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  value={usernameInput}
+                  onChange={(e) => {
+                    setUsernameInput(e.target.value);
+                    if (errorMsg) setErrorMsg('');
+                  }}
+                  placeholder="Tu nombre de usuario (ej: camilo)"
+                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-emerald-500 text-sm text-white rounded-xl py-3 pl-10 pr-4 focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Password / PIN Input */}
+            <div className="space-y-1.5 text-left">
+              <label className="block text-xs font-bold text-neutral-300">
+                Contraseña / PIN
+              </label>
+              <div className="relative">
+                <KeyRound className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    if (errorMsg) setErrorMsg('');
+                  }}
+                  placeholder="Tu contraseña o PIN"
+                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-emerald-500 text-sm text-white rounded-xl py-3 pl-10 pr-10 focus:outline-none transition-colors"
+                />
                 <button
-                  key={user.id}
-                  onClick={() => handleProfileClick(user)}
-                  className="group flex flex-col items-center p-3 rounded-2xl hover:bg-neutral-900/80 transition-all transform hover:-translate-y-1 focus:outline-none"
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors p-1"
+                  title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
                 >
-                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden mb-3 ring-2 ring-neutral-800 group-hover:ring-emerald-500 shadow-lg group-hover:shadow-emerald-500/20 transition-all">
-                    <img
-                      src={user.avatarUrl}
-                      alt={user.displayName}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                    {user.role === 'admin' && (
-                      <div className="absolute bottom-0 right-0 p-1 bg-emerald-500 rounded-full text-black" title="Administrador">
-                        <Shield className="w-3.5 h-3.5 fill-black" />
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-sm font-semibold text-neutral-300 group-hover:text-white truncate max-w-[110px]">
-                    {user.displayName}
-                  </span>
-                  <span className="text-[11px] text-neutral-500 capitalize">
-                    {user.role === 'admin' ? 'Administrador' : 'Miembro'}
-                  </span>
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
-              ))}
+              </div>
             </div>
 
             {errorMsg && (
-              <p className="text-xs text-red-400 bg-red-950/40 border border-red-500/20 py-2 px-3 rounded-lg">
+              <div className="p-3 bg-red-950/60 border border-red-500/30 rounded-xl text-xs text-red-300 text-center font-medium">
                 {errorMsg}
-              </p>
+              </div>
             )}
-          </div>
-        ) : (
-          /* PIN Entry Form */
-          <div className="bg-neutral-900/90 border border-neutral-800 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95">
+
             <button
-              onClick={() => {
-                setSelectedUser(null);
-                setPinInput('');
-                setErrorMsg('');
-              }}
-              className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition-colors mb-4"
+              type="submit"
+              disabled={isLoading || !usernameInput.trim() || !passwordInput.trim()}
+              className="w-full py-3.5 mt-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:hover:bg-emerald-500 text-black font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all transform active:scale-[0.99]"
             >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Cambiar de perfil</span>
+              <LogIn className="w-4 h-4 stroke-[2.5]" />
+              <span>{isLoading ? 'Comprobando...' : 'Iniciar Sesión'}</span>
             </button>
-
-            <div className="flex flex-col items-center text-center mb-6">
-              <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-emerald-500/50 mb-3 shadow-lg">
-                <img
-                  src={selectedUser.avatarUrl}
-                  alt={selectedUser.displayName}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <h3 className="text-lg font-bold text-white">{selectedUser.displayName}</h3>
-              <p className="text-xs text-neutral-400 flex items-center gap-1 mt-0.5">
-                <Lock className="w-3 h-3 text-emerald-400" />
-                <span>Introduce tu PIN para acceder</span>
-              </p>
-            </div>
-
-            <form onSubmit={handlePinSubmit} className="space-y-4">
-              <div className="relative">
-                <KeyRound className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  autoFocus
-                  maxLength={8}
-                  value={pinInput}
-                  onChange={(e) => {
-                    setPinInput(e.target.value);
-                    if (errorMsg) setErrorMsg('');
-                  }}
-                  placeholder="Introduce tu PIN"
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-emerald-500 text-center tracking-[0.5em] text-lg font-mono text-white rounded-xl py-3 px-10 focus:outline-none transition-colors"
-                />
-              </div>
-
-              {errorMsg && (
-                <p className="text-xs text-red-400 text-center bg-red-950/40 border border-red-500/20 py-2 rounded-lg">
-                  {errorMsg}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={!pinInput.trim()}
-                className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:hover:bg-emerald-500 text-black font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Ingresar a Música</span>
-              </button>
-            </form>
-          </div>
-        )}
+          </form>
+        </div>
       </div>
 
-      <div className="relative z-10 text-center mt-12 text-[11px] text-neutral-600">
-        Sesión privada y cifrada &bull; Acceso sincronizado en tiempo real con Google Firebase
+      <div className="relative z-10 text-center mt-10 text-[11px] text-neutral-600">
+        Sesión protegida &bull; Libre de rastreo &bull; Base de datos en la nube
       </div>
     </div>
   );

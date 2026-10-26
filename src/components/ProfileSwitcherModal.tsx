@@ -12,17 +12,17 @@ import {
   RotateCcw,
   Sparkles,
   UploadCloud,
-  LogOut
+  LogOut,
+  Sun,
+  Moon,
+  Layers,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCustomization, ACCENT_PRESETS } from '../context/CustomizationContext';
 import { UserProfile } from '../types';
 import { compressImage } from '../utils/imageCompressor';
 import { DEFAULT_AVATAR } from '../services/storage';
-import {
-  getCustomAppIcon,
-  setCustomAppIcon,
-  removeCustomAppIcon,
-} from '../utils/appIcon';
 
 interface ProfileSwitcherModalProps {
   isOpen: boolean;
@@ -38,6 +38,20 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   onNavigateAddMusic,
 }) => {
   const { currentUser, allUsers, switchUser, updateProfile, isAdmin, logout } = useAuth();
+  const {
+    themeMode,
+    setThemeMode,
+    accentColor,
+    setAccentColorById,
+    appName,
+    setCustomAppName,
+    setGlobalAppName,
+    globalIcons,
+    uploadGlobalIcon,
+    appIcon,
+    selectIcon,
+    resetIcon,
+  } = useCustomization();
 
   const [activeTab, setActiveTab] = useState<'perfiles' | 'mi_perfil' | 'personalizacion'>('perfiles');
 
@@ -52,6 +66,13 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Tab: Personalizacion state
+  const [nameInput, setNameInput] = useState(appName);
+  const [nameSuccessMsg, setNameSuccessMsg] = useState('');
+  const [iconSuccessMsg, setIconSuccessMsg] = useState('');
+  const iconFileInputRef = useRef<HTMLInputElement | null>(null);
+  const adminGlobalIconInputRef = useRef<HTMLInputElement | null>(null);
+
   React.useEffect(() => {
     if (currentUser) {
       setEditDisplayName(currentUser.displayName || '');
@@ -59,11 +80,9 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
     }
   }, [currentUser]);
 
-  // Tab: Personalizacion (App Icon) state
-  const [currentIcon, setCurrentIcon] = useState<string | null>(() => getCustomAppIcon());
-  const [iconPreview, setIconPreview] = useState<string | null>(null);
-  const [iconSuccessMsg, setIconSuccessMsg] = useState('');
-  const iconFileInputRef = useRef<HTMLInputElement | null>(null);
+  React.useEffect(() => {
+    setNameInput(appName);
+  }, [appName]);
 
   if (!isOpen) return null;
 
@@ -97,7 +116,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
     }
   };
 
-  // Avatar file upload from PC with automatic compression for Firestore
+  // Avatar file upload from PC
   const handleAvatarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -130,40 +149,55 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
     setTimeout(() => setProfileSuccessMsg(''), 3000);
   };
 
-  // Icon upload from PC
-  const handleIconFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Icon upload from PC for personal use
+  const handlePersonalIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (dataUrl) {
-        setIconPreview(dataUrl);
+    try {
+      const compressed = await compressImage(file, 256, 0.85);
+      if (compressed) {
+        selectIcon(compressed);
+        setIconSuccessMsg('¡Icono de la aplicación actualizado para tu navegador!');
+        setTimeout(() => setIconSuccessMsg(''), 4000);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error subiendo icono personal:', err);
+    }
   };
 
-  const handleApplyCustomIcon = () => {
-    if (!iconPreview) return;
-    setCustomAppIcon(iconPreview);
-    setCurrentIcon(iconPreview);
-    setIconSuccessMsg('¡Icono de la aplicación actualizado! Se mostrará en pestañas e instalación PWA.');
-    setTimeout(() => setIconSuccessMsg(''), 4000);
+  // Icon upload for Admin into Global Gallery (shared with all profiles)
+  const handleAdminGlobalIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const compressed = await compressImage(file, 256, 0.85);
+      if (compressed) {
+        await uploadGlobalIcon(compressed);
+        setIconSuccessMsg('¡Icono añadido a la Galería Global! Ahora todos los perfiles lo pueden elegir.');
+        setTimeout(() => setIconSuccessMsg(''), 4500);
+      }
+    } catch (err) {
+      console.error('Error subiendo icono a galería global:', err);
+    }
   };
 
-  const handleResetIcon = () => {
-    removeCustomAppIcon();
-    setCurrentIcon(null);
-    setIconPreview(null);
-    setIconSuccessMsg('Icono restaurado al valor por defecto.');
-    setTimeout(() => setIconSuccessMsg(''), 3000);
+  const handleSaveLocalName = () => {
+    setCustomAppName(nameInput);
+    setNameSuccessMsg('¡Nombre de aplicación actualizado para tu perfil!');
+    setTimeout(() => setNameSuccessMsg(''), 3000);
+  };
+
+  const handleSaveGlobalName = async () => {
+    await setGlobalAppName(nameInput);
+    setNameSuccessMsg('¡Nombre de aplicación guardado globalmente para todos los perfiles!');
+    setTimeout(() => setNameSuccessMsg(''), 3500);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl max-w-xl w-full p-6 md:p-8 shadow-2xl relative max-h-[90vh] flex flex-col">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-3xl max-w-xl w-full p-6 md:p-8 shadow-2xl relative max-h-[92vh] flex flex-col">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -207,7 +241,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
             }`}
           >
             <Palette className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Personalizar Icono</span>
+            <span>Personalización & Tema</span>
           </button>
 
           {onNavigateAddMusic && (
@@ -224,8 +258,8 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
           )}
         </div>
 
-        {/* Tab Content Container (Scrollable) */}
-        <div className="flex-1 overflow-y-auto pr-1">
+        {/* Tab Content Container */}
+        <div className="flex-1 overflow-y-auto pr-1 space-y-6">
           {/* TAB 1: PERFILES */}
           {activeTab === 'perfiles' && (
             <div>
@@ -296,7 +330,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                         >
                           <div className="flex items-center gap-3">
                             <img
-                              src={user.avatarUrl}
+                              src={user.avatarUrl || DEFAULT_AVATAR}
                               alt={user.displayName}
                               className="w-11 h-11 rounded-xl object-cover ring-2 ring-neutral-700/60"
                             />
@@ -359,13 +393,13 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: MI PERFIL (PHOTO UPLOAD FROM PC & DATA) */}
+          {/* TAB 2: MI PERFIL */}
           {activeTab === 'mi_perfil' && (
             <div className="space-y-6">
               <div>
-                <h3 className="font-extrabold text-white text-xl">Tu Perfil Personal</h3>
+                <h3 className="font-extrabold text-white text-xl">Configurar Mi Perfil</h3>
                 <p className="text-xs text-neutral-400 mt-1">
-                  Cambia tu foto directamente desde tu computador y configura tu seguridad.
+                  Personaliza tu foto de perfil, nombre de usuario y PIN de seguridad.
                 </p>
               </div>
 
@@ -395,13 +429,13 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                   <button
                     type="button"
                     onClick={() => avatarFileInputRef.current?.click()}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs tracking-wide shadow-md transition-all"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-emerald-400 font-bold text-xs transition-colors"
                   >
                     <Upload className="w-3.5 h-3.5" />
                     Subir foto desde tu PC
                   </button>
                   <p className="text-[11px] text-neutral-500">
-                    Soporta imágenes JPG, PNG o WebP. Se guarda en tu perfil local.
+                    Soporta imágenes JPG, PNG o WebP. Se guarda en la nube y en tu perfil.
                   </p>
                 </div>
               </div>
@@ -435,7 +469,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
                   />
                   <p className="text-[11px] text-neutral-500 mt-1">
-                    Si asignas un PIN, se solicitará cada vez que alguien intente cambiar a tu perfil.
+                    Si asignas un PIN, se solicitará cada vez que alguien intente ingresar o cambiar a tu perfil.
                   </p>
                 </div>
 
@@ -451,13 +485,13 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: PERSONALIZACION (APP ICON FROM PC) */}
+          {/* TAB 3: PERSONALIZACION & TEMA */}
           {activeTab === 'personalizacion' && (
             <div className="space-y-6">
               <div>
-                <h3 className="font-extrabold text-white text-xl">Personalizar Icono de la App</h3>
+                <h3 className="font-extrabold text-white text-xl">Personalización & Apariencia</h3>
                 <p className="text-xs text-neutral-400 mt-1">
-                  Sube tu propio logo o imagen desde tu computador. Se aplicará a la pestaña del navegador y a la aplicación web instalada (PWA).
+                  Modo claro/oscuro, color de acento, nombre de la página y galería de iconos.
                 </p>
               </div>
 
@@ -468,67 +502,246 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                 </div>
               )}
 
-              {/* Icon Preview */}
-              <div className="p-5 bg-neutral-950 rounded-2xl border border-neutral-800 flex flex-col md:flex-row items-center gap-6">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-20 h-20 rounded-2xl bg-neutral-900 border border-neutral-700 flex items-center justify-center overflow-hidden shadow-xl">
+              {nameSuccessMsg && (
+                <div className="p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-300 text-xs font-bold flex items-center gap-2">
+                  <Check className="w-4 h-4" />
+                  <span>{nameSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* 1. Theme Mode Switcher (Dark vs Light) */}
+              <div className="space-y-2 p-4 bg-neutral-950 rounded-2xl border border-neutral-800">
+                <label className="block text-xs font-black uppercase tracking-wider text-emerald-400">
+                  Modo de Visualización
+                </label>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setThemeMode('dark')}
+                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                      themeMode === 'dark'
+                        ? 'bg-neutral-800 text-white border-emerald-500 shadow-md ring-1 ring-emerald-500/40'
+                        : 'bg-neutral-900/60 text-neutral-400 border-neutral-800 hover:text-white'
+                    }`}
+                  >
+                    <Moon className="w-4 h-4" />
+                    <span>Modo Oscuro</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setThemeMode('light')}
+                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                      themeMode === 'light'
+                        ? 'bg-neutral-800 text-white border-emerald-500 shadow-md ring-1 ring-emerald-500/40'
+                        : 'bg-neutral-900/60 text-neutral-400 border-neutral-800 hover:text-white'
+                    }`}
+                  >
+                    <Sun className="w-4 h-4" />
+                    <span>Modo Claro</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Accent Color Palette */}
+              <div className="space-y-3 p-4 bg-neutral-950 rounded-2xl border border-neutral-800">
+                <label className="block text-xs font-black uppercase tracking-wider text-emerald-400">
+                  Color de Acento de la Aplicación
+                </label>
+                <p className="text-[11px] text-neutral-400">
+                  Cambia el color de los botones de reproducción, insignias, controles y letras activas:
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  {ACCENT_PRESETS.map((p) => {
+                    const isSelected = accentColor.toLowerCase() === p.color.toLowerCase();
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setAccentColorById(p.id)}
+                        className={`flex items-center gap-2.5 p-2 rounded-xl border text-xs font-bold transition-all ${
+                          isSelected
+                            ? 'bg-neutral-850 border-white text-white shadow-md'
+                            : 'bg-neutral-900/60 border-neutral-800 text-neutral-300 hover:border-neutral-700'
+                        }`}
+                      >
+                        <span
+                          className="w-4 h-4 rounded-full flex-shrink-0 shadow"
+                          style={{ backgroundColor: p.color }}
+                        />
+                        <span className="truncate">{p.name.split(' ')[0]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. App Name Customization */}
+              <div className="space-y-3 p-4 bg-neutral-950 rounded-2xl border border-neutral-800">
+                <label className="block text-xs font-black uppercase tracking-wider text-emerald-400">
+                  Nombre de la Aplicación (Cabecera Superior)
+                </label>
+                <p className="text-[11px] text-neutral-400">
+                  Personaliza el nombre que aparece en la esquina superior izquierda:
+                </p>
+
+                <div className="space-y-2.5">
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="Ej. Música / Sonora / Freely"
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-bold"
+                  />
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveLocalName}
+                      className="px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs transition-colors"
+                    >
+                      Guardar para mi perfil
+                    </button>
+
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={handleSaveGlobalName}
+                        className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5"
+                      >
+                        <Shield className="w-3.5 h-3.5" />
+                        <span>Guardar como Nombre Global (Para todos)</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. App Icon Customization & Global Gallery */}
+              <div className="space-y-4 p-4 bg-neutral-950 rounded-2xl border border-neutral-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-emerald-400">
+                      Icono de la Aplicación & Galería
+                    </label>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">
+                      Se aplica al favicon del navegador y al icono al instalar la app (PWA).
+                    </p>
+                  </div>
+
+                  {appIcon && (
+                    <button
+                      type="button"
+                      onClick={resetIcon}
+                      className="text-[11px] text-neutral-400 hover:text-white flex items-center gap-1 transition-colors"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Original</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Current Active Icon Preview */}
+                <div className="flex items-center gap-4 p-3 bg-neutral-900/60 rounded-xl border border-neutral-800/80">
+                  <div className="w-14 h-14 rounded-xl bg-neutral-950 border border-neutral-700 overflow-hidden flex-shrink-0 shadow">
                     <img
-                      src={iconPreview || currentIcon || '/icon.svg'}
-                      alt="Icon Preview"
+                      src={appIcon || '/icon.svg'}
+                      alt="Active Icon"
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <span className="text-[10px] text-neutral-400 font-semibold">
-                    {iconPreview ? 'Vista Previa' : currentIcon ? 'Icono Personalizado' : 'Icono Por Defecto'}
-                  </span>
+                  <div>
+                    <span className="text-xs font-bold text-white block">
+                      {appIcon ? 'Icono Personalizado Activo' : 'Icono Por Defecto'}
+                    </span>
+                    <span className="text-[11px] text-neutral-400 block mt-0.5">
+                      Visible en la pestaña del navegador y la cabecera.
+                    </span>
+                  </div>
                 </div>
 
-                <div className="space-y-3 text-center md:text-left flex-1">
-                  <input
-                    type="file"
-                    ref={iconFileInputRef}
-                    accept="image/png,image/jpeg,image/svg+xml,image/x-icon,image/webp"
-                    onChange={handleIconFileUpload}
-                    className="hidden"
-                  />
+                {/* Global Icon Gallery (Admin can upload for everyone) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-neutral-300 flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Galería Global de Iconos ({globalIcons.length})</span>
+                    </label>
 
-                  <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                    <button
-                      type="button"
-                      onClick={() => iconFileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-emerald-400 font-bold text-xs transition-colors"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      Elegir imagen de tu PC
-                    </button>
-
-                    {iconPreview && (
-                      <button
-                        type="button"
-                        onClick={handleApplyCustomIcon}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs shadow-md transition-all"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        Guardar como Icono
-                      </button>
-                    )}
-
-                    {(currentIcon || iconPreview) && (
-                      <button
-                        type="button"
-                        onClick={handleResetIcon}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white text-xs font-semibold"
-                        title="Restaurar icono original"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        Restaurar original
-                      </button>
+                    {isAdmin && (
+                      <div>
+                        <input
+                          type="file"
+                          ref={adminGlobalIconInputRef}
+                          accept="image/*"
+                          onChange={handleAdminGlobalIconUpload}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => adminGlobalIconInputRef.current?.click()}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-all"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Subir a Galería Global</span>
+                        </button>
+                      </div>
                     )}
                   </div>
 
-                  <p className="text-[11px] text-neutral-500">
-                    Recomendado: imagen cuadrada (PNG, SVG, ICO o JPG) de al menos 192x192 píxeles.
-                  </p>
+                  {globalIcons.length === 0 ? (
+                    <p className="text-xs text-neutral-500 italic p-3 bg-neutral-900/40 rounded-xl">
+                      Aún no hay iconos en la galería global. Como administrador puedes subir iconos arriba para que todos los perfiles los usen.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2.5 max-h-40 overflow-y-auto p-2.5 bg-neutral-900/60 rounded-xl border border-neutral-800">
+                      {globalIcons.map((ic, idx) => {
+                        const isCurrent = appIcon === ic;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              selectIcon(ic);
+                              setIconSuccessMsg('¡Icono seleccionado de la galería global!');
+                              setTimeout(() => setIconSuccessMsg(''), 3000);
+                            }}
+                            className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all hover:scale-105 p-0.5 relative group ${
+                              isCurrent ? 'border-white shadow-lg' : 'border-neutral-700/80 hover:border-neutral-400'
+                            }`}
+                            title="Haz clic para elegir este icono"
+                          >
+                            <img src={ic} alt={`Icon ${idx + 1}`} className="w-full h-full object-cover rounded-lg" />
+                            {isCurrent && (
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Personal Icon Upload from PC */}
+                <div className="pt-1">
+                  <input
+                    type="file"
+                    ref={iconFileInputRef}
+                    accept="image/*"
+                    onChange={handlePersonalIconUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => iconFileInputRef.current?.click()}
+                    className="w-full py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold text-xs transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Subir icono propio desde tu PC (para ti)</span>
+                  </button>
                 </div>
               </div>
             </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { MusicProvider, useMusic } from './context/MusicContext';
 import { AudioProvider, useAudio } from './context/AudioContext';
+import { CustomizationProvider, useCustomization } from './context/CustomizationContext';
 import { Sidebar } from './components/Sidebar';
 import { PlayerBar } from './components/PlayerBar';
 import { SpotifyRightPanel } from './components/SpotifyRightPanel';
@@ -50,6 +51,7 @@ const MainLayout: React.FC = () => {
   const { currentUser, isAdmin } = useAuth();
   const { downloadingState } = useMusic();
   const { isCenterLyricsOpen, setIsCenterLyricsOpen, currentSong } = useAudio();
+  const { appName, appIcon } = useCustomization();
 
   // Listen to network status & initialize custom app icon
   useEffect(() => {
@@ -361,13 +363,15 @@ const AuthenticatedApp: React.FC = () => {
 
 export function App() {
   return (
-    <AuthProvider>
-      <MusicProvider>
-        <AudioProvider>
-          <AuthenticatedApp />
-        </AudioProvider>
-      </MusicProvider>
-    </AuthProvider>
+    <CustomizationProvider>
+      <AuthProvider>
+        <MusicProvider>
+          <AudioProvider>
+            <AuthenticatedApp />
+          </AudioProvider>
+        </MusicProvider>
+      </AuthProvider>
+    </CustomizationProvider>
   );
 }
 

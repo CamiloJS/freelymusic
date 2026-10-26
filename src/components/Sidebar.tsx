@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
+import { useCustomization } from '../context/CustomizationContext';
 import { getCustomAppIcon } from '../utils/appIcon';
 import { Playlist, Album } from '../types';
 import { DEFAULT_AVATAR } from '../services/storage';
@@ -68,23 +69,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'add-music', label: 'Añadir Música', icon: UploadCloud },
   ];
 
-  // Extract unique albums from catalog
+  const { appName, appIcon: contextIcon } = useCustomization();
+
+  // Extract unique albums from catalog (grouped solely by album name so guest collaborations remain together)
   const uniqueAlbums = React.useMemo((): Album[] => {
     const map = new Map<string, Album>();
     catalog.forEach((song) => {
       if (!song.album || song.album.trim().toLowerCase() === 'sencillo') return;
-      const key = `${song.album.trim().toLowerCase()}___${song.artist.trim().toLowerCase()}`;
-      if (!map.has(key)) {
-        map.set(key, {
+      const albumKey = song.album.trim().toLowerCase();
+      const primaryArtist = song.artist.split(',')[0].trim();
+
+      if (!map.has(albumKey)) {
+        map.set(albumKey, {
           name: song.album.trim(),
-          artist: song.artist.trim(),
+          artist: primaryArtist || song.artist.trim(),
           coverUrl: song.coverUrl,
           year: song.year,
           genre: song.genre,
           songs: [],
         });
       }
-      map.get(key)!.songs.push(song);
+      map.get(albumKey)!.songs.push(song);
     });
 
     map.forEach((alb) => {
@@ -110,6 +115,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return alb.name.toLowerCase().includes(q) || alb.artist.toLowerCase().includes(q);
   });
 
+  const activeIcon = contextIcon || appIcon;
+
   return (
     <aside className="w-68 lg:w-76 bg-black text-neutral-300 flex flex-col h-full border-r border-neutral-900 select-none flex-shrink-0">
       {/* Brand Header */}
@@ -122,15 +129,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className="flex items-center gap-3 cursor-pointer group"
         >
           <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-emerald-500 via-green-400 to-teal-300 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-all overflow-hidden flex-shrink-0">
-            {appIcon ? (
-              <img src={appIcon} alt="App Icon" className="w-full h-full object-cover" />
+            {activeIcon ? (
+              <img src={activeIcon} alt={appName} className="w-full h-full object-cover" />
             ) : (
               <Disc3 className="w-5 h-5 text-black animate-spin" style={{ animationDuration: '8s' }} />
             )}
           </div>
           <div>
             <span className="font-black tracking-wider text-lg text-white block">
-              Música
+              {appName}
             </span>
           </div>
         </div>

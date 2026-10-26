@@ -4,6 +4,7 @@ import {
   collection,
   doc,
   setDoc,
+  getDoc,
   getDocs,
   deleteDoc,
   Firestore,
@@ -195,6 +196,51 @@ export function subscribeToCatalogUpdates(onUpdate: (songs: Song[]) => void): ((
       const songs: Song[] = [];
       snapshot.forEach((d) => songs.push(d.data() as Song));
       onUpdate(songs);
+    });
+    return unsubscribe;
+  } catch {
+    return null;
+  }
+}
+
+// Global App Customization Settings (App Name & Admin Icon Gallery)
+export interface GlobalAppSettings {
+  globalAppName?: string;
+  globalIcons?: string[];
+}
+
+export async function syncGlobalSettingsFromFirestore(): Promise<GlobalAppSettings | null> {
+  if (!db) return null;
+  try {
+    const snap = await getDoc(doc(db, ...BASE_PATH, 'appSettings', 'global'));
+    if (snap.exists()) {
+      return snap.data() as GlobalAppSettings;
+    }
+    return null;
+  } catch (err) {
+    console.warn('Error fetching global settings from Firestore:', err);
+    return null;
+  }
+}
+
+export async function saveGlobalSettingsToFirestore(settings: GlobalAppSettings): Promise<void> {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, ...BASE_PATH, 'appSettings', 'global'), settings, { merge: true });
+  } catch (err) {
+    console.warn('Error saving global settings to Firestore:', err);
+  }
+}
+
+export function subscribeToGlobalSettingsUpdates(
+  onUpdate: (settings: GlobalAppSettings) => void
+): (() => void) | null {
+  if (!db) return null;
+  try {
+    const unsubscribe = onSnapshot(doc(db, ...BASE_PATH, 'appSettings', 'global'), (snap) => {
+      if (snap.exists()) {
+        onUpdate(snap.data() as GlobalAppSettings);
+      }
     });
     return unsubscribe;
   } catch {

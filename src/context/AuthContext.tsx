@@ -22,6 +22,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isAuthenticated: boolean;
   login: (userId: string, pin?: string) => { success: boolean; error?: string };
+  loginWithCredentials: (username: string, pin: string) => { success: boolean; error?: string };
   logout: () => void;
   switchUser: (userId: string) => void;
   createProfile: (data: { username: string; displayName: string; role: UserRole; avatarUrl?: string; pin?: string }) => UserProfile;
@@ -83,6 +84,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (requiredPin && requiredPin.trim() !== '') {
       if (!pin || pin.trim() !== requiredPin.trim()) {
         return { success: false, error: 'PIN incorrecto. Intenta de nuevo.' };
+      }
+    }
+
+    setActiveUserId(target.id);
+    saveStoredActiveUserId(target.id);
+    saveStoredActiveSessionUserId(target.id);
+    setIsAuthenticated(true);
+    return { success: true };
+  };
+
+  const loginWithCredentials = (
+    usernameInput: string,
+    pinInput: string
+  ): { success: boolean; error?: string } => {
+    const trimmed = usernameInput.trim().toLowerCase();
+    if (!trimmed) {
+      return { success: false, error: 'Por favor ingresa tu nombre de usuario.' };
+    }
+
+    const target = allUsers.find(
+      (u) =>
+        u.username.toLowerCase() === trimmed ||
+        u.displayName.toLowerCase() === trimmed ||
+        (u.id === 'camilo-admin' && (trimmed === 'camilo' || trimmed === 'camilo jaimes'))
+    );
+
+    if (!target) {
+      return { success: false, error: 'Usuario o contraseña incorrectos.' };
+    }
+
+    const requiredPin = target.pin || (target.id === 'camilo-admin' ? '2410' : undefined);
+    if (requiredPin && requiredPin.trim() !== '') {
+      if (!pinInput || pinInput.trim() !== requiredPin.trim()) {
+        return { success: false, error: 'Usuario o contraseña incorrectos.' };
       }
     }
 
@@ -181,6 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdmin,
         isAuthenticated,
         login,
+        loginWithCredentials,
         logout,
         switchUser,
         createProfile,
