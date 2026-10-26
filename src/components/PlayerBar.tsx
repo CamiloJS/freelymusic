@@ -314,6 +314,8 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
             step="0.01"
             value={isMuted ? 0 : volume}
             onChange={(e) => setVolume(parseFloat(e.target.value))}
+            aria-label="Volumen"
+            title="Volumen"
             className="w-18 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
           />
         </div>
