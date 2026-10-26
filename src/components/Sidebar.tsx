@@ -197,14 +197,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title="Abrir Perfil y Ajustes"
         >
           <img
-            src={currentUser.avatarUrl}
-            alt={currentUser.displayName}
+            src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'}
+            alt={currentUser?.displayName || 'Usuario'}
             className="w-9 h-9 rounded-xl object-cover ring-2 ring-emerald-500/30 flex-shrink-0"
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-bold text-white truncate block">
-                {currentUser.displayName}
+                {currentUser?.displayName || 'Usuario'}
               </span>
               {isAdmin && (
                 <UserCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />

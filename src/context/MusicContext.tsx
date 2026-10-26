@@ -139,29 +139,35 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     refreshDownloadedIds();
   };
 
-  // User Library Favorites
+  // User Library Favorites (with defensive fallback)
   const isFavorite = useCallback(
-    (songId: string) => userData.favoriteSongIds.includes(songId),
-    [userData.favoriteSongIds]
+    (songId: string) => (userData?.favoriteSongIds || []).includes(songId),
+    [userData?.favoriteSongIds]
   );
 
   const toggleFavorite = (songId: string) => {
-    const isFav = userData.favoriteSongIds.includes(songId);
+    const currentFavs = userData?.favoriteSongIds || [];
+    const isFav = currentFavs.includes(songId);
     const updatedFavorites = isFav
-      ? userData.favoriteSongIds.filter((id) => id !== songId)
-      : [...userData.favoriteSongIds, songId];
+      ? currentFavs.filter((id) => id !== songId)
+      : [...currentFavs, songId];
 
     const updatedData: UserLibraryData = {
-      ...userData,
       favoriteSongIds: updatedFavorites,
+      historySongIds: userData?.historySongIds || [],
+      playlists: userData?.playlists || [],
     };
 
     setUserData(updatedData);
-    saveStoredUserData(currentUser.id, updatedData);
-    saveUserDataToFirestore(currentUser.id, updatedData);
+    if (currentUser?.id) {
+      saveStoredUserData(currentUser.id, updatedData);
+      saveUserDataToFirestore(currentUser.id, updatedData);
+    }
   };
 
-  const userFavoriteSongs = catalog.filter((s) => userData.favoriteSongIds.includes(s.id));
+  const userFavoriteSongs = (catalog || []).filter((s) =>
+    (userData?.favoriteSongIds || []).includes(s?.id)
+  );
 
   // User Playlists
   const createPlaylist = (name: string, description = '', coverUrl = ''): Playlist => {

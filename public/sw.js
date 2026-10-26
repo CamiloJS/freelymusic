@@ -1,5 +1,7 @@
-const CACHE_NAME = 'sonora-cache-v1';
-const STATIC_ASSETS = [
+const CACHE_NAME = 'musica-cache-v2';
+
+// Assets to pre-cache for offline mode
+const PRECACHE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
@@ -10,7 +12,7 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      return cache.addAll(PRECACHE_ASSETS);
     })
   );
   self.skipWaiting();
@@ -32,27 +34,50 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Let audio blob and external audio streams handle via custom IndexedDB cache
+  const url = new URL(event.request.url);
+
+  // 1. Audio files: handled directly or via IndexedDB cache
   if (
-    event.request.url.includes('.mp3') ||
-    event.request.url.includes('.wav') ||
-    event.request.url.includes('.flac') ||
-    event.request.url.includes('.m4a')
+    url.pathname.endsWith('.mp3') ||
+    url.pathname.endsWith('.wav') ||
+    url.pathname.endsWith('.flac') ||
+    url.pathname.endsWith('.m4a') ||
+    url.pathname.endsWith('.ogg')
   ) {
     return;
   }
 
+  // 2. Navigation / HTML requests: NETWORK-FIRST so new deployments are NEVER stuck
+  if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => {
+          // If offline, serve cached index.html
+          return caches.match('/index.html') || caches.match('/');
+        })
+    );
+    return;
+  }
+
+  // 3. Static hashed JS / CSS assets: Network first with cache fallback
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).catch(() => {
-        // Fallback for navigation requests
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         }
-      });
-    })
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request);
+      })
   );
 });

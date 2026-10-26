@@ -34,20 +34,20 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   // AI-Driven Recommendations based on user favorites & catalog genres
   const { aiRecommendations, genreMixes, topGenreName } = useMemo(() => {
-    if (catalog.length === 0) {
+    if (!catalog || catalog.length === 0) {
       return { aiRecommendations: [], genreMixes: [], topGenreName: 'Música' };
     }
 
     // Calculate genre affinities from user favorites
     const genreScore: Record<string, number> = {};
-    userFavoriteSongs.forEach((s) => {
-      const g = s.genre || 'General';
+    (userFavoriteSongs || []).forEach((s) => {
+      const g = s?.genre || 'General';
       genreScore[g] = (genreScore[g] || 0) + 2;
     });
 
     // Also factor catalog genres
-    catalog.forEach((s) => {
-      const g = s.genre || 'General';
+    (catalog || []).forEach((s) => {
+      const g = s?.genre || 'General';
       genreScore[g] = (genreScore[g] || 0) + 0.5;
     });
 
@@ -59,8 +59,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
     // AI recommended tracks (blended selection prioritizing favored genres)
     const scoredSongs = [...catalog].sort((a, b) => {
-      const scoreA = (genreScore[a.genre || 'General'] || 1) + Math.sin(a.id.length);
-      const scoreB = (genreScore[b.genre || 'General'] || 1) + Math.cos(b.id.length);
+      const idA = String(a?.id || '');
+      const idB = String(b?.id || '');
+      const scoreA = (genreScore[a?.genre || 'General'] || 1) + Math.sin(idA.length);
+      const scoreB = (genreScore[b?.genre || 'General'] || 1) + Math.cos(idB.length);
       return scoreB - scoreA;
     });
 
@@ -69,7 +71,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     // Group top genres for dedicated "Mix IA" cards
     const mixes: { genre: string; songs: Song[] }[] = [];
     sortedGenres.slice(0, 3).forEach((g) => {
-      const gSongs = catalog.filter((s) => (s.genre || 'General') === g);
+      const gSongs = catalog.filter((s) => (s?.genre || 'General') === g);
       if (gSongs.length > 0) {
         mixes.push({ genre: g, songs: gSongs.slice(0, 6) });
       }

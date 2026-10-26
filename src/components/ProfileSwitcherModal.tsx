@@ -49,10 +49,17 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   const [pinError, setPinError] = useState('');
 
   // Tab: Mi Perfil state
-  const [editDisplayName, setEditDisplayName] = useState(currentUser.displayName);
-  const [editPin, setEditPin] = useState(currentUser.pin || '');
+  const [editDisplayName, setEditDisplayName] = useState(currentUser?.displayName || '');
+  const [editPin, setEditPin] = useState(currentUser?.pin || '');
   const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
   const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    if (currentUser) {
+      setEditDisplayName(currentUser.displayName || '');
+      setEditPin(currentUser.pin || '');
+    }
+  }, [currentUser]);
 
   // Tab: Personalizacion (App Icon) state
   const [currentIcon, setCurrentIcon] = useState<string | null>(() => getCustomAppIcon());
@@ -382,7 +389,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
 
                   <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                     {allUsers.map((user) => {
-                      const isActive = user.id === currentUser.id;
+                      const isActive = user.id === currentUser?.id;
                       return (
                         <div
                           key={user.id}
@@ -467,8 +474,8 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
               {/* Avatar Uploader */}
               <div className="flex items-center gap-5 p-4 bg-neutral-950 rounded-2xl border border-neutral-800">
                 <img
-                  src={currentUser.avatarUrl}
-                  alt={currentUser.displayName}
+                  src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'}
+                  alt={currentUser?.displayName || 'Usuario'}
                   className="w-20 h-20 rounded-2xl object-cover ring-2 ring-emerald-500/50 shadow-lg"
                 />
 

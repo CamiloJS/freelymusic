@@ -1,11 +1,52 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" class="bg-black">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Música</title>
     
+    <style>
+      html, body {
+        background-color: #000000 !important;
+        color: #ffffff;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+      }
+    </style>
+
+    <!-- Auto-recovery from stale PWA cache -->
+    <script>
+      window.addEventListener('error', function (event) {
+        if (event.target && (event.target.tagName === 'SCRIPT' || event.target.tagName === 'LINK')) {
+          var key = 'musica_reload_attempt';
+          var last = sessionStorage.getItem(key);
+          if (!last) {
+            sessionStorage.setItem(key, Date.now());
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                for (var i = 0; i < registrations.length; i++) {
+                  registrations[i].unregister();
+                }
+                if (window.caches) {
+                  caches.keys().then(function (names) {
+                    return Promise.all(names.map(function (n) { return caches.delete(n); }));
+                  }).then(function () {
+                    window.location.reload();
+                  });
+                } else {
+                  window.location.reload();
+                }
+              });
+            } else {
+              window.location.reload();
+            }
+          }
+        }
+      }, true);
+    </script>
+
     <!-- PWA & Mobile Web App Meta -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#1ed760" />
@@ -22,8 +63,10 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch((err) => {
-            console.log('SW registration failed:', err);
+          navigator.serviceWorker.register('/sw.js').then((reg) => {
+            reg.update();
+          }).catch((err) => {
+            console.log('SW registration error:', err);
           });
         });
       }
