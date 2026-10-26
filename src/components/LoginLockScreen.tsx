@@ -12,10 +12,11 @@ export const LoginLockScreen: React.FC = () => {
   const handleProfileClick = (user: UserProfile) => {
     setErrorMsg('');
     setPinInput('');
-    if (user.pin && user.pin.trim() !== '') {
+    const requiredPin = user.pin || (user.id === 'camilo-admin' ? '2410' : undefined);
+    if (requiredPin && requiredPin.trim() !== '') {
       setSelectedUser(user);
     } else {
-      // No pin set, login directly
+      // Member without PIN
       const result = login(user.id);
       if (!result.success && result.error) {
         setErrorMsg(result.error);
@@ -27,9 +28,14 @@ export const LoginLockScreen: React.FC = () => {
     e.preventDefault();
     if (!selectedUser) return;
 
+    if (!pinInput.trim()) {
+      setErrorMsg('Por favor introduce tu PIN.');
+      return;
+    }
+
     const result = login(selectedUser.id, pinInput);
     if (!result.success) {
-      setErrorMsg(result.error || 'PIN incorrecto.');
+      setErrorMsg(result.error || 'PIN incorrecto. Acceso bloqueado.');
       setPinInput('');
     }
   };
@@ -121,11 +127,6 @@ export const LoginLockScreen: React.FC = () => {
                 <Lock className="w-3 h-3 text-emerald-400" />
                 <span>Introduce tu PIN para acceder</span>
               </p>
-              {selectedUser.id === 'camilo-admin' && (
-                <p className="text-[11px] text-neutral-500 mt-1">
-                  (PIN predeterminado: <span className="text-emerald-400 font-mono font-bold">1234</span>)
-                </p>
-              )}
             </div>
 
             <form onSubmit={handlePinSubmit} className="space-y-4">

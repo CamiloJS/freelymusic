@@ -189,7 +189,7 @@ export const INITIAL_PROFILES: UserProfile[] = [
     displayName: 'Camilo Jaimes',
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
     role: 'admin',
-    pin: '1234',
+    pin: '2410',
     createdAt: new Date().toISOString(),
   },
 ];

@@ -44,13 +44,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Firestore initial sync & live updates
   useEffect(() => {
-    syncProfilesFromFirestore().then((cloudProfiles) => {
+    const localProfiles = getStoredProfiles();
+    syncProfilesFromFirestore().then(async (cloudProfiles) => {
       if (cloudProfiles && cloudProfiles.length > 0) {
-        setAllUsers(cloudProfiles);
-        saveStoredProfiles(cloudProfiles);
+        // Merge with local profiles in case local has updated avatar or pin that hadn't reached cloud
+        const cloudMap = new Map(cloudProfiles.map((p) => [p.id, p]));
+        const merged = localProfiles.map((lp) => {
+          const cp = cloudMap.get(lp.id);
+          if (!cp) return lp;
+          const avatarUrl = lp.avatarUrl?.startsWith('data:') ? lp.avatarUrl : cp.avatarUrl;
+          const pin = lp.pin || cp.pin || (lp.id === 'camilo-admin' ? '2410' : undefined);
+          return { ...cp, ...lp, avatarUrl, pin };
+        });
+
+        cloudProfiles.forEach((cp) => {
+          if (!localProfiles.some((lp) => lp.id === cp.id)) {
+            merged.push(cp);
+          }
+        });
+
+        setAllUsers(merged);
+        saveStoredProfiles(merged);
+        for (const p of merged) {
+          await saveProfileToFirestore(p);
+        }
       } else {
-        // First time initializing Firestore database with initial admin profile
-        INITIAL_PROFILES.forEach((p) => saveProfileToFirestore(p));
+        // First time initializing Firestore database with profiles
+        for (const p of localProfiles) {
+          await saveProfileToFirestore(p);
+        }
       }
     });
 
@@ -75,9 +97,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Perfil no encontrado.' };
     }
 
-    // Check PIN requirement
-    if (target.pin && target.pin.trim() !== '') {
-      if (!pin || pin.trim() !== target.pin.trim()) {
+    // Check PIN requirement strictly (default pin for Camilo is 2410)
+    const requiredPin = target.pin || (target.id === 'camilo-admin' ? '2410' : undefined);
+    if (requiredPin && requiredPin.trim() !== '') {
+      if (!pin || pin.trim() !== requiredPin.trim()) {
         return { success: false, error: 'PIN incorrecto. Intenta de nuevo.' };
       }
     }

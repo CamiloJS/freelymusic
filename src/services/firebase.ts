@@ -9,6 +9,7 @@ import {
   Firestore,
   onSnapshot
 } from 'firebase/firestore';
+import { getAuth, signInAnonymously, Auth } from 'firebase/auth';
 import { Song, UserProfile, UserLibraryData, FirebaseConfigOptions } from '../types';
 import { getStoredFirebaseConfig } from './storage';
 
@@ -22,7 +23,12 @@ export const DEFAULT_FIREBASE_CONFIG: FirebaseConfigOptions = {
 };
 
 let firebaseApp: FirebaseApp | null = null;
+let auth: Auth | null = null;
 let db: Firestore | null = null;
+
+// Authorized path matching firestore.rules in ginadocente-unipamplona:
+// match /artifacts/{appId} { match /public/data/{document=**} { allow read: if isAuth(); allow write: if isAuth(); } }
+const BASE_PATH = ['artifacts', 'freelymusic', 'public', 'data'] as const;
 
 export function initFirebase(config?: FirebaseConfigOptions | null): boolean {
   try {
@@ -48,8 +54,15 @@ export function initFirebase(config?: FirebaseConfigOptions | null): boolean {
       firebaseApp = getApps()[0];
     }
 
+    auth = getAuth(firebaseApp);
     db = getFirestore(firebaseApp);
-    console.info('Firebase Firestore connected successfully to project:', finalConfig.projectId);
+
+    // Authenticate anonymously so security rules permit read/write operations
+    signInAnonymously(auth).catch((err) => {
+      console.warn('Firebase anonymous authentication error:', err);
+    });
+
+    console.info('Firebase connected with authenticated session to:', finalConfig.projectId);
     return true;
   } catch (err) {
     console.warn('Firebase initialization error, running in offline fallback:', err);
@@ -68,7 +81,7 @@ export function isFirebaseConnected(): boolean {
 export async function syncCatalogFromFirestore(): Promise<Song[] | null> {
   if (!db) return null;
   try {
-    const snapshot = await getDocs(collection(db, 'catalog'));
+    const snapshot = await getDocs(collection(db, ...BASE_PATH, 'catalog'));
     const songs: Song[] = [];
     snapshot.forEach((d) => {
       songs.push(d.data() as Song);
@@ -83,7 +96,7 @@ export async function syncCatalogFromFirestore(): Promise<Song[] | null> {
 export async function saveSongToFirestore(song: Song): Promise<void> {
   if (!db) return;
   try {
-    await setDoc(doc(db, 'catalog', song.id), song, { merge: true });
+    await setDoc(doc(db, ...BASE_PATH, 'catalog', song.id), song, { merge: true });
   } catch (err) {
     console.warn('Error saving song to Firestore:', err);
   }
@@ -92,7 +105,7 @@ export async function saveSongToFirestore(song: Song): Promise<void> {
 export async function deleteSongFromFirestore(songId: string): Promise<void> {
   if (!db) return;
   try {
-    await deleteDoc(doc(db, 'catalog', songId));
+    await deleteDoc(doc(db, ...BASE_PATH, 'catalog', songId));
   } catch (err) {
     console.warn('Error deleting song from Firestore:', err);
   }
@@ -102,7 +115,7 @@ export async function deleteSongFromFirestore(songId: string): Promise<void> {
 export async function syncProfilesFromFirestore(): Promise<UserProfile[] | null> {
   if (!db) return null;
   try {
-    const snapshot = await getDocs(collection(db, 'profiles'));
+    const snapshot = await getDocs(collection(db, ...BASE_PATH, 'profiles'));
     const profiles: UserProfile[] = [];
     snapshot.forEach((d) => {
       profiles.push(d.data() as UserProfile);
@@ -117,7 +130,7 @@ export async function syncProfilesFromFirestore(): Promise<UserProfile[] | null>
 export async function saveProfileToFirestore(profile: UserProfile): Promise<void> {
   if (!db) return;
   try {
-    await setDoc(doc(db, 'profiles', profile.id), profile, { merge: true });
+    await setDoc(doc(db, ...BASE_PATH, 'profiles', profile.id), profile, { merge: true });
   } catch (err) {
     console.warn('Error saving profile to Firestore:', err);
   }
@@ -126,7 +139,7 @@ export async function saveProfileToFirestore(profile: UserProfile): Promise<void
 export async function deleteProfileFromFirestore(profileId: string): Promise<void> {
   if (!db) return;
   try {
-    await deleteDoc(doc(db, 'profiles', profileId));
+    await deleteDoc(doc(db, ...BASE_PATH, 'profiles', profileId));
   } catch (err) {
     console.warn('Error deleting profile from Firestore:', err);
   }
@@ -136,7 +149,7 @@ export async function deleteProfileFromFirestore(profileId: string): Promise<voi
 export function subscribeToProfilesUpdates(onUpdate: (profiles: UserProfile[]) => void): (() => void) | null {
   if (!db) return null;
   try {
-    const unsubscribe = onSnapshot(collection(db, 'profiles'), (snapshot) => {
+    const unsubscribe = onSnapshot(collection(db, ...BASE_PATH, 'profiles'), (snapshot) => {
       const profiles: UserProfile[] = [];
       snapshot.forEach((d) => profiles.push(d.data() as UserProfile));
       if (profiles.length > 0) {
@@ -153,7 +166,7 @@ export function subscribeToProfilesUpdates(onUpdate: (profiles: UserProfile[]) =
 export async function syncUserDataFromFirestore(userId: string): Promise<UserLibraryData | null> {
   if (!db) return null;
   try {
-    const snapshot = await getDocs(collection(db, 'usersData'));
+    const snapshot = await getDocs(collection(db, ...BASE_PATH, 'usersData'));
     let data: UserLibraryData | null = null;
     snapshot.forEach((d) => {
       if (d.id === userId) {
@@ -170,7 +183,7 @@ export async function syncUserDataFromFirestore(userId: string): Promise<UserLib
 export async function saveUserDataToFirestore(userId: string, data: UserLibraryData): Promise<void> {
   if (!db) return;
   try {
-    await setDoc(doc(db, 'usersData', userId), data, { merge: true });
+    await setDoc(doc(db, ...BASE_PATH, 'usersData', userId), data, { merge: true });
   } catch (err) {
     console.warn('Error saving user data to Firestore:', err);
   }
@@ -180,7 +193,7 @@ export async function saveUserDataToFirestore(userId: string, data: UserLibraryD
 export function subscribeToCatalogUpdates(onUpdate: (songs: Song[]) => void): (() => void) | null {
   if (!db) return null;
   try {
-    const unsubscribe = onSnapshot(collection(db, 'catalog'), (snapshot) => {
+    const unsubscribe = onSnapshot(collection(db, ...BASE_PATH, 'catalog'), (snapshot) => {
       const songs: Song[] = [];
       snapshot.forEach((d) => songs.push(d.data() as Song));
       if (songs.length > 0) {
