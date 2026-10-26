@@ -5,25 +5,20 @@ import { AudioProvider, useAudio } from './context/AudioContext';
 import { CustomizationProvider, useCustomization } from './context/CustomizationContext';
 import { Sidebar } from './components/Sidebar';
 import { PlayerBar } from './components/PlayerBar';
+import { MobilePlayerBar } from './components/MobilePlayerBar';
+import { MobileNav } from './components/MobileNav';
 import { SpotifyRightPanel } from './components/SpotifyRightPanel';
 import { InstallPrompt } from './components/InstallPrompt';
 import { Playlist, Song, Album } from './types';
 import { getCustomAppIcon, applyAppIcon } from './utils/appIcon';
 import { DEFAULT_AVATAR } from './services/storage';
-import Compass from 'lucide-react/dist/esm/icons/compass.mjs';
 import Home from 'lucide-react/dist/esm/icons/house.mjs';
-import Library from 'lucide-react/dist/esm/icons/library.mjs';
-import HardDriveDownload from 'lucide-react/dist/esm/icons/hard-drive-download.mjs';
-import ShieldAlert from 'lucide-react/dist/esm/icons/shield-alert.mjs';
 import Search from 'lucide-react/dist/esm/icons/search.mjs';
-import Menu from 'lucide-react/dist/esm/icons/menu.mjs';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
-import UploadCloud from 'lucide-react/dist/esm/icons/cloud-upload.mjs';
 import ChevronLeft from 'lucide-react/dist/esm/icons/chevron-left.mjs';
 import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right.mjs';
 import ArrowDownCircle from 'lucide-react/dist/esm/icons/circle-arrow-down.mjs';
 import Settings from 'lucide-react/dist/esm/icons/settings.mjs';
-import UserRound from 'lucide-react/dist/esm/icons/user-round.mjs';
 import Disc3 from 'lucide-react/dist/esm/icons/disc-3.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 
@@ -110,16 +105,16 @@ const MainLayout: React.FC = () => {
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
   const [isImportPlaylistOpen, setIsImportPlaylistOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser } = useAuth();
   const { downloadingState } = useMusic();
   const {
     isCenterLyricsOpen,
     setIsCenterLyricsOpen,
     currentSong,
     isFullscreenNowPlaying,
+    setIsFullscreenNowPlaying,
     isVideoMode,
   } = useAudio();
   const { appName, appIcon } = useCustomization();
@@ -207,14 +202,43 @@ const MainLayout: React.FC = () => {
     setIsCenterLyricsOpen(false);
   };
 
+  // On mobile, the bottom nav handles the root sections. The header back arrow
+  // is only useful inside details such as an album, artist or settings view.
+  const showMobileBack =
+    currentTab === 'artist' ||
+    currentTab === 'add-music' ||
+    currentTab === 'profile' ||
+    currentTab === 'admin' ||
+    currentTab === 'offline' ||
+    (currentTab === 'library' && Boolean(selectedPlaylist));
+
+  const handleMobileTab = (tab: 'home' | 'cloud' | 'library') => {
+    setCurrentTab(tab);
+    if (tab !== 'cloud') setSearchQuery('');
+    setSelectedPlaylist(null);
+    setSelectedArtist(null);
+    setIsCenterLyricsOpen(false);
+    setIsFullscreenNowPlaying(false);
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-black text-white select-none">
       {/* Spotify Top Bar (Images 1, 2, 4) */}
-      <header className="h-14 bg-black border-b border-neutral-900/80 px-4 flex items-center justify-between flex-shrink-0 z-30">
+      <header
+        className="bg-black border-b border-neutral-900/80 px-4 flex items-center justify-between flex-shrink-0 z-30"
+        style={{
+          height: 'calc(3.5rem + env(safe-area-inset-top))',
+          paddingTop: 'env(safe-area-inset-top)',
+        }}
+      >
         {/* Left: Brand, navigation arrows & Home */}
         <div className="flex items-center gap-2 min-w-0">
-          <div className="flex items-center gap-2 min-w-0 mr-1">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 via-green-400 to-teal-300 flex items-center justify-center overflow-hidden shadow-lg shadow-emerald-500/20 flex-shrink-0">
+          <div
+            className={`${
+              currentTab === 'home' ? 'flex' : 'hidden'
+            } md:flex items-center gap-2 min-w-0 mr-1`}
+          >
+            <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-tr from-emerald-500 via-green-400 to-teal-300 flex items-center justify-center overflow-hidden shadow-lg shadow-emerald-500/20 flex-shrink-0">
               {appIcon ? (
                 <img src={appIcon} alt={appName} className="w-full h-full object-cover" />
               ) : (
@@ -226,25 +250,29 @@ const MainLayout: React.FC = () => {
             </span>
           </div>
 
-          <div className="hidden sm:flex items-center gap-1">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => {
                 if (currentTab === 'artist') {
                   handleBackFromArtist();
                 } else if (currentTab === 'library' && selectedPlaylist) {
                   setSelectedPlaylist(null);
+                } else if (currentTab !== 'home') {
+                  setCurrentTab('home');
                 } else {
                   window.history.back();
                 }
               }}
-              className="w-8 h-8 rounded-full bg-neutral-900 hover:bg-neutral-800 text-neutral-300 flex items-center justify-center transition-colors"
+              className={`${
+                showMobileBack ? 'flex' : 'hidden md:flex'
+              } w-8 h-8 rounded-full bg-neutral-900 hover:bg-neutral-800 text-neutral-300 items-center justify-center transition-colors`}
               title="Atrás"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={() => window.history.forward()}
-              className="w-8 h-8 rounded-full bg-neutral-900 hover:bg-neutral-800 text-neutral-300 flex items-center justify-center transition-colors"
+              className="hidden sm:flex w-8 h-8 rounded-full bg-neutral-900 hover:bg-neutral-800 text-neutral-300 items-center justify-center transition-colors"
               title="Adelante"
             >
               <ChevronRight className="w-4 h-4" />
@@ -257,7 +285,7 @@ const MainLayout: React.FC = () => {
               setCurrentTab('home');
               setSelectedPlaylist(null);
             }}
-            className="w-9 h-9 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white flex items-center justify-center transition-colors ml-1"
+            className="hidden md:flex w-9 h-9 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white items-center justify-center transition-colors ml-1"
             title="Inicio"
           >
             <Home className="w-4 h-4 text-emerald-400" />
@@ -313,103 +341,11 @@ const MainLayout: React.FC = () => {
             <span className="text-xs font-bold text-white hidden md:inline truncate max-w-[120px]">
               {currentUser?.displayName || 'Usuario'}
             </span>
-            <Settings className="w-3.5 h-3.5 text-neutral-400" />
+            <Settings className="hidden md:block w-3.5 h-3.5 text-neutral-400" />
           </button>
 
-          {/* Mobile hamburger menu button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 rounded-xl bg-neutral-900 text-neutral-300"
-          >
-            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
         </div>
       </header>
-
-      {/* Mobile Drawer Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden absolute top-14 left-0 right-0 z-40 bg-neutral-900/95 border-b border-neutral-800 p-4 space-y-2 backdrop-blur-xl animate-in slide-in-from-top-2">
-          <button
-            onClick={() => {
-              setCurrentTab('home');
-              setIsCenterLyricsOpen(false);
-              setIsMobileMenuOpen(false);
-            }}
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-950 text-sm font-bold text-white"
-          >
-            <Home className="w-4 h-4 text-emerald-400" />
-            Inicio
-          </button>
-          <button
-            onClick={() => {
-              setCurrentTab('cloud');
-              setIsCenterLyricsOpen(false);
-              setIsMobileMenuOpen(false);
-            }}
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-950 text-sm font-bold text-white"
-          >
-            <Compass className="w-4 h-4 text-emerald-400" />
-            Explorar la Nube
-          </button>
-          <button
-            onClick={() => {
-              setCurrentTab('add-music');
-              setIsCenterLyricsOpen(false);
-              setIsMobileMenuOpen(false);
-            }}
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-950 text-sm font-bold text-white"
-          >
-            <UploadCloud className="w-4 h-4 text-emerald-400" />
-            Añadir Música
-          </button>
-          <button
-            onClick={() => {
-              setCurrentTab('library');
-              setIsCenterLyricsOpen(false);
-              setIsMobileMenuOpen(false);
-            }}
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-950 text-sm font-bold text-white"
-          >
-            <Library className="w-4 h-4 text-emerald-400" />
-            Tu Biblioteca
-          </button>
-          <button
-            onClick={() => {
-              setCurrentTab('offline');
-              setIsCenterLyricsOpen(false);
-              setIsMobileMenuOpen(false);
-            }}
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-950 text-sm font-bold text-white"
-          >
-            <HardDriveDownload className="w-4 h-4 text-emerald-400" />
-            Modo Sin Conexión
-          </button>
-          <button
-            onClick={() => {
-              setCurrentTab('profile');
-              setIsCenterLyricsOpen(false);
-              setIsMobileMenuOpen(false);
-            }}
-            className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-950 text-sm font-bold text-white"
-          >
-            <UserRound className="w-4 h-4 text-emerald-400" />
-            Mi Perfil y Estadísticas
-          </button>
-          {isAdmin && (
-            <button
-              onClick={() => {
-                setCurrentTab('admin');
-                setIsCenterLyricsOpen(false);
-                setIsMobileMenuOpen(false);
-              }}
-              className="w-full flex items-center gap-3 p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-sm font-bold text-emerald-400"
-            >
-              <ShieldAlert className="w-4 h-4" />
-              Panel Admin
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Main 3-Column Spotify Desktop Layout (Left Sidebar | Center Content | Right Panel) */}
       <div className="flex-1 flex overflow-hidden min-h-0">
@@ -518,8 +454,12 @@ const MainLayout: React.FC = () => {
         </div>
       </div>
 
-      {/* Spotify Bottom Player Bar */}
-      <PlayerBar onSelectArtist={handleSelectArtist} />
+      {/* Desktop player. Mobile has its own compact player + bottom navigation. */}
+      <div className="hidden md:block">
+        <PlayerBar onSelectArtist={handleSelectArtist} />
+      </div>
+      <MobilePlayerBar onSelectArtist={handleSelectArtist} />
+      <MobileNav currentTab={currentTab} onSelectTab={handleMobileTab} />
 
       {/* PWA Install Banner */}
       <InstallPrompt />

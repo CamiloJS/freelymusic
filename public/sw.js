@@ -1,4 +1,4 @@
-const CACHE_NAME = 'musica-cache-v4';
+const CACHE_NAME = 'musica-cache-v5';
 const PWA_ICON_CACHE = 'musica-pwa-icons';
 const PWA_ICON_PATHS = new Set([
   '/pwa-icon-180.png',

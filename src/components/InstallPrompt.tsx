@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Download from 'lucide-react/dist/esm/icons/download.mjs';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
 import Smartphone from 'lucide-react/dist/esm/icons/smartphone.mjs';
-import Check from 'lucide-react/dist/esm/icons/check.mjs';
+import { useAudio } from '../context/AudioContext';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -10,6 +10,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export const InstallPrompt: React.FC = () => {
+  const { currentSong, isFullscreenNowPlaying } = useAudio();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showBanner, setShowBanner] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
@@ -72,35 +73,40 @@ export const InstallPrompt: React.FC = () => {
     setShowBanner(false);
   };
 
-  if (!showBanner || isInstalled) return null;
+  if (!showBanner || isInstalled || isFullscreenNowPlaying) return null;
 
   return (
-    <div className="fixed bottom-24 right-4 md:right-8 z-50 max-w-sm bg-neutral-900/95 border border-neutral-700/80 p-4 rounded-2xl shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-5">
+    <div
+      className={`fixed left-4 right-4 md:left-auto md:right-8 ${
+        currentSong ? 'bottom-44 md:bottom-24' : 'bottom-28 md:bottom-24'
+      } z-40 md:max-w-sm bg-neutral-900/95 border border-neutral-700/80 p-3.5 md:p-4 rounded-2xl shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-5`}
+    >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-600 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 flex-shrink-0">
-            <Smartphone className="w-6 h-6 text-black" />
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-tr from-emerald-600 to-green-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 flex-shrink-0">
+            <Smartphone className="w-5 h-5 md:w-6 md:h-6 text-black" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h4 className="font-bold text-white text-sm">Instalar Música</h4>
-            <p className="text-xs text-neutral-400 mt-0.5">
-              Instala la aplicación para escuchar y descargar tu música sin conexión.
+            <p className="text-[11px] md:text-xs text-neutral-400 mt-0.5 line-clamp-2">
+              Añádela a tu pantalla de inicio y escucha sin conexión.
             </p>
           </div>
         </div>
         <button
           onClick={handleDismiss}
-          className="text-neutral-500 hover:text-white p-1 rounded-lg transition-colors"
+          className="text-neutral-500 hover:text-white p-1 rounded-lg transition-colors flex-shrink-0"
           title="Cerrar y no volver a mostrar"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-neutral-800">
+      <div className="mt-2.5 pt-2.5 border-t border-neutral-800">
         {isIOS ? (
-          <p className="text-xs text-emerald-400 font-medium">
-            En Safari: toca el botón <span className="font-bold">Compartir</span> y selecciona <span className="font-bold">"Añadir a la pantalla de inicio"</span>.
+          <p className="text-[11px] md:text-xs text-emerald-400 font-medium">
+            En Safari: toca <span className="font-bold">Compartir</span> y elige{' '}
+            <span className="font-bold">"Añadir a la pantalla de inicio"</span>.
           </p>
         ) : (
           <button

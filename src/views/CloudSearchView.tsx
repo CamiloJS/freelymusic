@@ -95,7 +95,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto pb-32">
+    <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto pb-32">
       {!searchQuery.trim() ? (
         <div className="max-w-2xl">
           <h1 className="text-3xl font-black text-white">Buscar</h1>
@@ -180,7 +180,9 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
           <div>
             <h1 className="text-3xl font-black text-white">Resultados</h1>
             <p className="text-sm text-neutral-400 mt-1">
-              {filteredSongs.length} coincidencias para “{searchQuery.trim()}”
+              {filteredSongs.length === 1
+                ? `1 coincidencia para “${searchQuery.trim()}”`
+                : `${filteredSongs.length} coincidencias para “${searchQuery.trim()}”`}
             </p>
           </div>
 
@@ -198,9 +200,9 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
             <div className="bg-neutral-900/40 border border-neutral-800/60 rounded-3xl overflow-hidden">
               <div className="p-4 border-b border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-500 font-bold uppercase tracking-wider">
                 <span>Canción</span>
-                <div className="flex items-center gap-12 pr-4">
+                <div className="flex items-center gap-6 sm:gap-12 sm:pr-4">
                   <span className="hidden md:inline">Álbum</span>
-                  <span>Duración</span>
+                  <span className="hidden sm:inline">Duración</span>
                   <span>Acciones</span>
                 </div>
               </div>
@@ -224,7 +226,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                         isCurrent ? 'bg-neutral-800/40' : ''
                       }`}
                     >
-                      <div className="flex items-center gap-3.5 truncate max-w-sm md:max-w-md">
+                      <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 flex-1 pr-2 md:max-w-md">
                         <span className="text-xs font-mono text-neutral-500 w-5 text-right flex-shrink-0 group-hover:hidden">
                           {index + 1}
                         </span>
@@ -254,8 +256,8 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                           )}
                         </div>
 
-                        <div className="truncate">
-                          <div className="flex items-center gap-1.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 min-w-0">
                             {song.isExplicit && (
                               <span
                                 className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-black text-[9px] font-black flex-shrink-0 select-none leading-none"
@@ -294,7 +296,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-6 md:gap-12 flex-shrink-0 pr-2">
+                      <div className="flex items-center gap-0.5 sm:gap-6 md:gap-12 flex-shrink-0 pr-0 sm:pr-2">
                         {song.album && song.album.trim().toLowerCase() !== 'sencillo' ? (
                           <span
                             onClick={(event) => {
@@ -319,17 +321,17 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                           </span>
                         )}
 
-                        <span className="text-xs font-mono text-neutral-400">
+                        <span className="hidden sm:inline text-xs font-mono text-neutral-400">
                           {formatTime(song.duration)}
                         </span>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5 sm:gap-1">
                           <button
                             onClick={(event) => {
                               event.stopPropagation();
                               toggleFavorite(song.id);
                             }}
-                            className={`p-2 rounded-full transition-colors active:scale-90 ${
+                            className={`p-1.5 sm:p-2 rounded-full transition-colors active:scale-90 ${
                               liked ? 'text-emerald-400' : 'text-neutral-500 hover:text-white'
                             }`}
                             title={liked ? 'Quitar de favoritos' : 'Añadir a mis favoritos'}
@@ -342,7 +344,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                               event.stopPropagation();
                               onOpenAddToPlaylist(song);
                             }}
-                            className="p-2 rounded-full text-neutral-500 hover:text-white transition-colors"
+                            className="p-1.5 sm:p-2 rounded-full text-neutral-500 hover:text-white transition-colors"
                             title="Añadir a una playlist"
                           >
                             <Plus className="w-4 h-4" />
@@ -353,7 +355,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                               event.stopPropagation();
                               void toggleDownloadSong(song);
                             }}
-                            className={`p-2 rounded-full transition-colors ${
+                            className={`p-1.5 sm:p-2 rounded-full transition-colors ${
                               downloaded
                                 ? 'text-emerald-400 hover:text-emerald-300'
                                 : 'text-neutral-500 hover:text-white'

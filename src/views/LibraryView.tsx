@@ -106,6 +106,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
     const sourceType = isFavorites ? 'favorites' : isAlbum ? 'album' : 'playlist';
 
+    // Ambient light for the hero, taken from the artwork itself.
+    const heroCover = isFavorites
+      ? null
+      : (isAlbum ? albumObj?.coverUrl : playlistObj?.coverUrl) || playlistSongs[0]?.coverUrl;
+
     const handlePlayAll = () => {
       if (playlistSongs.length === 0) return;
       if (isThisPlaylistPlaying) {
@@ -152,18 +157,22 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
     return (
       <div className="flex-1 overflow-y-auto pb-36 animate-in fade-in duration-200 select-none">
-        {/* Spotify Hero Banner */}
-        <div
-          className={`p-6 md:p-8 pt-10 flex flex-col md:flex-row items-start md:items-end gap-6 shadow-2xl relative ${
-            isFavorites
-              ? 'bg-gradient-to-b from-indigo-900 via-purple-950 to-neutral-950'
-              : isAlbum
-              ? 'bg-gradient-to-b from-blue-950 via-slate-900 to-neutral-950'
-              : 'bg-gradient-to-b from-emerald-950 via-teal-950 to-neutral-950'
-          }`}
-        >
+        {/* Spotify Hero Banner: the ambient light comes from the cover. */}
+        <div className="relative overflow-hidden p-5 md:p-8 pt-6 md:pt-10 flex flex-col md:flex-row items-start md:items-end gap-5 md:gap-6 shadow-2xl">
+          {heroCover ? (
+            <>
+              <div
+                className="absolute inset-0 bg-cover bg-center scale-125 blur-3xl opacity-60 saturate-150"
+                style={{ backgroundImage: `url(${heroCover})` }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-neutral-950/55 to-neutral-950" />
+            </>
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-b from-indigo-900 via-purple-950 to-neutral-950" />
+          )}
+
           {/* Cover Art Box */}
-          <div className="w-48 h-48 md:w-56 md:h-56 rounded-2xl overflow-hidden shadow-2xl flex-shrink-0 flex items-center justify-center">
+          <div className="relative z-10 w-52 h-52 sm:w-56 sm:h-56 md:w-56 md:h-56 self-center md:self-auto rounded-xl md:rounded-2xl overflow-hidden shadow-2xl flex-shrink-0 flex items-center justify-center">
             {isFavorites ? (
               <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-2xl">
                 <Heart className="w-24 h-24 text-white fill-white" />
@@ -188,11 +197,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
 
           {/* Details */}
-          <div className="flex-1 space-y-2">
-            <span className="text-[11px] font-black uppercase tracking-wider text-white">
+          <div className="relative z-10 flex-1 min-w-0 space-y-2">
+            <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider text-white">
               {isFavorites ? 'Colección privada' : isAlbum ? 'Álbum' : 'Playlist pública'}
             </span>
-            <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight leading-none py-1">
+            <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-white tracking-tight leading-none py-1 break-words">
               {sourceName}
             </h1>
             {!isFavorites && !isAlbum && playlistObj?.description && (
@@ -220,9 +229,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         </div>
 
         {/* Action Controls Bar */}
-        <div className="p-6 md:p-8 pt-6 space-y-6">
+        <div className="p-5 md:p-8 pt-4 md:pt-6 space-y-5 md:space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-3.5 md:gap-5">
               {/* Big Circular Green Play Button */}
               <button
                 onClick={handlePlayAll}
@@ -329,11 +338,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           <div className="border-t border-neutral-900 pt-4">
             <div className="grid grid-cols-12 gap-4 px-4 py-2 text-[11px] font-black uppercase tracking-wider text-neutral-400 border-b border-neutral-900">
               <span className="col-span-1 text-center">#</span>
-              <span className="col-span-5 md:col-span-6">Título</span>
+              <span className="col-span-7 sm:col-span-5 md:col-span-6">Título</span>
               <span className="col-span-4 md:col-span-4 hidden sm:block">
                 {isAlbum ? 'Reproducciones' : 'Álbum'}
               </span>
-              <span className="col-span-6 sm:col-span-2 md:col-span-1 text-right flex justify-end">
+              <span className="col-span-4 sm:col-span-2 md:col-span-1 text-right flex justify-end">
                 <Clock className="w-4 h-4" />
               </span>
             </div>
@@ -380,7 +389,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       </div>
 
                       {/* Title + Artist. Album rows omit the repeated cover. */}
-                      <div className="col-span-5 md:col-span-6 flex items-center gap-3 truncate">
+                      <div className="col-span-7 sm:col-span-5 md:col-span-6 flex items-center gap-3 min-w-0 truncate">
                         {!isAlbum && (
                           <img
                             src={song.coverUrl}
@@ -390,8 +399,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                             className="w-10 h-10 rounded-lg object-cover flex-shrink-0 shadow"
                           />
                         )}
-                        <div className="truncate">
-                          <div className="flex items-center gap-1.5">
+                        <div className="min-w-0 flex-1 truncate">
+                          <div className="flex items-center gap-1.5 min-w-0">
                             {song.isExplicit && (
                               <span
                                 className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-black text-[9px] font-black flex-shrink-0 select-none leading-none"
@@ -449,7 +458,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       </div>
 
                       {/* Actions & Duration */}
-                      <div className="col-span-6 sm:col-span-2 md:col-span-1 flex items-center justify-end gap-2 text-xs font-mono text-neutral-400">
+                      <div className="col-span-4 sm:col-span-2 md:col-span-1 flex items-center justify-end gap-1.5 sm:gap-2 text-xs font-mono text-neutral-400">
                         {downloaded && (
                           <span title="Descargado">
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -479,7 +488,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
   // Fallback if no playlist is selected: Grid of user playlists
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-36 animate-in fade-in select-none">
+    <div className="p-4 sm:p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-36 animate-in fade-in select-none">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black text-white">Tu Biblioteca</h1>

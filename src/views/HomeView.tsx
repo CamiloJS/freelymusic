@@ -166,8 +166,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   }
 
   return (
-    <div className="p-6 md:p-8 space-y-9 max-w-7xl mx-auto pb-32">
-      <div className="bg-gradient-to-r from-emerald-950/70 via-neutral-900 to-black p-6 rounded-3xl border border-emerald-500/20 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+    <div className="p-4 sm:p-6 md:p-8 space-y-7 md:space-y-9 max-w-7xl mx-auto pb-32">
+      <div className="bg-gradient-to-r from-emerald-950/70 via-neutral-900 to-black p-5 md:p-6 rounded-3xl border border-emerald-500/20 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
         <div className="space-y-1.5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold">
             <Radio className="w-3.5 h-3.5 text-emerald-400" />
@@ -181,11 +181,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 md:gap-3">
           {aiRecommendations.length > 0 && (
             <button
               onClick={() => playSong(aiRecommendations[0], aiRecommendations)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs tracking-wide shadow-lg shadow-emerald-500/25 transition-transform active:scale-95"
+              className="inline-flex items-center justify-center gap-2 px-4 md:px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs tracking-wide whitespace-nowrap shadow-lg shadow-emerald-500/25 transition-transform active:scale-95"
             >
               <Play className="w-4 h-4 fill-black" />
               Reproducir mix
@@ -193,7 +193,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           )}
           <button
             onClick={() => onNavigate('cloud')}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 font-semibold text-xs border border-neutral-800 transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 font-semibold text-xs whitespace-nowrap border border-neutral-800 transition-colors"
           >
             <Compass className="w-4 h-4 text-emerald-400" />
             Buscar música

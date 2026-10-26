@@ -12,6 +12,7 @@ import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
 import Video from 'lucide-react/dist/esm/icons/video.mjs';
+import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down.mjs';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { buildDisplayLyrics, formatTime } from '../utils/lyrics';
@@ -61,25 +62,33 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
   const currentLine = displayLyrics[activeLyricIndex];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between p-8 md:p-14 select-none overflow-hidden animate-in fade-in duration-300">
-      {/* Blurred artwork background */}
+    <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between px-5 md:px-14 pt-[calc(1.25rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pt-14 md:pb-14 select-none overflow-hidden animate-in fade-in duration-300">
+      {/* Ambient light from the artwork, like Spotify's now-playing view. */}
       <div
-        className="absolute inset-0 bg-cover bg-center filter blur-3xl scale-125 opacity-25 pointer-events-none transition-all duration-1000"
+        className="absolute inset-0 bg-cover bg-center filter blur-3xl scale-150 opacity-45 saturate-150 pointer-events-none transition-all duration-1000"
         style={{ backgroundImage: `url(${currentSong.coverUrl})` }}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-black/40 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/20 pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_35%,transparent_0%,rgba(0,0,0,0.35)_70%,rgba(0,0,0,0.7)_100%)] pointer-events-none" />
 
       {/* Top Header */}
-      <div className="relative z-10 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-black uppercase tracking-widest text-emerald-400">
+      <div className="relative z-10 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={() => setIsFullscreenNowPlaying(false)}
+            className="md:hidden p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95 flex-shrink-0"
+            title="Cerrar reproductor"
+          >
+            <ChevronDown className="w-5 h-5" />
+          </button>
+          <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-emerald-400 truncate">
             {playbackSource?.name || 'Tus me gusta'}
           </span>
         </div>
 
         <button
           onClick={() => setIsFullscreenNowPlaying(false)}
-          className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95"
+          className="hidden md:flex p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all active:scale-95"
           title="Salir de pantalla completa"
         >
           <Minimize2 className="w-5 h-5" />
@@ -88,7 +97,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
 
       {/* Center Section: Cover + Live lyric line */}
       <div className="relative z-10 flex flex-col md:flex-row items-center justify-center gap-10 max-w-5xl mx-auto w-full my-auto">
-        <div className="w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 rounded-3xl overflow-hidden shadow-2xl shadow-emerald-500/15 ring-1 ring-white/10 flex-shrink-0">
+        <div className="w-72 h-72 sm:w-80 sm:h-80 md:w-96 md:h-96 rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl shadow-emerald-500/15 ring-1 ring-white/10 flex-shrink-0">
           <img
             src={currentSong.coverUrl}
             alt={currentSong.title}
@@ -149,7 +158,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
                 setIsFullscreenNowPlaying(false);
                 setIsCenterLyricsOpen(true);
               }}
-              className="p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md cursor-pointer hover:bg-white/10 transition-colors"
+              className="hidden md:block p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md cursor-pointer hover:bg-white/10 transition-colors"
             >
               <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold mb-1">
                 <Mic2 className="w-3.5 h-3.5" />
@@ -167,7 +176,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
           )}
 
           {parsedLyrics.length > 0 && (
-            <div className="flex justify-center md:justify-start">
+            <div className="hidden md:flex justify-start">
               <LyricsTranslationControls compact />
             </div>
           )}

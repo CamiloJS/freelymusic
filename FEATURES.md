@@ -80,12 +80,18 @@ cada integración. Todo está desplegado en https://freelymusic.vercel.app.
   en **Ajustes → Personalización → Estadísticas globales · Last.fm**.
   - Artista: oyentes y reproducciones totales.
   - Canción: oyentes y reproducciones totales.
-- **No se muestran oyentes mensuales de Spotify**: ninguna de las dos fuentes
-  gratuitas los ofrece. La interfaz indica claramente la fuente, el período y que no
-  son cifras de Spotify.
+- **La interfaz solo muestra el número y la palabra “reproducciones”**. No muestra
+  el nombre de la fuente, enlaces, períodos ni notas al pie.
+- **YouTube / YouTube Music todavía no se suman**: YouTube Data API exige una API
+  key y YouTube Music no publica un contador separado de reproducciones por canción.
+  Sin credenciales no se inventan cifras; si más adelante se configura una clave, la
+  suma se puede añadir dentro del mismo servicio.
+- **No se muestran oyentes mensuales de Spotify**: ninguna de las fuentes gratuitas
+  los ofrece.
 - Caché de 7 días en `statsCache` (Firestore) y localStorage. Al cambiar de Last.fm
   a Deezer (o viceversa) se usa una clave de caché distinta.
-- Las fichas muestran “Popularidad global” en el perfil del artista y en la canción.
+- Las fichas muestran el total acumulado (o la popularidad pública cuando no hay un
+  total de reproducciones) sin atribuir la fuente en pantalla.
 
 ## 7. Importación de playlists
 
@@ -178,5 +184,6 @@ de entorno.
 - Las reglas actuales de Firestore permiten lectura/escritura a usuarios anónimos
   autenticados y el PIN es validado en el cliente. Para un uso público habría que
   migrar a autenticación real y reglas por usuario.
-- Las estadísticas de Deezer/Last.fm no equivalen a las de Spotify; la interfaz lo
-  indica explícitamente.
+- Las cifras globales no equivalen a los oyentes mensuales de Spotify. La interfaz
+  muestra únicamente el número de reproducciones para no atribuir ni comparar
+  fuentes.

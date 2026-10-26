@@ -59,7 +59,9 @@ export async function cachePwaIcons(iconUrl: string): Promise<void> {
           new Response(blob, {
             headers: {
               'Content-Type': 'image/png',
-              'Cache-Control': 'public, max-age=31536000, immutable',
+              // Icons can change when the user picks another artwork. Do not
+              // let the browser keep an old copy when installing the PWA.
+              'Cache-Control': 'no-store',
             },
           })
         );

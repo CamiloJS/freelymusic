@@ -107,7 +107,18 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
   };
 
   return (
-    <footer className="h-22 bg-neutral-950/95 backdrop-blur-xl border-t border-neutral-900 px-4 md:px-6 flex items-center justify-between select-none z-40 relative">
+    <footer className="h-22 bg-neutral-950/90 backdrop-blur-xl border-t border-neutral-900 px-4 md:px-6 flex items-center justify-between select-none z-40 relative isolate">
+      {/* Ambient colour taken from the artwork, Spotify-style. */}
+      {currentSong?.coverUrl && (
+        <div className="absolute inset-0 overflow-hidden -z-10 pointer-events-none">
+          <div
+            className="absolute inset-0 bg-cover bg-center scale-150 blur-2xl opacity-30 saturate-150"
+            style={{ backgroundImage: `url(${currentSong.coverUrl})` }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-neutral-950/80 via-neutral-950/65 to-neutral-950/80" />
+        </div>
+      )}
+
       {playbackError && (
         <div className="absolute -top-11 left-1/2 -translate-x-1/2 max-w-[90vw] flex items-center gap-2 px-3.5 py-2 rounded-xl bg-red-950/95 border border-red-500/40 text-red-200 text-[11px] font-semibold shadow-xl">
           <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
