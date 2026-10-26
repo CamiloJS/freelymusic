@@ -117,6 +117,93 @@ async function musicbrainz(title, artist) {
   return result;
 }
 
+function normalizeName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+async function deezerArtist(name) {
+  const key = `dz-artist:${normalizeName(name)}`;
+  const cached = cacheGet(key);
+  if (cached) return cached;
+
+  const payload = await fetchJson(
+    `https://api.deezer.com/search/artist?q=${encodeURIComponent(name)}&limit=25`
+  );
+  const normalized = normalizeName(name);
+  const candidates = (payload.data || []).filter(
+    (artist) => normalizeName(artist.name) === normalized
+  );
+
+  if (candidates.length === 0) {
+    const error = new Error('Deezer no encontró el artista.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const best = candidates.sort((a, b) => (Number(b.nb_fan) || 0) - (Number(a.nb_fan) || 0))[0];
+  const result = {
+    source: 'deezer',
+    name: best.name,
+    fans: Number(best.nb_fan) || undefined,
+    url: best.link,
+    fetchedAt: new Date().toISOString(),
+    period: 'Datos actuales de Deezer (caché semanal)',
+    note: 'Deezer publica fans totales, no oyentes mensuales. La cifra no equivale a Spotify.',
+  };
+  cacheSet(key, result, 7 * 24 * 60 * 60 * 1000);
+  return result;
+}
+
+async function deezerTrack(title, artist) {
+  const key = `dz-track:${normalizeName(artist)}:${normalizeName(title)}`;
+  const cached = cacheGet(key);
+  if (cached) return cached;
+
+  const payload = await fetchJson(
+    `https://api.deezer.com/search?q=${encodeURIComponent(`${title} ${artist}`)}&limit=12`
+  );
+  const wantedTitle = normalizeName(title);
+  const wantedArtist = normalizeName(artist);
+
+  const candidates = (payload.data || [])
+    .map((track) => {
+      const trackTitle = normalizeName(track.title);
+      const trackArtist = normalizeName(track.artist?.name);
+      let score = 0;
+      if (trackTitle === wantedTitle) score += 0.65;
+      else if (trackTitle.includes(wantedTitle) || wantedTitle.includes(trackTitle)) score += 0.4;
+      if (trackArtist === wantedArtist) score += 0.35;
+      else if (trackArtist.includes(wantedArtist) || wantedArtist.includes(trackArtist)) score += 0.2;
+      return { track, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const best = candidates[0];
+  if (!best || best.score < 0.55) {
+    const error = new Error('Deezer no encontró una coincidencia fiable para esta canción.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const result = {
+    source: 'deezer',
+    name: best.track.title,
+    artist: best.track.artist?.name,
+    rank: Number(best.track.rank) || undefined,
+    url: best.track.id ? `https://www.deezer.com/track/${best.track.id}` : undefined,
+    fetchedAt: new Date().toISOString(),
+    period: 'Datos actuales de Deezer (caché semanal)',
+    note: 'Deezer no publica reproducciones; se muestra su ranking de popularidad (0-1.000.000).',
+  };
+  cacheSet(key, result, 7 * 24 * 60 * 60 * 1000);
+  return result;
+}
+
 async function lyrics(title, artist, album, duration) {
   const key = `lyrics:${title}:${artist}:${album || ''}:${duration || ''}`;
   const cached = cacheGet(key);
@@ -193,8 +280,20 @@ export default async function handler(req, res) {
   const source = String(req.query.source || '');
   const title = String(req.query.title || '');
   const artist = String(req.query.artist || '');
+  const name = String(req.query.name || req.query.title || '');
 
-  if (!title || !artist) {
+  if (source === 'deezer-artist') {
+    if (!name) {
+      return send(res, 400, { error: 'missing_params', message: 'Se requiere name.' });
+    }
+  } else if (source === 'deezer-track') {
+    if (!title || !artist) {
+      return send(res, 400, {
+        error: 'missing_params',
+        message: 'Se requieren title y artist.',
+      });
+    }
+  } else if (!title || !artist) {
     return send(res, 400, {
       error: 'missing_params',
       message: 'Se requieren title y artist.',
@@ -217,9 +316,15 @@ export default async function handler(req, res) {
         )
       );
     }
+    if (source === 'deezer-artist') {
+      return send(res, 200, await deezerArtist(name));
+    }
+    if (source === 'deezer-track') {
+      return send(res, 200, await deezerTrack(title, artist));
+    }
     return send(res, 400, {
       error: 'unsupported_source',
-      message: 'Usa source=musicbrainz o source=lyrics.',
+      message: 'Usa source=musicbrainz, source=lyrics, source=deezer-artist o source=deezer-track.',
     });
   } catch (error) {
     console.error('Metadata proxy failed:', error);

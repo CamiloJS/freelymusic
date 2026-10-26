@@ -143,6 +143,37 @@ async function fetchLastfmTrack(
 }
 
 async function fetchDeezerArtist(name: string): Promise<GlobalStatsCacheEntry> {
+  // Deezer does not always send CORS headers. Try the same-origin proxy first.
+  try {
+    const proxied = await fetchJson(
+      `/api/metadata?source=deezer-artist&name=${encodeURIComponent(name)}`
+    );
+    if (proxied?.source === 'deezer') {
+      return {
+        key: cacheKey('artist', name),
+        type: 'artist',
+        name: String(proxied.name || name),
+        source: 'deezer',
+        fans: asNumber(proxied.fans),
+        url: typeof proxied.url === 'string' ? proxied.url : undefined,
+        fetchedAt:
+          typeof proxied.fetchedAt === 'string'
+            ? proxied.fetchedAt
+            : new Date().toISOString(),
+        period:
+          typeof proxied.period === 'string'
+            ? proxied.period
+            : 'Datos actuales de Deezer (caché semanal)',
+        note:
+          typeof proxied.note === 'string'
+            ? proxied.note
+            : 'Deezer publica fans totales, no oyentes mensuales.',
+      };
+    }
+  } catch {
+    // Local development / proxy unavailable: try the public endpoint.
+  }
+
   const payload = await fetchJson(
     `${DEEZER_ENDPOINT}/search/artist?q=${encodeURIComponent(name)}&limit=25`
   );
@@ -177,6 +208,39 @@ async function fetchDeezerTrack(
   title: string,
   artist: string
 ): Promise<GlobalStatsCacheEntry> {
+  try {
+    const proxied = await fetchJson(
+      `/api/metadata?source=deezer-track&title=${encodeURIComponent(
+        title
+      )}&artist=${encodeURIComponent(artist)}`
+    );
+    if (proxied?.source === 'deezer') {
+      return {
+        key: cacheKey('track', title, artist),
+        type: 'track',
+        name: String(proxied.name || title),
+        artist: String(proxied.artist || artist),
+        source: 'deezer',
+        rank: asNumber(proxied.rank),
+        url: typeof proxied.url === 'string' ? proxied.url : undefined,
+        fetchedAt:
+          typeof proxied.fetchedAt === 'string'
+            ? proxied.fetchedAt
+            : new Date().toISOString(),
+        period:
+          typeof proxied.period === 'string'
+            ? proxied.period
+            : 'Datos actuales de Deezer (caché semanal)',
+        note:
+          typeof proxied.note === 'string'
+            ? proxied.note
+            : 'Deezer no publica reproducciones; se muestra su ranking de popularidad.',
+      };
+    }
+  } catch {
+    // Local development / proxy unavailable.
+  }
+
   const payload = await fetchJson(
     `${DEEZER_ENDPOINT}/search?q=${encodeURIComponent(`${title} ${artist}`)}&limit=12`
   );

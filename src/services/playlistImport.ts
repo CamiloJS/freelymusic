@@ -362,7 +362,18 @@ export async function importPlaylistFromUrl(
   }
 
   if (provider === 'deezer') {
-    return fetchDeezerPlaylist(url);
+    // Deezer's public endpoint is inconsistent with CORS, so use the same
+    // serverless proxy that also supports Spotify/Apple. If the app is running
+    // without functions (local preview), try the public endpoint directly.
+    try {
+      return await fetchServerPlaylist('deezer', url);
+    } catch (serverError) {
+      try {
+        return await fetchDeezerPlaylist(url);
+      } catch {
+        throw serverError;
+      }
+    }
   }
 
   return fetchServerPlaylist(provider, url, appleMusicToken);
