@@ -14,6 +14,7 @@ import { CloudSearchView } from './views/CloudSearchView';
 import { LibraryView } from './views/LibraryView';
 import { OfflineView } from './views/OfflineView';
 import { AdminView } from './views/AdminView';
+import { AddMusicView } from './views/AddMusicView';
 import { Playlist, Song } from './types';
 import { getCustomAppIcon, applyAppIcon } from './utils/appIcon';
 import {
@@ -24,7 +25,8 @@ import {
   ShieldAlert,
   Mic2,
   Menu,
-  X
+  X,
+  UploadCloud
 } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
@@ -127,6 +129,16 @@ const MainLayout: React.FC = () => {
             </button>
             <button
               onClick={() => {
+                setCurrentTab('add-music');
+                setIsMobileMenuOpen(false);
+              }}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-950 text-sm font-bold text-white"
+            >
+              <UploadCloud className="w-4 h-4 text-emerald-400" />
+              Añadir Música
+            </button>
+            <button
+              onClick={() => {
                 setCurrentTab('library');
                 setIsMobileMenuOpen(false);
               }}
@@ -179,8 +191,12 @@ const MainLayout: React.FC = () => {
           {currentTab === 'cloud' && (
             <CloudSearchView
               onOpenAddToPlaylist={handleOpenAddToPlaylist}
-              onOpenAddMusic={() => setIsProfileSwitcherOpen(true)}
+              onOpenAddMusic={() => setCurrentTab('add-music')}
             />
+          )}
+
+          {currentTab === 'add-music' && (
+            <AddMusicView onNavigate={setCurrentTab} />
           )}
 
           {currentTab === 'library' && (
@@ -213,6 +229,9 @@ const MainLayout: React.FC = () => {
         onClose={() => setIsProfileSwitcherOpen(false)}
         onOpenCreateProfile={() => {
           setCurrentTab('admin');
+        }}
+        onNavigateAddMusic={() => {
+          setCurrentTab('add-music');
         }}
       />
 

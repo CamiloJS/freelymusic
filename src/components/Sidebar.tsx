@@ -11,7 +11,8 @@ import {
   Disc3,
   Wifi,
   WifiOff,
-  Settings
+  Settings,
+  UploadCloud
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
@@ -49,6 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     { id: 'home', label: 'Inicio', icon: Home },
     { id: 'cloud', label: 'Explorar la Nube', icon: Compass },
+    { id: 'add-music', label: 'Añadir Música', icon: UploadCloud },
     { id: 'library', label: 'Tu Biblioteca', icon: Library },
     { id: 'offline', label: 'Sin Conexión', icon: HardDriveDownload, badge: downloadedSongIds.length > 0 ? downloadedSongIds.length : null },
   ];

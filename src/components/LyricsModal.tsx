@@ -64,27 +64,20 @@ export const LyricsModal: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
 
       {/* Top Header Bar */}
-      <header className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-white/10 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
-            <Mic2 className="w-5 h-5" />
+      <header className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-white/5 backdrop-blur-md">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl overflow-hidden bg-neutral-800 flex-shrink-0 shadow">
+            <img src={currentSong.coverUrl} alt={currentSong.title} className="w-full h-full object-cover" />
           </div>
-          <div>
-            <h3 className="font-bold text-sm text-white flex items-center gap-2">
-              Letras en Tiempo Real
-              <span className="text-[10px] uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
-                Apple Music Style
-              </span>
-            </h3>
-            <p className="text-xs text-neutral-400">
-              Toca cualquier línea para saltar a ese instante
-            </p>
+          <div className="truncate">
+            <h3 className="font-bold text-sm text-white truncate">{currentSong.title}</h3>
+            <p className="text-xs text-neutral-400 truncate">{currentSong.artist}</p>
           </div>
         </div>
 
         <button
           onClick={() => setShowLyricsView(false)}
-          className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white active:scale-95"
+          className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white active:scale-95 flex-shrink-0"
           title="Cerrar vista de letras"
         >
           <X className="w-5 h-5" />
