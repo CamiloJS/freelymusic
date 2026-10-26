@@ -35,6 +35,7 @@ export const MetadataEnrichmentModal: React.FC<MetadataEnrichmentModalProps> = (
   const [currentTitle, setCurrentTitle] = useState('');
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [entries, setEntries] = useState<ScanEntry[]>([]);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const cancelledRef = useRef(false);
 
   const pendingSongs = useMemo(
@@ -107,6 +108,53 @@ export const MetadataEnrichmentModal: React.FC<MetadataEnrichmentModalProps> = (
 
     setCurrentTitle('');
     setRunning(false);
+  };
+
+  const analyzeOne = async (entry: ScanEntry) => {
+    if (analyzingId) return;
+    setAnalyzingId(entry.song.id);
+
+    try {
+      const result = await enrichSongMetadata(entry.song);
+      const shouldApply = Object.keys(result.updated).length > 0 && !result.needsReview;
+
+      if (shouldApply) {
+        updateCatalogTrack({
+          ...entry.song,
+          ...result.updated,
+          needsReview: undefined,
+          enrichmentNote: undefined,
+        });
+      }
+
+      setEntries((previous) =>
+        previous.map((item) =>
+          item.song.id === entry.song.id ? { ...item, result, applied: shouldApply } : item
+        )
+      );
+    } catch (error) {
+      setEntries((previous) =>
+        previous.map((item) =>
+          item.song.id === entry.song.id
+            ? {
+                ...item,
+                result: {
+                  updated: {},
+                  candidate: null,
+                  needsReview: true,
+                  note:
+                    error instanceof Error
+                      ? error.message
+                      : 'No se pudo consultar la fuente.',
+                  sources: [],
+                },
+              }
+            : item
+        )
+      );
+    } finally {
+      setAnalyzingId(null);
+    }
   };
 
   const applyManual = (entry: ScanEntry) => {
@@ -325,9 +373,16 @@ export const MetadataEnrichmentModal: React.FC<MetadataEnrichmentModalProps> = (
                     )}
 
                     {!result && !isScanning && (
-                      <p className="mt-1 pl-13 text-[10px] text-neutral-600">
-                        Pendiente de analizar
-                      </p>
+                      <div className="mt-1 pl-13 flex items-center gap-2">
+                        <p className="text-[10px] text-neutral-600">Pendiente de analizar</p>
+                        <button
+                          onClick={() => void analyzeOne(entry)}
+                          disabled={analyzingId === entry.song.id}
+                          className="px-2 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold disabled:opacity-50"
+                        >
+                          {analyzingId === entry.song.id ? 'Analizando...' : 'Analizar esta canción'}
+                        </button>
+                      </div>
                     )}
                   </div>
                 );
