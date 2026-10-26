@@ -62,7 +62,7 @@ export const InstallPrompt: React.FC = () => {
             <Smartphone className="w-6 h-6 text-black" />
           </div>
           <div>
-            <h4 className="font-bold text-white text-sm">Instalar Sonora</h4>
+            <h4 className="font-bold text-white text-sm">Instalar FreelyMusic</h4>
             <p className="text-xs text-neutral-400 mt-0.5">
               Instala la aplicación para escuchar y descargar tu música sin conexión.
             </p>

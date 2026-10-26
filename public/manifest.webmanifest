@@ -1,6 +1,6 @@
 {
-  "name": "Sonora - Cloud Music",
-  "short_name": "Sonora",
+  "name": "FreelyMusic - Cloud Music",
+  "short_name": "FreelyMusic",
   "description": "Tu reproductor privado de música en la nube con letras en tiempo real y modo sin conexión.",
   "start_url": "/",
   "display": "standalone",

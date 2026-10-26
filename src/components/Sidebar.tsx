@@ -56,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <div>
             <span className="font-extrabold tracking-wider text-xl text-white block">
-              SONORA
+              FreelyMusic
             </span>
             <span className="text-[10px] tracking-widest text-emerald-400 font-bold uppercase block -mt-1">
               Cloud Audio

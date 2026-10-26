@@ -69,7 +69,7 @@ export const AdminView: React.FC = () => {
         <ShieldAlert className="w-16 h-16 text-amber-500 mx-auto" />
         <h2 className="text-xl font-bold text-white">Acceso Restringido</h2>
         <p className="text-sm">
-          Esta sección está reservada exclusivamente para administradores de Sonora.
+          Esta sección está reservada exclusivamente para administradores de FreelyMusic.
         </p>
       </div>
     );
@@ -685,7 +685,7 @@ export const AdminView: React.FC = () => {
         <div className="bg-neutral-900/40 border border-neutral-800/80 rounded-3xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-extrabold text-white text-lg">Catálogo Global de Sonora</h3>
+              <h3 className="font-extrabold text-white text-lg">Catálogo Global de FreelyMusic</h3>
               <p className="text-xs text-neutral-400">
                 Pistas agregadas por enlaces que están disponibles para la búsqueda en la nube.
               </p>

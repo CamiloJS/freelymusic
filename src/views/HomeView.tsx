@@ -47,7 +47,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold mb-4">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Sonora Cloud Studio</span>
+            <span>FreelyMusic Cloud Studio</span>
           </div>
           <h1 className="text-3xl md:text-5xl font-black text-white tracking-tight">
             {getGreeting()}, {currentUser.displayName}
