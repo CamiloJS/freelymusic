@@ -3,6 +3,79 @@
  */
 
 const CUSTOM_ICON_STORAGE_KEY = 'musica_custom_app_icon';
+const PWA_ICON_CACHE = 'musica-pwa-icons';
+const PWA_ICON_SIZES = [180, 192, 512] as const;
+
+async function loadIconImage(iconUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('No se pudo cargar el icono'));
+    image.src = iconUrl;
+  });
+}
+
+function renderPwaIcon(image: HTMLImageElement, size: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      reject(new Error('Canvas no disponible'));
+      return;
+    }
+
+    context.clearRect(0, 0, size, size);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(image, 0, 0, size, size);
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('No se pudo generar el PNG'))),
+      'image/png',
+      1
+    );
+  });
+}
+
+/**
+ * The manifest and apple-touch-icon point to stable /pwa-icon-*.png URLs.
+ * The service worker serves these responses from a dedicated cache, so the
+ * icon selected by the user is the one used when installing the PWA.
+ */
+export async function cachePwaIcons(iconUrl: string): Promise<void> {
+  if (typeof window === 'undefined' || !('caches' in window)) return;
+
+  try {
+    const image = await loadIconImage(iconUrl);
+    const cache = await caches.open(PWA_ICON_CACHE);
+
+    await Promise.all(
+      PWA_ICON_SIZES.map(async (size) => {
+        const blob = await renderPwaIcon(image, size);
+        await cache.put(
+          `/pwa-icon-${size}.png`,
+          new Response(blob, {
+            headers: {
+              'Content-Type': 'image/png',
+              'Cache-Control': 'public, max-age=31536000, immutable',
+            },
+          })
+        );
+      })
+    );
+
+    const appleTouch = document.querySelector(
+      "link[rel='apple-touch-icon']"
+    ) as HTMLLinkElement | null;
+    if (appleTouch) {
+      appleTouch.href = '/pwa-icon-180.png';
+    }
+  } catch (err) {
+    console.warn('No se pudieron preparar los iconos de instalación:', err);
+  }
+}
 
 export function getCustomAppIcon(): string | null {
   try {
@@ -52,4 +125,7 @@ export function applyAppIcon(iconUrl: string): void {
     document.head.appendChild(appleTouch);
   }
   appleTouch.href = iconUrl;
+
+  // Cache the active icon as the PWA/installed-app icon.
+  void cachePwaIcons(iconUrl);
 }

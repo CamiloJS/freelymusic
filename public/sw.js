@@ -1,7 +1,14 @@
-const CACHE_NAME = 'musica-cache-v3';
+const CACHE_NAME = 'musica-cache-v4';
+const PWA_ICON_CACHE = 'musica-pwa-icons';
+const PWA_ICON_PATHS = new Set([
+  '/pwa-icon-180.png',
+  '/pwa-icon-192.png',
+  '/pwa-icon-512.png',
+]);
 
 const PRECACHE_ASSETS = [
   '/',
+  '/index.html',
   '/manifest.webmanifest',
   '/icon.svg',
   '/favicon.svg',
@@ -29,7 +36,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          if (key !== CACHE_NAME && key !== PWA_ICON_CACHE) {
             return caches.delete(key);
           }
           return undefined;
@@ -54,6 +61,28 @@ self.addEventListener('fetch', (event) => {
   // every cross-origin response, including private API traffic.
   if (url.origin !== self.location.origin) return;
   if (AUDIO_EXTENSIONS.test(url.pathname)) return;
+
+  // Dynamic PWA icons: the selected icon is cached as a PNG by the app and
+  // served here for the manifest/apple-touch-icon. Falls back to the static
+  // default files if the user has not customized the icon yet.
+  if (PWA_ICON_PATHS.has(url.pathname)) {
+    event.respondWith(
+      caches.open(PWA_ICON_CACHE).then(async (cache) => {
+        const cached = await cache.match(url.pathname);
+        if (cached) return cached;
+
+        const response = await fetch(request);
+        if (
+          response.ok &&
+          (response.headers.get('content-type') || '').startsWith('image/')
+        ) {
+          return response;
+        }
+        return fetch('/icon.svg');
+      })
+    );
+    return;
+  }
 
   // HTML: network-first so a new deployment is picked up immediately, with an
   // offline fallback from the cache.

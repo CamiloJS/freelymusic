@@ -27,6 +27,8 @@ interface ProfileSwitcherModalProps {
   onClose: () => void;
   onOpenCreateProfile?: () => void;
   onNavigateAddMusic?: () => void;
+  onOpenProfileView?: () => void;
+  onOpenAdminPanel?: () => void;
 }
 
 export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
@@ -34,6 +36,8 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   onClose,
   onOpenCreateProfile,
   onNavigateAddMusic,
+  onOpenProfileView,
+  onOpenAdminPanel,
 }) => {
   const { currentUser, allUsers, switchUser, updateProfile, isAdmin, logout } = useAuth();
   const {
@@ -380,6 +384,32 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                   </div>
 
                   <div className="mt-5 pt-4 border-t border-neutral-800 space-y-2">
+                    {onOpenProfileView && (
+                      <button
+                        onClick={() => {
+                          onClose();
+                          onOpenProfileView();
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs tracking-wide transition-all"
+                      >
+                        <Sparkles className="w-4 h-4 text-emerald-400" />
+                        Mi perfil y estadísticas
+                      </button>
+                    )}
+
+                    {onOpenAdminPanel && isAdmin && (
+                      <button
+                        onClick={() => {
+                          onClose();
+                          onOpenAdminPanel();
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-500/25 text-emerald-300 font-bold text-xs tracking-wide transition-all"
+                      >
+                        <Shield className="w-4 h-4" />
+                        Panel de Administración
+                      </button>
+                    )}
+
                     {onOpenCreateProfile && isAdmin && (
                       <button
                         onClick={() => {

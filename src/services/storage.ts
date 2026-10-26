@@ -100,8 +100,11 @@ export async function isSongDownloaded(songId: string): Promise<boolean> {
  * Downloads audio file and caches it inside IndexedDB for 100% offline playback
  */
 export async function cacheSongOffline(song: Song): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+
   try {
-    const res = await fetch(song.audioUrl);
+    const res = await fetch(song.audioUrl, { signal: controller.signal });
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const blob = await res.blob();
     await storeSongBlob(song.id, blob);
@@ -109,6 +112,8 @@ export async function cacheSongOffline(song: Song): Promise<boolean> {
   } catch (err) {
     console.error(`Failed to cache song ${song.title} offline:`, err);
     return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

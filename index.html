@@ -96,6 +96,9 @@
     <!-- Auto-recovery from stale PWA cache -->
     <script>
       window.addEventListener('error', function (event) {
+        // Offline must never trigger the destructive cache reset. The service
+        // worker is the one that serves the app in that case.
+        if (!navigator.onLine) return;
         if (event.target && (event.target.tagName === 'SCRIPT' || event.target.tagName === 'LINK')) {
           var key = 'musica_reload_attempt';
           var last = sessionStorage.getItem(key);
@@ -125,12 +128,13 @@
     </script>
 
     <!-- PWA & Mobile Web App Meta -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="manifest" href="/api/manifest" />
     <meta name="theme-color" content="#1ed760" />
+    <meta name="application-name" content="Música" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Música" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/pwa-icon-180.png" />
     
     <meta name="description" content="Reproductor privado de música por enlaces en la nube con letras sincronizadas estilo Apple Music y modo sin conexión." />
   </head>

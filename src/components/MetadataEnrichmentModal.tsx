@@ -221,7 +221,7 @@ export const MetadataEnrichmentModal: React.FC<MetadataEnrichmentModalProps> = (
           <div>
             <h2 className="flex items-center gap-2 text-lg font-black text-white">
               <Sparkles className="w-5 h-5 text-emerald-400" />
-              Enriquecer metadatos con IA y fuentes públicas
+              Enriquecer metadatos con fuentes públicas
             </h2>
             <p className="text-[11px] text-neutral-400 mt-1 max-w-2xl">
               MusicBrainz para álbum/año/género/ISRC, iTunes para carátula y LRCLIB para letras

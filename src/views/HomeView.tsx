@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
-import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
 import Music from 'lucide-react/dist/esm/icons/eighth-notes.mjs';
 import Clock from 'lucide-react/dist/esm/icons/clock.mjs';
 import Compass from 'lucide-react/dist/esm/icons/compass.mjs';
@@ -34,6 +33,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const { currentUser } = useAuth();
   const {
     catalog,
+    librarySongs,
     isCatalogReady,
     userFavoriteSongs,
     playlists,
@@ -45,7 +45,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   // Recommendations based on genre affinity, personal plays and recency.
   const { aiRecommendations, genreMixes, topGenreName } = useMemo(() => {
-    if (!catalog || catalog.length === 0) {
+    if (!librarySongs || librarySongs.length === 0) {
       return { aiRecommendations: [], genreMixes: [], topGenreName: 'Música' };
     }
 
@@ -55,7 +55,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
       genreScore[genre] = (genreScore[genre] || 0) + 2;
     });
 
-    (catalog || []).forEach((song) => {
+    (librarySongs || []).forEach((song) => {
       const genre = song?.genre || 'General';
       genreScore[genre] = (genreScore[genre] || 0) + 0.5;
     });
@@ -68,7 +68,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     const favoriteIds = new Set((userFavoriteSongs || []).map((song) => song.id));
     const playCounts = userPlayCounts || {};
 
-    const recommendations = [...catalog]
+    const recommendations = [...librarySongs]
       .map((song) => {
         const genreAffinity = genreScore[song.genre || 'General'] || 0;
         const favoriteBoost = favoriteIds.has(song.id) ? 2 : 0;
@@ -86,7 +86,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
     const mixes: { genre: string; songs: Song[] }[] = [];
     sortedGenres.slice(0, 3).forEach((genre) => {
-      const genreSongs = catalog.filter((song) => (song.genre || 'General') === genre);
+      const genreSongs = librarySongs.filter((song) => (song.genre || 'General') === genre);
       if (genreSongs.length > 0) {
         mixes.push({ genre, songs: genreSongs.slice(0, 6) });
       }
@@ -97,16 +97,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
       genreMixes: mixes,
       topGenreName: primaryGenre,
     };
-  }, [catalog, userFavoriteSongs, userPlayCounts]);
+  }, [librarySongs, userFavoriteSongs, userPlayCounts]);
 
   const recentSongs = useMemo(
     () =>
-      [...catalog]
+      [...librarySongs]
         .sort(
           (a, b) => (Date.parse(b.createdAt || '') || 0) - (Date.parse(a.createdAt || '') || 0)
         )
         .slice(0, 6),
-    [catalog]
+    [librarySongs]
   );
 
   // A new device used to show an empty page while Firestore was loading.
@@ -130,7 +130,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     );
   }
 
-  if (catalog.length === 0) {
+  if (librarySongs.length === 0) {
     return (
       <div className="p-6 md:p-8 max-w-3xl mx-auto pb-32">
         <div className="bg-neutral-900/40 border border-neutral-800/80 rounded-3xl p-10 text-center space-y-5">
@@ -140,24 +140,24 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div>
             <h1 className="text-2xl font-black text-white">Tu biblioteca está vacía</h1>
             <p className="text-sm text-neutral-400 mt-2 max-w-md mx-auto">
-              Añade tu primera canción con un enlace de audio o explora el repositorio
-              para empezar a escuchar.
+              Busca en el repositorio y guarda canciones con el corazón o añádelas a una
+              playlist. Así aparecerán aquí sin llenar tu biblioteca con todo el catálogo.
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
-              onClick={() => onNavigate('add-music')}
+              onClick={() => onNavigate('cloud')}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs shadow-lg transition-transform active:scale-95"
             >
-              <Plus className="w-4 h-4" />
-              Añadir música
+              <Compass className="w-4 h-4" />
+              Buscar música
             </button>
             <button
-              onClick={() => onNavigate('cloud')}
+              onClick={() => onNavigate('add-music')}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs transition-colors"
             >
-              <Compass className="w-4 h-4 text-emerald-400" />
-              Explorar la nube
+              <Plus className="w-4 h-4 text-emerald-400" />
+              Añadir al repositorio
             </button>
           </div>
         </div>
@@ -167,18 +167,17 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   return (
     <div className="p-6 md:p-8 space-y-9 max-w-7xl mx-auto pb-32">
-      {/* AI Smart Mix Spotlight Header (NO welcome text or banners) */}
       <div className="bg-gradient-to-r from-emerald-950/70 via-neutral-900 to-black p-6 rounded-3xl border border-emerald-500/20 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
         <div className="space-y-1.5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Recomendación Inteligente IA</span>
+            <Radio className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Hecho para ti</span>
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-            Mix IA personalizado · {topGenreName}
+            Tu mix · {topGenreName}
           </h1>
           <p className="text-neutral-400 text-xs md:text-sm">
-            Generado automáticamente con base en tus géneros favoritos y el repositorio en la nube.
+            Basado en tu biblioteca, tus favoritos y lo que más escuchas.
           </p>
         </div>
 
@@ -189,7 +188,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs tracking-wide shadow-lg shadow-emerald-500/25 transition-transform active:scale-95"
             >
               <Play className="w-4 h-4 fill-black" />
-              Reproducir Mix IA
+              Reproducir mix
             </button>
           )}
           <button
@@ -197,7 +196,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 font-semibold text-xs border border-neutral-800 transition-colors"
           >
             <Compass className="w-4 h-4 text-emerald-400" />
-            Explorar Repositorio
+            Buscar música
           </button>
         </div>
       </div>

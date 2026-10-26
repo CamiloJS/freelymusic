@@ -120,7 +120,14 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
   // device think the user had a local override and it never adopted the
   // global app name from Firestore.
   useEffect(() => {
-    document.title = appName || 'Música';
+    const safeName = appName || 'Música';
+    document.title = safeName;
+    document
+      .querySelector('meta[name="apple-mobile-web-app-title"]')
+      ?.setAttribute('content', safeName);
+    document
+      .querySelector('meta[name="application-name"]')
+      ?.setAttribute('content', safeName);
   }, [appName]);
 
   // Sync Global Settings from Firestore (Cloud Gallery & Global App Name)

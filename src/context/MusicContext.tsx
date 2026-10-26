@@ -40,6 +40,7 @@ export interface DownloadingState {
 
 interface MusicContextType {
   catalog: Song[];
+  librarySongs: Song[];
   isCatalogReady: boolean;
   addTrackToCatalog: (song: Omit<Song, 'id' | 'createdAt' | 'addedBy'>) => Song;
   addMultipleTracksToCatalog: (songs: Omit<Song, 'id' | 'createdAt' | 'addedBy'>[]) => Promise<Song[]>;
@@ -84,6 +85,7 @@ interface MusicContextType {
   downloadedSongIds: string[];
   isDownloaded: (songId: string) => boolean;
   toggleDownloadSong: (song: Song) => Promise<boolean>;
+  downloadSongsBatch: (songs: Song[]) => Promise<{ downloaded: number; failed: number }>;
   downloadSingleSongFile: (song: Song) => Promise<void>;
   downloadFullPlaylistZip: (
     playlist: Playlist,
@@ -477,6 +479,21 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [catalog, userData?.favoriteSongIds]
   );
 
+  // The personal library is what the user explicitly saved: favorites plus
+  // songs inside playlists. The global catalog stays hidden in search.
+  const librarySongIds = useMemo(() => {
+    const ids = new Set<string>(userData.favoriteSongIds || []);
+    (userData.playlists || []).forEach((playlist) => {
+      playlist.songIds.forEach((songId) => ids.add(songId));
+    });
+    return ids;
+  }, [userData.favoriteSongIds, userData.playlists]);
+
+  const librarySongs = useMemo(
+    () => catalog.filter((song) => librarySongIds.has(song.id)),
+    [catalog, librarySongIds]
+  );
+
   // User Playlists
   const createPlaylist = (name: string, description = '', coverUrl = ''): Playlist => {
     const defaultCovers = [
@@ -612,6 +629,77 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const downloadSongsBatch = async (
+    songs: Song[]
+  ): Promise<{ downloaded: number; failed: number }> => {
+    const uniqueSongs = songs.filter(
+      (song, index, array) => array.findIndex((item) => item.id === song.id) === index
+    );
+    const pending = uniqueSongs.filter((song) => !isDownloaded(song.id));
+
+    if (pending.length === 0) {
+      setDownloadingState({
+        isDownloading: true,
+        title: 'Todas las canciones ya están descargadas',
+        progress: 100,
+      });
+      setTimeout(() => setDownloadingState(null), 2500);
+      return { downloaded: 0, failed: 0 };
+    }
+
+    setDownloadingState({
+      isDownloading: true,
+      title: `Preparando ${pending.length} canciones...`,
+      progress: 0,
+    });
+
+    let downloaded = 0;
+    let failed = 0;
+
+    for (let index = 0; index < pending.length; index += 1) {
+      const song = pending[index];
+      const baseProgress = Math.round((index / pending.length) * 100);
+
+      setDownloadingState({
+        isDownloading: true,
+        title: `${song.title} (${index + 1}/${pending.length})`,
+        progress: baseProgress,
+      });
+
+      try {
+        const ok = await cacheSongOffline(song);
+        if (ok) {
+          downloaded += 1;
+        } else {
+          failed += 1;
+        }
+      } catch (err) {
+        console.warn(`No se pudo descargar ${song.title}:`, err);
+        failed += 1;
+      }
+
+      setDownloadingState({
+        isDownloading: true,
+        title: `${song.title} (${index + 1}/${pending.length})`,
+        progress: Math.round(((index + 1) / pending.length) * 100),
+      });
+    }
+
+    await refreshDownloadedIds();
+
+    setDownloadingState({
+      isDownloading: true,
+      title:
+        failed > 0
+          ? `Descarga terminada: ${downloaded} correctas, ${failed} con error`
+          : 'Descarga completada',
+      progress: 100,
+    });
+    setTimeout(() => setDownloadingState(null), 3500);
+
+    return { downloaded, failed };
+  };
+
   const downloadSingleSongFile = async (song: Song) => {
     setDownloadingState({ isDownloading: true, title: song.title });
     await downloadSongFile(song);
@@ -735,6 +823,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <MusicContext.Provider
       value={{
         catalog,
+        librarySongs,
         isCatalogReady,
         addTrackToCatalog,
         addMultipleTracksToCatalog,
@@ -765,6 +854,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         downloadedSongIds,
         isDownloaded,
         toggleDownloadSong,
+        downloadSongsBatch,
         downloadSingleSongFile,
         downloadFullPlaylistZip,
         downloadingState,

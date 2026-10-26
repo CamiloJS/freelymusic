@@ -835,7 +835,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                 {/* Genre Selection & Chips */}
                 <div>
                   <label className="block text-xs font-bold text-neutral-300 mb-1.5">
-                    Género Musical (para Recomendación IA)
+                    Género musical
                   </label>
                   <input
                     type="text"

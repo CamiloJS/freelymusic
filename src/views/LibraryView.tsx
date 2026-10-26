@@ -43,6 +43,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const { currentUser } = useAuth();
   const {
     catalog,
+    librarySongs,
     userFavoriteSongs,
     playlists,
     deletePlaylist,
@@ -52,6 +53,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     isDownloaded,
     toggleDownloadSong,
     downloadFullPlaylistZip,
+    downloadSongsBatch,
     getUserSongPlayCount,
   } = useMusic();
 
@@ -59,8 +61,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
   const [playlistSearch, setPlaylistSearch] = useState('');
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; status: string } | null>(null);
+  const [downloadMessage, setDownloadMessage] = useState('');
 
-  const albums = React.useMemo(() => getAlbumsFromCatalog(catalog), [catalog]);
+  const albums = React.useMemo(() => getAlbumsFromCatalog(librarySongs), [librarySongs]);
 
   // If a playlist, album, or 'favorites' is selected, show Spotify-style Hero Detail
   if (selectedPlaylist) {
@@ -116,10 +119,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     };
 
     const handleDownloadAll = async () => {
-      for (const song of playlistSongs) {
-        if (!isDownloaded(song.id)) {
-          await toggleDownloadSong(song);
-        }
+      setDownloadMessage('');
+      const result = await downloadSongsBatch(playlistSongs);
+      if (result.failed > 0) {
+        setDownloadMessage(
+          `${result.downloaded} descargadas. ${result.failed} no se pudieron guardar; revisa su enlace.`
+        );
+        setTimeout(() => setDownloadMessage(''), 6000);
       }
     };
 
@@ -313,6 +319,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             </div>
           )}
 
+          {downloadMessage && (
+            <div className="p-3 bg-amber-950/40 border border-amber-500/30 rounded-2xl max-w-md text-[11px] font-semibold text-amber-200">
+              {downloadMessage}
+            </div>
+          )}
+
           {/* Songs Table Header (Spotify Style) */}
           <div className="border-t border-neutral-900 pt-4">
             <div className="grid grid-cols-12 gap-4 px-4 py-2 text-[11px] font-black uppercase tracking-wider text-neutral-400 border-b border-neutral-900">
@@ -367,13 +379,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         </button>
                       </div>
 
-                      {/* Title + Cover + Artist */}
+                      {/* Title + Artist. Album rows omit the repeated cover. */}
                       <div className="col-span-5 md:col-span-6 flex items-center gap-3 truncate">
-                        <img
-                          src={song.coverUrl}
-                          alt={song.title} loading="lazy" decoding="async"
-                          className="w-10 h-10 rounded-lg object-cover flex-shrink-0 shadow"
-                        />
+                        {!isAlbum && (
+                          <img
+                            src={song.coverUrl}
+                            alt={song.title}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0 shadow"
+                          />
+                        )}
                         <div className="truncate">
                           <div className="flex items-center gap-1.5">
                             {song.isExplicit && (
@@ -487,7 +503,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs shadow-lg transition-transform active:scale-95"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
-            <span>Crear Playlist</span>
+            <span>Crear</span>
           </button>
         </div>
       </div>

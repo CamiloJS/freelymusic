@@ -24,6 +24,7 @@ import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right.mjs';
 import ArrowDownCircle from 'lucide-react/dist/esm/icons/circle-arrow-down.mjs';
 import Settings from 'lucide-react/dist/esm/icons/settings.mjs';
 import UserRound from 'lucide-react/dist/esm/icons/user-round.mjs';
+import Disc3 from 'lucide-react/dist/esm/icons/disc-3.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 
 // Views and modals are split into separate chunks: the first paint no longer
@@ -108,6 +109,7 @@ const MainLayout: React.FC = () => {
   const [isProfileSwitcherOpen, setIsProfileSwitcherOpen] = useState(false);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
   const [isImportPlaylistOpen, setIsImportPlaylistOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
@@ -125,9 +127,7 @@ const MainLayout: React.FC = () => {
   // Listen to network status & initialize custom app icon
   useEffect(() => {
     const customIcon = getCustomAppIcon();
-    if (customIcon) {
-      applyAppIcon(customIcon);
-    }
+    applyAppIcon(customIcon || '/icon.svg');
 
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -139,6 +139,43 @@ const MainLayout: React.FC = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
+  }, []);
+
+  // Warm the service-worker cache for the core views after first paint so the
+  // app can still be opened offline after the initial visit.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void (async () => {
+        await Promise.allSettled([
+          import('./views/HomeView'),
+          import('./views/CloudSearchView'),
+          import('./views/LibraryView'),
+          import('./views/ProfileView'),
+          import('./views/OfflineView'),
+          import('./views/AddMusicView'),
+        ]);
+
+        // Re-fetch chunks that were loaded before the service worker took
+        // control (for example right after an update) so they are in the
+        // offline cache too.
+        const assetUrls = performance
+          .getEntriesByType('resource')
+          .map((entry) => entry.name)
+          .filter(
+            (url) =>
+              url.includes('/assets/') &&
+              (url.endsWith('.js') || url.endsWith('.css'))
+          );
+
+        await Promise.allSettled(
+          assetUrls.map((url) =>
+            fetch(url, { cache: 'reload' }).then((response) => response.blob())
+          )
+        );
+      })();
+    }, 4000);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const handleOpenAddToPlaylist = (song: Song) => {
@@ -174,8 +211,21 @@ const MainLayout: React.FC = () => {
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-black text-white select-none">
       {/* Spotify Top Bar (Images 1, 2, 4) */}
       <header className="h-14 bg-black border-b border-neutral-900/80 px-4 flex items-center justify-between flex-shrink-0 z-30">
-        {/* Left: Navigation arrows & Home */}
-        <div className="flex items-center gap-2">
+        {/* Left: Brand, navigation arrows & Home */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 mr-1">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 via-green-400 to-teal-300 flex items-center justify-center overflow-hidden shadow-lg shadow-emerald-500/20 flex-shrink-0">
+              {appIcon ? (
+                <img src={appIcon} alt={appName} className="w-full h-full object-cover" />
+              ) : (
+                <Disc3 className="w-4 h-4 text-black" />
+              )}
+            </div>
+            <span className="hidden md:block text-sm font-black text-white truncate max-w-[130px]">
+              {appName}
+            </span>
+          </div>
+
           <div className="hidden sm:flex items-center gap-1">
             <button
               onClick={() => {
@@ -214,31 +264,38 @@ const MainLayout: React.FC = () => {
           </button>
         </div>
 
-        {/* Center: Search input & Downloading notification banner */}
-        <div className="flex-1 max-w-lg mx-3 flex items-center justify-center gap-3">
-          {/* Downloading Indicator Pill (User request: "cuando se está descargando música, ahí arriba sale como que descargando") */}
-          {downloadingState?.isDownloading ? (
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold animate-pulse shadow-lg">
-              <ArrowDownCircle className="w-4 h-4 text-emerald-400 animate-bounce" />
-              <span>
-                Descargando música: {downloadingState.title || 'Guardando offline...'}
-              </span>
-            </div>
-          ) : (
-            /* Spotify-style search bar */
-            <div
-              onClick={() => {
+        {/* Center: one real search input, shared with the search view */}
+        <div className="flex-1 max-w-lg mx-3">
+          <div className="w-full flex items-center gap-2.5 bg-neutral-900/90 hover:bg-neutral-850 border border-neutral-800/80 hover:border-neutral-600 focus-within:border-white/70 px-4 py-2 rounded-full transition-all max-w-md shadow-inner group">
+            <Search className="w-4 h-4 text-neutral-400 group-focus-within:text-white transition-colors" />
+            <input
+              type="text"
+              value={searchQuery}
+              onFocus={() => {
                 setIsCenterLyricsOpen(false);
                 setCurrentTab('cloud');
+                setSelectedPlaylist(null);
               }}
-              className="w-full flex items-center gap-2.5 bg-neutral-900/90 hover:bg-neutral-850 border border-neutral-800/80 hover:border-neutral-700 px-4 py-2 rounded-full cursor-pointer transition-all max-w-md shadow-inner group"
-            >
-              <Search className="w-4 h-4 text-neutral-400 group-hover:text-white transition-colors" />
-              <span className="text-xs text-neutral-400 font-semibold truncate">
-                ¿Qué quieres reproducir?
-              </span>
-            </div>
-          )}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setIsCenterLyricsOpen(false);
+                setCurrentTab('cloud');
+                setSelectedPlaylist(null);
+              }}
+              placeholder="¿Qué quieres reproducir?"
+              aria-label="Buscar música"
+              className="flex-1 min-w-0 bg-transparent text-xs text-white placeholder-neutral-400 focus:outline-none font-semibold"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="p-0.5 rounded-full text-neutral-400 hover:text-white"
+                title="Limpiar búsqueda"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Right: User Profile & Preferences Button */}
@@ -368,6 +425,7 @@ const MainLayout: React.FC = () => {
             selectedPlaylist={selectedPlaylist}
             onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
             onOpenProfileSwitcher={() => setIsProfileSwitcherOpen(true)}
+            onSelectArtist={handleSelectArtist}
             isOnline={isOnline}
           />
         </div>
@@ -397,8 +455,9 @@ const MainLayout: React.FC = () => {
 
                 {currentTab === 'cloud' && (
                   <CloudSearchView
+                    searchQuery={searchQuery}
+                    onSearchQueryChange={setSearchQuery}
                     onOpenAddToPlaylist={handleOpenAddToPlaylist}
-                    onOpenAddMusic={() => setCurrentTab('add-music')}
                     onSelectArtist={handleSelectArtist}
                     onSelectAlbum={handleSelectAlbum}
                   />
@@ -465,6 +524,37 @@ const MainLayout: React.FC = () => {
       {/* PWA Install Banner */}
       <InstallPrompt />
 
+      {downloadingState?.isDownloading && (
+        <div className="fixed bottom-24 right-4 z-40 w-72 rounded-2xl border border-emerald-500/25 bg-neutral-900/95 p-4 shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-emerald-300">
+            <ArrowDownCircle className="w-4 h-4 animate-bounce flex-shrink-0" />
+            <span className="truncate flex-1">
+              {downloadingState.title || 'Descargando música...'}
+            </span>
+            {typeof downloadingState.progress === 'number' && (
+              <span className="text-[10px] text-emerald-400 flex-shrink-0">
+                {Math.round(downloadingState.progress)}%
+              </span>
+            )}
+          </div>
+          <div className="mt-2 h-1.5 rounded-full bg-neutral-800 overflow-hidden">
+            <div
+              className={`h-full rounded-full bg-emerald-400 transition-all ${
+                typeof downloadingState.progress === 'number' ? '' : 'w-1/3 animate-pulse'
+              }`}
+              style={
+                typeof downloadingState.progress === 'number'
+                  ? { width: `${Math.max(4, Math.min(100, downloadingState.progress))}%` }
+                  : undefined
+              }
+            />
+          </div>
+          <p className="mt-1.5 text-[10px] text-neutral-500">
+            Guardando para escuchar sin conexión
+          </p>
+        </div>
+      )}
+
       {isFullscreenNowPlaying && (
         <Suspense fallback={null}>
           <FullscreenNowPlayingModal onSelectArtist={handleSelectArtist} />
@@ -487,6 +577,14 @@ const MainLayout: React.FC = () => {
             }}
             onNavigateAddMusic={() => {
               setCurrentTab('add-music');
+            }}
+            onOpenProfileView={() => {
+              setSelectedPlaylist(null);
+              setCurrentTab('profile');
+            }}
+            onOpenAdminPanel={() => {
+              setSelectedPlaylist(null);
+              setCurrentTab('admin');
             }}
           />
         </Suspense>
