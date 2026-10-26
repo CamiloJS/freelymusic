@@ -88,17 +88,23 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
+    const onError = (e: Event) => {
+      console.warn('Audio playback error:', e);
+      setIsPlaying(false);
+    };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('durationchange', onDurationChange);
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
+    audio.addEventListener('error', onError);
 
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('durationchange', onDurationChange);
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('error', onError);
       audio.pause();
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);

@@ -14,13 +14,15 @@ import {
   Shuffle,
   Search,
   ArrowDownCircle,
-  MoreHorizontal
+  MoreHorizontal,
+  Disc
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
 import { Playlist, Song, Album } from '../types';
 import { formatTime } from '../utils/lyrics';
+import { getAlbumsFromCatalog } from '../utils/albums';
 
 interface LibraryViewProps {
   selectedPlaylist: Playlist | 'favorites' | Album | null;
@@ -53,6 +55,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
   const [playlistSearch, setPlaylistSearch] = useState('');
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; status: string } | null>(null);
+
+  const albums = React.useMemo(() => getAlbumsFromCatalog(catalog), [catalog]);
 
   // If a playlist, album, or 'favorites' is selected, show Spotify-style Hero Detail
   if (selectedPlaylist) {
@@ -477,6 +481,55 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
         ))}
       </div>
+
+      {/* Álbumes Section */}
+      {albums.length > 0 && (
+        <div className="pt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <Disc className="w-6 h-6 text-emerald-400" />
+                <span>Tus Álbumes</span>
+              </h2>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Álbumes completos con todas sus pistas unificadas (incluyendo colaboraciones).
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {albums.map((alb) => (
+              <div
+                key={alb.name}
+                onClick={() => setSelectedPlaylist(alb)}
+                className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group"
+              >
+                <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center">
+                  {alb.coverUrl ? (
+                    <img
+                      src={alb.coverUrl}
+                      alt={alb.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    />
+                  ) : (
+                    <Disc className="w-12 h-12 text-neutral-600" />
+                  )}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Play className="w-8 h-8 text-emerald-400 fill-emerald-400 drop-shadow-lg" />
+                  </div>
+                </div>
+                <h3 className="font-bold text-sm text-white truncate">{alb.name}</h3>
+                <p className="text-xs text-emerald-400 font-semibold truncate mt-0.5">
+                  {alb.artist}
+                </p>
+                <p className="text-[11px] text-neutral-500 truncate mt-0.5">
+                  {alb.year ? `${alb.year} • ` : ''}{alb.songs.length} pistas
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

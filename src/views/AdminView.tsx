@@ -70,6 +70,7 @@ export const AdminView: React.FC = () => {
   const [editTitle, setEditTitle] = useState('');
   const [editArtistList, setEditArtistList] = useState<string[]>(['']);
   const [editAlbum, setEditAlbum] = useState('');
+  const [editAlbumArtist, setEditAlbumArtist] = useState('');
   const [editGenre, setEditGenre] = useState('');
   const [editYear, setEditYear] = useState('2026');
   const [editCoverUrl, setEditCoverUrl] = useState('');
@@ -87,6 +88,7 @@ export const AdminView: React.FC = () => {
     const split = song.artist ? song.artist.split(',').map((a) => a.trim()).filter(Boolean) : [''];
     setEditArtistList(split.length > 0 ? split : ['']);
     setEditAlbum(song.album || '');
+    setEditAlbumArtist(song.albumArtist || '');
     setEditTrackNumber(song.trackNumber);
     setEditGenre(song.genre || '');
     setEditYear(song.year || '2026');
@@ -112,6 +114,7 @@ export const AdminView: React.FC = () => {
       title: editTitle.trim(),
       artist: finalArtist,
       album: editAlbum.trim() || 'Sencillo',
+      albumArtist: editAlbumArtist.trim() || undefined,
       trackNumber: editTrackNumber ? Number(editTrackNumber) : undefined,
       genre: editGenre.trim() || 'General',
       year: editYear.trim() || '2026',
@@ -990,13 +993,24 @@ export const AdminView: React.FC = () => {
                   </div>
 
                   {/* Album, Track # & Year */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-neutral-300 mb-1.5">Álbum</label>
                       <input
                         type="text"
                         value={editAlbum}
                         onChange={(e) => setEditAlbum(e.target.value)}
+                        placeholder="Ej. Cuarto Azul"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-300 mb-1.5">Artista del Álbum</label>
+                      <input
+                        type="text"
+                        value={editAlbumArtist}
+                        onChange={(e) => setEditAlbumArtist(e.target.value)}
+                        placeholder="Ej. Aitana"
                         className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                       />
                     </div>

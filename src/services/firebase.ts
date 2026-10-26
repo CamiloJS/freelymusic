@@ -26,6 +26,23 @@ export const DEFAULT_FIREBASE_CONFIG: FirebaseConfigOptions = {
 let firebaseApp: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
+let authReadyPromise: Promise<boolean> | null = null;
+
+export async function ensureAuth(): Promise<boolean> {
+  if (!auth) return false;
+  if (auth.currentUser) return true;
+  if (authReadyPromise) return authReadyPromise;
+
+  authReadyPromise = signInAnonymously(auth)
+    .then(() => true)
+    .catch((err) => {
+      console.warn('Firebase anonymous authentication error:', err);
+      authReadyPromise = null;
+      return false;
+    });
+
+  return authReadyPromise;
+}
 
 // Authorized path matching firestore.rules in ginadocente-unipamplona:
 // match /artifacts/{appId} { match /public/data/{document=**} { allow read: if isAuth(); allow write: if isAuth(); } }
@@ -59,9 +76,7 @@ export function initFirebase(config?: FirebaseConfigOptions | null): boolean {
     db = getFirestore(firebaseApp);
 
     // Authenticate anonymously so security rules permit read/write operations
-    signInAnonymously(auth).catch((err) => {
-      console.warn('Firebase anonymous authentication error:', err);
-    });
+    ensureAuth();
 
     console.info('Firebase connected with authenticated session to:', finalConfig.projectId);
     return true;
@@ -82,6 +97,7 @@ export function isFirebaseConnected(): boolean {
 export async function syncCatalogFromFirestore(): Promise<Song[] | null> {
   if (!db) return null;
   try {
+    await ensureAuth();
     const snapshot = await getDocs(collection(db, ...BASE_PATH, 'catalog'));
     const songs: Song[] = [];
     snapshot.forEach((d) => {
@@ -97,6 +113,7 @@ export async function syncCatalogFromFirestore(): Promise<Song[] | null> {
 export async function saveSongToFirestore(song: Song): Promise<void> {
   if (!db) return;
   try {
+    await ensureAuth();
     await setDoc(doc(db, ...BASE_PATH, 'catalog', song.id), song, { merge: true });
   } catch (err) {
     console.warn('Error saving song to Firestore:', err);
@@ -106,6 +123,7 @@ export async function saveSongToFirestore(song: Song): Promise<void> {
 export async function deleteSongFromFirestore(songId: string): Promise<void> {
   if (!db) return;
   try {
+    await ensureAuth();
     await deleteDoc(doc(db, ...BASE_PATH, 'catalog', songId));
   } catch (err) {
     console.warn('Error deleting song from Firestore:', err);
@@ -116,6 +134,7 @@ export async function deleteSongFromFirestore(songId: string): Promise<void> {
 export async function syncProfilesFromFirestore(): Promise<UserProfile[] | null> {
   if (!db) return null;
   try {
+    await ensureAuth();
     const snapshot = await getDocs(collection(db, ...BASE_PATH, 'profiles'));
     const profiles: UserProfile[] = [];
     snapshot.forEach((d) => {
@@ -131,6 +150,7 @@ export async function syncProfilesFromFirestore(): Promise<UserProfile[] | null>
 export async function saveProfileToFirestore(profile: UserProfile): Promise<void> {
   if (!db) return;
   try {
+    await ensureAuth();
     await setDoc(doc(db, ...BASE_PATH, 'profiles', profile.id), profile, { merge: true });
   } catch (err) {
     console.warn('Error saving profile to Firestore:', err);
@@ -140,6 +160,7 @@ export async function saveProfileToFirestore(profile: UserProfile): Promise<void
 export async function deleteProfileFromFirestore(profileId: string): Promise<void> {
   if (!db) return;
   try {
+    await ensureAuth();
     await deleteDoc(doc(db, ...BASE_PATH, 'profiles', profileId));
   } catch (err) {
     console.warn('Error deleting profile from Firestore:', err);
@@ -150,6 +171,7 @@ export async function deleteProfileFromFirestore(profileId: string): Promise<voi
 export function subscribeToProfilesUpdates(onUpdate: (profiles: UserProfile[]) => void): (() => void) | null {
   if (!db) return null;
   try {
+    ensureAuth();
     const unsubscribe = onSnapshot(collection(db, ...BASE_PATH, 'profiles'), (snapshot) => {
       const profiles: UserProfile[] = [];
       snapshot.forEach((d) => profiles.push(d.data() as UserProfile));
@@ -165,6 +187,7 @@ export function subscribeToProfilesUpdates(onUpdate: (profiles: UserProfile[]) =
 export async function syncUserDataFromFirestore(userId: string): Promise<UserLibraryData | null> {
   if (!db) return null;
   try {
+    await ensureAuth();
     const snapshot = await getDocs(collection(db, ...BASE_PATH, 'usersData'));
     let data: UserLibraryData | null = null;
     snapshot.forEach((d) => {
@@ -182,6 +205,7 @@ export async function syncUserDataFromFirestore(userId: string): Promise<UserLib
 export async function saveUserDataToFirestore(userId: string, data: UserLibraryData): Promise<void> {
   if (!db) return;
   try {
+    await ensureAuth();
     await setDoc(doc(db, ...BASE_PATH, 'usersData', userId), data, { merge: true });
   } catch (err) {
     console.warn('Error saving user data to Firestore:', err);
@@ -192,6 +216,7 @@ export async function saveUserDataToFirestore(userId: string, data: UserLibraryD
 export function subscribeToCatalogUpdates(onUpdate: (songs: Song[]) => void): (() => void) | null {
   if (!db) return null;
   try {
+    ensureAuth();
     const unsubscribe = onSnapshot(collection(db, ...BASE_PATH, 'catalog'), (snapshot) => {
       const songs: Song[] = [];
       snapshot.forEach((d) => songs.push(d.data() as Song));

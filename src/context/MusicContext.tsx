@@ -6,6 +6,8 @@ import {
   saveStoredCatalog,
   getStoredUserData,
   saveStoredUserData,
+  getStoredDeletedSongIds,
+  addStoredDeletedSongId,
   cacheSongOffline,
   deleteSongBlob,
   getAllDownloadedSongIds,
@@ -82,25 +84,43 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   }, [currentUser.id]);
 
-  // Sync catalog from Firestore & setup listener
+  // Sync catalog from Firestore & setup listener with resilient merging
   useEffect(() => {
+    const mergeSongs = (cloudSongs: Song[]) => {
+      const deletedIds = getStoredDeletedSongIds();
+      setCatalog((current) => {
+        const map = new Map<string, Song>();
+        // Add cloud songs first
+        cloudSongs.forEach((s) => {
+          if (!deletedIds.has(s.id) && s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3') {
+            map.set(s.id, s);
+          }
+        });
+        // Preserve any local songs that were not deleted
+        current.forEach((s) => {
+          if (!deletedIds.has(s.id) && s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3') {
+            if (!map.has(s.id)) {
+              map.set(s.id, s);
+              // Ensure it gets safely persisted to Firestore
+              saveSongToFirestore(s);
+            }
+          }
+        });
+        const merged = Array.from(map.values());
+        saveStoredCatalog(merged);
+        return merged;
+      });
+    };
+
     syncCatalogFromFirestore().then((cloudSongs) => {
       if (cloudSongs !== null) {
-        const cleaned = cloudSongs.filter(
-          (s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3'
-        );
-        setCatalog(cleaned);
-        saveStoredCatalog(cleaned);
+        mergeSongs(cloudSongs);
       }
     });
 
     const unsubscribe = subscribeToCatalogUpdates((updatedCatalog) => {
       if (updatedCatalog !== null) {
-        const cleaned = updatedCatalog.filter(
-          (s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3'
-        );
-        setCatalog(cleaned);
-        saveStoredCatalog(cleaned);
+        mergeSongs(updatedCatalog);
       }
     });
 
@@ -132,11 +152,13 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       createdAt: new Date().toISOString(),
     };
 
-    const updated = [newSong, ...catalog];
-    setCatalog(updated);
-    saveStoredCatalog(updated);
-    saveSongToFirestore(newSong);
+    setCatalog((prev) => {
+      const updated = [newSong, ...prev.filter((s) => s.id !== newSong.id)];
+      saveStoredCatalog(updated);
+      return updated;
+    });
 
+    saveSongToFirestore(newSong);
     return newSong;
   };
 
@@ -151,9 +173,12 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       createdAt: new Date(now + idx).toISOString(),
     }));
 
-    const updated = [...newSongs, ...catalog];
-    setCatalog(updated);
-    saveStoredCatalog(updated);
+    setCatalog((prev) => {
+      const updated = [...newSongs, ...prev];
+      saveStoredCatalog(updated);
+      return updated;
+    });
+
     for (const song of newSongs) {
       await saveSongToFirestore(song);
     }
@@ -161,16 +186,21 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateCatalogTrack = (song: Song) => {
-    const updated = catalog.map((s) => (s.id === song.id ? song : s));
-    setCatalog(updated);
-    saveStoredCatalog(updated);
+    setCatalog((prev) => {
+      const updated = prev.map((s) => (s.id === song.id ? song : s));
+      saveStoredCatalog(updated);
+      return updated;
+    });
     saveSongToFirestore(song);
   };
 
   const deleteCatalogTrack = (songId: string) => {
-    const updated = catalog.filter((s) => s.id !== songId);
-    setCatalog(updated);
-    saveStoredCatalog(updated);
+    addStoredDeletedSongId(songId);
+    setCatalog((prev) => {
+      const updated = prev.filter((s) => s.id !== songId);
+      saveStoredCatalog(updated);
+      return updated;
+    });
     deleteSongFromFirestore(songId);
     deleteSongBlob(songId);
     refreshDownloadedIds();

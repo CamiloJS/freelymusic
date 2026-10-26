@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Song, Album } from '../types';
+import { getAlbumsFromCatalog } from './albums';
 
 describe('Album management & sorting', () => {
   const mockSongs: Song[] = [
@@ -69,7 +70,7 @@ describe('Album management & sorting', () => {
         id: 's1',
         title: 'Song 1',
         artist: 'Aitana',
-        album: 'alpha',
+        album: 'CUARTO AZUL',
         coverUrl: 'https://example.com/alpha.jpg',
         audioUrl: 'https://example.com/1.mp3',
         duration: 180,
@@ -78,9 +79,9 @@ describe('Album management & sorting', () => {
       },
       {
         id: 's2',
-        title: 'Song 2',
+        title: 'EX EX EX',
         artist: 'Aitana, Kenia Os',
-        album: 'alpha',
+        album: 'CUARTO AZUL',
         coverUrl: 'https://example.com/alpha.jpg',
         audioUrl: 'https://example.com/2.mp3',
         duration: 190,
@@ -90,8 +91,8 @@ describe('Album management & sorting', () => {
       {
         id: 's3',
         title: 'Song 3',
-        artist: 'Aitana, Danna Paola',
-        album: 'alpha',
+        artist: 'Aitana',
+        album: 'CUARTO AZUL',
         coverUrl: 'https://example.com/alpha.jpg',
         audioUrl: 'https://example.com/3.mp3',
         duration: 200,
@@ -100,25 +101,11 @@ describe('Album management & sorting', () => {
       },
     ];
 
-    const map = new Map<string, Album>();
-    multiArtistSongs.forEach((song) => {
-      const albumKey = song.album.trim().toLowerCase();
-      const primaryArtist = song.artist.split(',')[0].trim();
-      if (!map.has(albumKey)) {
-        map.set(albumKey, {
-          name: song.album.trim(),
-          artist: primaryArtist,
-          coverUrl: song.coverUrl,
-          songs: [],
-        });
-      }
-      map.get(albumKey)!.songs.push(song);
-    });
-
-    const albums = Array.from(map.values());
+    const albums = getAlbumsFromCatalog(multiArtistSongs);
     expect(albums).toHaveLength(1);
-    expect(albums[0].name).toBe('alpha');
+    expect(albums[0].name).toBe('CUARTO AZUL');
     expect(albums[0].artist).toBe('Aitana');
     expect(albums[0].songs).toHaveLength(3);
+    expect(albums[0].songs.map((s) => s.title)).toEqual(['Song 1', 'EX EX EX', 'Song 3']);
   });
 });

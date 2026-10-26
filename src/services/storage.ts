@@ -200,6 +200,28 @@ export const INITIAL_PROFILES: UserProfile[] = [
 
 export const INITIAL_CATALOG: Song[] = [];
 
+const DELETED_SONGS_KEY = 'sonora_deleted_song_ids';
+
+export function getStoredDeletedSongIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_SONGS_KEY);
+    if (!raw) return new Set<string>();
+    return new Set(JSON.parse(raw));
+  } catch {
+    return new Set<string>();
+  }
+}
+
+export function addStoredDeletedSongId(id: string): void {
+  try {
+    const current = getStoredDeletedSongIds();
+    current.add(id);
+    localStorage.setItem(DELETED_SONGS_KEY, JSON.stringify(Array.from(current)));
+  } catch {
+    // ignore
+  }
+}
+
 // LocalStorage Handlers
 export function getStoredCatalog(): Song[] {
   try {
@@ -208,14 +230,20 @@ export function getStoredCatalog(): Song[] {
       return [];
     }
     const parsed: Song[] = JSON.parse(raw);
-    return parsed.filter((s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3');
+    const deleted = getStoredDeletedSongIds();
+    return parsed.filter(
+      (s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3' && !deleted.has(s.id)
+    );
   } catch {
     return [];
   }
 }
 
 export function saveStoredCatalog(songs: Song[]): void {
-  const cleaned = songs.filter((s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3');
+  const deleted = getStoredDeletedSongIds();
+  const cleaned = songs.filter(
+    (s) => s.id !== 'track-1' && s.id !== 'track-2' && s.id !== 'track-3' && !deleted.has(s.id)
+  );
   localStorage.setItem(KEYS.CATALOG, JSON.stringify(cleaned));
 }
 

@@ -446,6 +446,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         title: t.title.trim(),
         artist: t.artist?.trim() || finalAlbumArtist,
         album: albumTitle.trim(),
+        albumArtist: finalAlbumArtist,
         genre: albumGenre.trim() || 'General',
         year: albumYear.trim() || '2026',
         coverUrl: albumCoverUrl.trim(),

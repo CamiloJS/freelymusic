@@ -127,13 +127,16 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
       }
 
       // 3. Album match
-      if (song.album && song.album.toLowerCase().includes(q) && !seenAlbums.has(song.album)) {
-        seenAlbums.add(song.album);
-        items.push({
-          type: 'album',
-          text: song.album,
-          subText: `${song.artist} • Álbum`,
-        });
+      if (song.album && song.album.trim().toLowerCase() !== 'sencillo') {
+        const albumKey = song.album.trim().toLowerCase();
+        if (albumKey.includes(q) && !seenAlbums.has(albumKey)) {
+          seenAlbums.add(albumKey);
+          items.push({
+            type: 'album',
+            text: song.album.trim(),
+            subText: 'Álbum',
+          });
+        }
       }
 
       // 4. Lyrics match
@@ -297,7 +300,12 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
             {autocompleteSuggestions.map((item, idx) => (
               <div
                 key={idx}
-                onClick={() => handleSelectQuery(item.type === 'lyric' && item.song ? item.song.title : item.text, item.song)}
+                onClick={() =>
+                  handleSelectQuery(
+                    item.type === 'lyric' && item.song ? item.song.title : item.text,
+                    item.type === 'song' ? item.song : undefined
+                  )
+                }
                 className="flex items-center justify-between p-3 px-4 hover:bg-neutral-800/80 cursor-pointer transition-colors group"
               >
                 <div className="flex items-center gap-3 truncate">

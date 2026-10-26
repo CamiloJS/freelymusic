@@ -25,6 +25,7 @@ import { useAudio } from '../context/AudioContext';
 import { useCustomization } from '../context/CustomizationContext';
 import { getCustomAppIcon } from '../utils/appIcon';
 import { Playlist, Album } from '../types';
+import { getAlbumsFromCatalog } from '../utils/albums';
 import { DEFAULT_AVATAR } from '../services/storage';
 
 interface SidebarProps {
@@ -73,30 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Extract unique albums from catalog (grouped solely by album name so guest collaborations remain together)
   const uniqueAlbums = React.useMemo((): Album[] => {
-    const map = new Map<string, Album>();
-    catalog.forEach((song) => {
-      if (!song.album || song.album.trim().toLowerCase() === 'sencillo') return;
-      const albumKey = song.album.trim().toLowerCase();
-      const primaryArtist = song.artist.split(',')[0].trim();
-
-      if (!map.has(albumKey)) {
-        map.set(albumKey, {
-          name: song.album.trim(),
-          artist: primaryArtist || song.artist.trim(),
-          coverUrl: song.coverUrl,
-          year: song.year,
-          genre: song.genre,
-          songs: [],
-        });
-      }
-      map.get(albumKey)!.songs.push(song);
-    });
-
-    map.forEach((alb) => {
-      alb.songs.sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0));
-    });
-
-    return Array.from(map.values());
+    return getAlbumsFromCatalog(catalog);
   }, [catalog]);
 
   // Check if all favorites are downloaded

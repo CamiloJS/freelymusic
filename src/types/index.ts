@@ -15,6 +15,7 @@ export interface Song {
   title: string;
   artist: string;
   album: string;
+  albumArtist?: string;
   coverUrl: string;
   audioUrl: string;
   duration: number; // in seconds
