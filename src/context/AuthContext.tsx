@@ -5,18 +5,24 @@ import {
   saveStoredProfiles,
   getStoredActiveUserId,
   saveStoredActiveUserId,
+  getStoredActiveSessionUserId,
+  saveStoredActiveSessionUserId,
   INITIAL_PROFILES,
 } from '../services/storage';
 import {
   syncProfilesFromFirestore,
   saveProfileToFirestore,
   deleteProfileFromFirestore,
+  subscribeToProfilesUpdates,
 } from '../services/firebase';
 
 interface AuthContextType {
   currentUser: UserProfile;
   allUsers: UserProfile[];
   isAdmin: boolean;
+  isAuthenticated: boolean;
+  login: (userId: string, pin?: string) => { success: boolean; error?: string };
+  logout: () => void;
   switchUser: (userId: string) => void;
   createProfile: (data: { username: string; displayName: string; role: UserRole; avatarUrl?: string; pin?: string }) => UserProfile;
   updateProfile: (profile: UserProfile) => void;
@@ -27,26 +33,73 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [allUsers, setAllUsers] = useState<UserProfile[]>(() => getStoredProfiles());
-  const [activeUserId, setActiveUserId] = useState<string>(() => getStoredActiveUserId());
+  const [activeUserId, setActiveUserId] = useState<string>(() => {
+    return getStoredActiveSessionUserId() || getStoredActiveUserId() || 'camilo-admin';
+  });
+  
+  // Track if this browser/device is currently authenticated
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return Boolean(getStoredActiveSessionUserId());
+  });
 
-  // Firestore initial sync
+  // Firestore initial sync & live updates
   useEffect(() => {
     syncProfilesFromFirestore().then((cloudProfiles) => {
       if (cloudProfiles && cloudProfiles.length > 0) {
         setAllUsers(cloudProfiles);
         saveStoredProfiles(cloudProfiles);
+      } else {
+        // First time initializing Firestore database with initial admin profile
+        INITIAL_PROFILES.forEach((p) => saveProfileToFirestore(p));
       }
     });
+
+    const unsubscribe = subscribeToProfilesUpdates((cloudProfiles) => {
+      if (cloudProfiles && cloudProfiles.length > 0) {
+        setAllUsers(cloudProfiles);
+        saveStoredProfiles(cloudProfiles);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const currentUser = allUsers.find((u) => u.id === activeUserId) || allUsers[0] || INITIAL_PROFILES[0];
   const isAdmin = currentUser.role === 'admin';
+
+  const login = (userId: string, pin?: string): { success: boolean; error?: string } => {
+    const target = allUsers.find((u) => u.id === userId);
+    if (!target) {
+      return { success: false, error: 'Perfil no encontrado.' };
+    }
+
+    // Check PIN requirement
+    if (target.pin && target.pin.trim() !== '') {
+      if (!pin || pin.trim() !== target.pin.trim()) {
+        return { success: false, error: 'PIN incorrecto. Intenta de nuevo.' };
+      }
+    }
+
+    setActiveUserId(target.id);
+    saveStoredActiveUserId(target.id);
+    saveStoredActiveSessionUserId(target.id);
+    setIsAuthenticated(true);
+    return { success: true };
+  };
+
+  const logout = () => {
+    saveStoredActiveSessionUserId(null);
+    setIsAuthenticated(false);
+  };
 
   const switchUser = (userId: string) => {
     const target = allUsers.find((u) => u.id === userId);
     if (target) {
       setActiveUserId(userId);
       saveStoredActiveUserId(userId);
+      saveStoredActiveSessionUserId(userId);
     }
   };
 
@@ -111,6 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const fallback = updated[0].id;
       setActiveUserId(fallback);
       saveStoredActiveUserId(fallback);
+      saveStoredActiveSessionUserId(fallback);
     }
     return true;
   };
@@ -121,6 +175,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         allUsers,
         isAdmin,
+        isAuthenticated,
+        login,
+        logout,
         switchUser,
         createProfile,
         updateProfile,

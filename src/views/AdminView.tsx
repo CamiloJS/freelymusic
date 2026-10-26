@@ -22,6 +22,7 @@ import { useMusic } from '../context/MusicContext';
 import { Song, UserRole, FirebaseConfigOptions } from '../types';
 import { saveStoredFirebaseConfig, getStoredFirebaseConfig } from '../services/storage';
 import { initFirebase, isFirebaseConnected } from '../services/firebase';
+import { compressImage } from '../utils/imageCompressor';
 
 export const AdminView: React.FC = () => {
   const { currentUser, allUsers, createProfile, deleteProfile, isAdmin } = useAuth();
@@ -64,18 +65,18 @@ export const AdminView: React.FC = () => {
   const lrcFileInputRef = useRef<HTMLInputElement | null>(null);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleCoverFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (dataUrl) {
-        setCoverUrl(dataUrl);
+    try {
+      const compressed = await compressImage(file, 500, 0.8);
+      if (compressed) {
+        setCoverUrl(compressed);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Error comprimiendo carátula:', err);
+    }
   };
 
   if (!isAdmin) {

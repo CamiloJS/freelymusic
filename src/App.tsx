@@ -11,6 +11,7 @@ import { InstallPrompt } from './components/InstallPrompt';
 import { ProfileSwitcherModal } from './components/ProfileSwitcherModal';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import { CreatePlaylistModal } from './components/CreatePlaylistModal';
+import { LoginLockScreen } from './components/LoginLockScreen';
 import { HomeView } from './views/HomeView';
 import { CloudSearchView } from './views/CloudSearchView';
 import { LibraryView } from './views/LibraryView';
@@ -45,9 +46,14 @@ const MainLayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser, isAdmin, isAuthenticated } = useAuth();
   const { downloadingState } = useMusic();
   const { isCenterLyricsOpen, setIsCenterLyricsOpen, currentSong } = useAudio();
+
+  // If session is not authenticated on this device/browser, require profile selection & login
+  if (!isAuthenticated) {
+    return <LoginLockScreen />;
+  }
 
   // Listen to network status & initialize custom app icon
   useEffect(() => {

@@ -175,6 +175,8 @@ const KEYS = {
   CATALOG: 'sonora_cloud_catalog',
   PROFILES: 'sonora_user_profiles',
   ACTIVE_USER: 'sonora_active_user_id',
+  SESSION_USER: 'sonora_session_user_id',
+  RECENT_SEARCHES: 'sonora_recent_searches',
   USER_DATA_PREFIX: 'sonora_userdata_',
   FIREBASE_CONFIG: 'sonora_firebase_config',
 };
@@ -187,6 +189,7 @@ export const INITIAL_PROFILES: UserProfile[] = [
     displayName: 'Camilo Jaimes',
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
     role: 'admin',
+    pin: '1234',
     createdAt: new Date().toISOString(),
   },
 ];
@@ -352,3 +355,59 @@ export function saveStoredFirebaseConfig(config: FirebaseConfigOptions | null): 
     localStorage.removeItem(KEYS.FIREBASE_CONFIG);
   }
 }
+
+// Session Lock / Authentication storage
+export function getStoredActiveSessionUserId(): string | null {
+  return localStorage.getItem(KEYS.SESSION_USER);
+}
+
+export function saveStoredActiveSessionUserId(userId: string | null): void {
+  if (userId) {
+    localStorage.setItem(KEYS.SESSION_USER, userId);
+  } else {
+    localStorage.removeItem(KEYS.SESSION_USER);
+  }
+}
+
+// Recent searches storage (max 10 recent searches)
+export function getRecentSearches(): string[] {
+  try {
+    const raw = localStorage.getItem(KEYS.RECENT_SEARCHES);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(0, 10) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveRecentSearch(term: string): string[] {
+  const clean = term.trim();
+  if (!clean) return getRecentSearches();
+
+  const current = getRecentSearches();
+  const filtered = current.filter((item) => item.toLowerCase() !== clean.toLowerCase());
+  const updated = [clean, ...filtered].slice(0, 10);
+  try {
+    localStorage.setItem(KEYS.RECENT_SEARCHES, JSON.stringify(updated));
+  } catch {
+    // ignore
+  }
+  return updated;
+}
+
+export function removeRecentSearch(term: string): string[] {
+  const current = getRecentSearches();
+  const updated = current.filter((item) => item.toLowerCase() !== term.toLowerCase());
+  try {
+    localStorage.setItem(KEYS.RECENT_SEARCHES, JSON.stringify(updated));
+  } catch {
+    // ignore
+  }
+  return updated;
+}
+
+export function clearRecentSearches(): void {
+  localStorage.removeItem(KEYS.RECENT_SEARCHES);
+}
+

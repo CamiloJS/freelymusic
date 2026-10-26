@@ -22,6 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
 import { parseLrc, formatTime } from '../utils/lyrics';
+import { compressImage } from '../utils/imageCompressor';
 import { Song, LyricLine } from '../types';
 
 interface AddMusicViewProps {
@@ -183,19 +184,19 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     }
   };
 
-  // Cover upload from computer
-  const handleCoverFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Cover upload from computer with automatic compression
+  const handleCoverFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (dataUrl) {
-        setCoverUrl(dataUrl);
+    try {
+      const compressed = await compressImage(file, 500, 0.8);
+      if (compressed) {
+        setCoverUrl(compressed);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Error comprimiendo carátula:', err);
+    }
   };
 
   // LRC file upload from computer

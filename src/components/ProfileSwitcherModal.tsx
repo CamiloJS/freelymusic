@@ -11,10 +11,12 @@ import {
   Check,
   RotateCcw,
   Sparkles,
-  UploadCloud
+  UploadCloud,
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserProfile } from '../types';
+import { compressImage } from '../utils/imageCompressor';
 import {
   getCustomAppIcon,
   setCustomAppIcon,
@@ -34,7 +36,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   onOpenCreateProfile,
   onNavigateAddMusic,
 }) => {
-  const { currentUser, allUsers, switchUser, updateProfile, isAdmin } = useAuth();
+  const { currentUser, allUsers, switchUser, updateProfile, isAdmin, logout } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'perfiles' | 'mi_perfil' | 'personalizacion'>('perfiles');
 
@@ -94,24 +96,24 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
     }
   };
 
-  // Avatar file upload from PC
-  const handleAvatarFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Avatar file upload from PC with automatic compression for Firestore
+  const handleAvatarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      if (dataUrl && currentUser) {
+    try {
+      const compressedDataUrl = await compressImage(file, 300, 0.8);
+      if (compressedDataUrl && currentUser) {
         updateProfile({
           ...currentUser,
-          avatarUrl: dataUrl,
+          avatarUrl: compressedDataUrl,
         });
-        setProfileSuccessMsg('¡Foto de perfil actualizada exitosamente!');
+        setProfileSuccessMsg('¡Foto de perfil actualizada y sincronizada en la nube!');
         setTimeout(() => setProfileSuccessMsg(''), 3000);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Error procesando imagen de perfil:', err);
+    }
   };
 
   // Save profile info (Name + PIN)
@@ -326,20 +328,31 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                     })}
                   </div>
 
-                  {onOpenCreateProfile && isAdmin && (
-                    <div className="mt-5 pt-4 border-t border-neutral-800">
+                  <div className="mt-5 pt-4 border-t border-neutral-800 space-y-2">
+                    {onOpenCreateProfile && isAdmin && (
                       <button
                         onClick={() => {
                           onClose();
                           onOpenCreateProfile();
                         }}
-                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-emerald-400 font-bold text-xs tracking-wide transition-all"
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-emerald-400 font-bold text-xs tracking-wide transition-all"
                       >
                         <Plus className="w-4 h-4" />
                         Crear Nuevo Perfil (Solo Admin)
                       </button>
-                    </div>
-                  )}
+                    )}
+
+                    <button
+                      onClick={() => {
+                        onClose();
+                        logout();
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/50 border border-red-500/20 text-red-400 font-bold text-xs tracking-wide transition-all"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Cerrar sesión en este dispositivo
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
