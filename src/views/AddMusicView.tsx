@@ -503,8 +503,29 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         trackNumber: idx + 1,
       }));
 
-      await addMultipleTracksToCatalog(tracksToSave);
+      const savedTracks = await addMultipleTracksToCatalog(tracksToSave);
       setSuccessMessage(`¡Álbum "${albumTitle}" con ${tracksToSave.length} pistas guardado exitosamente en el catálogo global!`);
+
+      if (autoEnrich && savedTracks.length > 0) {
+        // Run in the background so a long album does not block the form.
+        void (async () => {
+          for (const track of savedTracks) {
+            try {
+              const result = await enrichSongMetadata(track);
+              if (Object.keys(result.updated).length > 0) {
+                updateCatalogTrack({
+                  ...track,
+                  ...result.updated,
+                  needsReview: undefined,
+                  enrichmentNote: undefined,
+                });
+              }
+            } catch (err) {
+              console.warn(`No se pudieron completar los metadatos de ${track.title}:`, err);
+            }
+          }
+        })();
+      }
 
       // Reset
       setAlbumTitle('');
@@ -1272,6 +1293,24 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                   })}
                 </div>
               </div>
+
+              <label className="flex items-start gap-2.5 rounded-xl border border-neutral-800 bg-neutral-950/60 p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoEnrich}
+                  onChange={(event) => setAutoEnrich(event.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-emerald-500 flex-shrink-0"
+                />
+                <span>
+                  <span className="block text-xs font-bold text-white">
+                    Completar metadatos y letras de las pistas automáticamente
+                  </span>
+                  <span className="block text-[10px] text-neutral-500 mt-0.5">
+                    Se ejecuta en segundo plano después de guardar el álbum. Solo rellena
+                    campos vacíos con MusicBrainz, iTunes y LRCLIB.
+                  </span>
+                </span>
+              </label>
 
               {/* Save Album Button */}
               <div className="pt-2">

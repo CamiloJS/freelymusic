@@ -146,9 +146,10 @@ export const LyricsTranslationControls: React.FC<LyricsTranslationControlsProps>
         </button>
       )}
 
-      {!compact && translationProvider && translationUpdatedAt && (
+      {translationProvider && translationUpdatedAt && (
         <span className="text-[10px] text-neutral-500">
-          {translationProvider} · {new Date(translationUpdatedAt).toLocaleDateString()}
+          {translationProvider}
+          {!compact ? ` · ${new Date(translationUpdatedAt).toLocaleDateString()}` : ''}
         </span>
       )}
 

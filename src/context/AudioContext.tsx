@@ -347,11 +347,27 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ? playbackTrack.instrumentalLyricsLrc
       : playbackTrack?.lyricsLrc;
 
-  // Sync lyrics parsing
+  // Sync lyrics parsing. If the instrumental has an offset but no its own LRC,
+  // shift the original timestamps so they still match the karaoke audio.
   const parsedLyrics = React.useMemo(() => {
     if (!effectiveLyricsLrc) return [];
-    return parseLrc(effectiveLyricsLrc);
-  }, [effectiveLyricsLrc]);
+
+    const lines = parseLrc(effectiveLyricsLrc);
+    if (isKaraoke && !playbackTrack?.instrumentalLyricsLrc) {
+      const offset = Number(playbackTrack?.instrumentalOffset || 0);
+      if (offset !== 0) {
+        return lines
+          .map((line) => ({ ...line, time: Math.max(0, line.time - offset) }))
+          .sort((a, b) => a.time - b.time);
+      }
+    }
+    return lines;
+  }, [
+    effectiveLyricsLrc,
+    isKaraoke,
+    playbackTrack?.instrumentalLyricsLrc,
+    playbackTrack?.instrumentalOffset,
+  ]);
 
   const activeLyricIndex = React.useMemo(() => {
     return getActiveLyricIndex(parsedLyrics, currentTime);

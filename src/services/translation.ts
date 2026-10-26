@@ -30,6 +30,35 @@ export function detectSourceLanguage(text: string): string {
   if (/[\uac00-\ud7af]/u.test(text)) return 'ko';
   if (/[\u0400-\u04ff]/u.test(text)) return 'ru';
   if (/[\u0600-\u06ff]/u.test(text)) return 'ar';
+
+  const lower = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  const countWords = (words: string[]) =>
+    words.reduce(
+      (total, word) =>
+        total + (lower.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length,
+      0
+    );
+
+  const spanishScore = countWords([
+    'el', 'la', 'los', 'las', 'de', 'que', 'y', 'en', 'un', 'una', 'por',
+    'con', 'para', 'no', 'te', 'mi', 'tu', 'como', 'pero', 'mas', 'sin',
+    'cuando', 'me', 'si', 'lo', 'del', 'al', 'corazon', 'amor', 'ya',
+  ]);
+  const portugueseScore = countWords([
+    'voce', 'nao', 'uma', 'com', 'para', 'que', 'meu', 'minha', 'coracao',
+    'amor', 'voce', 'pra', 'sei', 'quando', 'mas', 'sem', 'por',
+  ]);
+  const englishScore = countWords([
+    'the', 'you', 'and', 'to', 'of', 'in', 'it', 'is', 'that', 'my', 'me',
+    'we', 'on', 'for', 'with', 'i', 'a', 'love', 'dont', 'cant', 'never',
+    'just', 'be', 'your', 'all', 'so',
+  ]);
+
+  if (portugueseScore > spanishScore && portugueseScore > englishScore) return 'pt';
+  if (spanishScore > englishScore + 1) return 'es';
   return 'en';
 }
 
