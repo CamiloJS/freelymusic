@@ -19,9 +19,14 @@ function normalize(value: string): string {
     .trim();
 }
 
-function cacheKey(type: 'artist' | 'track', name: string, artist?: string): string {
+function cacheKey(
+  type: 'artist' | 'track',
+  name: string,
+  artist?: string,
+  provider: 'last.fm' | 'deezer' = 'deezer'
+): string {
   const base = type === 'artist' ? name : `${artist || ''}__${name}`;
-  return `${type}__${normalize(base).replace(/\s+/g, '_').slice(0, 180)}`;
+  return `${provider}__${type}__${normalize(base).replace(/\s+/g, '_').slice(0, 180)}`;
 }
 
 function isFresh(fetchedAt?: string): boolean {
@@ -91,7 +96,7 @@ async function fetchLastfmArtist(
   if (!artist?.stats) throw new Error('Last.fm no encontró el artista.');
 
   return {
-    key: cacheKey('artist', name),
+    key: cacheKey('artist', name, undefined, 'last.fm'),
     type: 'artist',
     name: artist.name || name,
     source: 'last.fm',
@@ -128,7 +133,7 @@ async function fetchLastfmTrack(
   if (!track) throw new Error('Last.fm no encontró la canción.');
 
   return {
-    key: cacheKey('track', title, artist),
+    key: cacheKey('track', title, artist, 'last.fm'),
     type: 'track',
     name: track.name || title,
     artist: track.artist?.name || artist,
@@ -192,7 +197,7 @@ async function fetchDeezerArtist(name: string): Promise<GlobalStatsCacheEntry> {
   )[0];
 
   return {
-    key: cacheKey('artist', name),
+    key: cacheKey('artist', name, undefined, 'deezer'),
     type: 'artist',
     name: String(best.name || name),
     source: 'deezer',
@@ -270,7 +275,7 @@ async function fetchDeezerTrack(
 
   const track = best.track;
   return {
-    key: cacheKey('track', title, artist),
+    key: cacheKey('track', title, artist, 'deezer'),
     type: 'track',
     name: String(track.title || title),
     artist: String((track.artist as { name?: string } | undefined)?.name || artist),
@@ -323,7 +328,8 @@ export async function getArtistGlobalStats(
   lastfmApiKey?: string
 ): Promise<GlobalStatsResult | null> {
   if (!name.trim()) return null;
-  const key = cacheKey('artist', name);
+  const provider = lastfmApiKey ? 'last.fm' : 'deezer';
+  const key = cacheKey('artist', name, undefined, provider);
   const cached = await resolveCache(key);
   if (cached) return cached;
 
@@ -358,7 +364,8 @@ export async function getTrackGlobalStats(
   lastfmApiKey?: string
 ): Promise<GlobalStatsResult | null> {
   if (!title.trim() || !artist.trim()) return null;
-  const key = cacheKey('track', title, artist);
+  const provider = lastfmApiKey ? 'last.fm' : 'deezer';
+  const key = cacheKey('track', title, artist, provider);
   const cached = await resolveCache(key);
   if (cached) return cached;
 

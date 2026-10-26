@@ -309,8 +309,7 @@ function hasMissingMetadata(song: Song): boolean {
     !song.lyricsLrc ||
     !song.year ||
     !song.genre ||
-    song.genre.trim().toLowerCase() === 'general' ||
-    !song.isrc
+    song.genre.trim().toLowerCase() === 'general'
   );
 }
 
