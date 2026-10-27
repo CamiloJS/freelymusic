@@ -108,6 +108,22 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
       .slice(0, 4);
   }, [catalog, currentSong?.id]);
 
+  const displayOrigin = React.useMemo(() => {
+    if (!currentSong) return null;
+    if (!playbackSource?.name) {
+      return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
+        ? currentSong.album
+        : null;
+    }
+    // If it says "Artista: ...", remove it as requested (redundant)
+    if (/^artista:/i.test(playbackSource.name.trim())) {
+      return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
+        ? currentSong.album
+        : null;
+    }
+    return playbackSource.name;
+  }, [playbackSource, currentSong?.album, currentSong]);
+
   if (!isRightPanelOpen || !currentSong) return null;
 
   const liked = isFavorite(currentSong.id);
@@ -121,21 +137,6 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
   const lyricSnippet = parsedLyrics.length > 0
     ? parsedLyrics.slice(startLyricIndex, startLyricIndex + 6)
     : [];
-
-  const displayOrigin = React.useMemo(() => {
-    if (!playbackSource?.name) {
-      return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
-        ? currentSong.album
-        : null;
-    }
-    // If it says "Artista: ...", remove it as requested (redundant)
-    if (/^artista:/i.test(playbackSource.name.trim())) {
-      return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
-        ? currentSong.album
-        : null;
-    }
-    return playbackSource.name;
-  }, [playbackSource, currentSong.album]);
 
   const sourceName = displayOrigin || playbackSource?.name || 'Tus me gusta';
 
