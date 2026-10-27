@@ -154,7 +154,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     suppressPlaylistClickRef.current = true;
     window.setTimeout(() => {
       suppressPlaylistClickRef.current = false;
-    }, 1000);
+    }, 300);
     setPlaylistMenu({ playlist, x: event.clientX, y: event.clientY });
   };
 

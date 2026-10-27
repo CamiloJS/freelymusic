@@ -184,7 +184,7 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
     !isAfterLastLyric &&
     !isInstrumentalGap &&
     activeLyricIndex >= 0 &&
-    Boolean(displayLyrics[activeLyricIndex]?.text);
+    Boolean(displayLyrics[activeLyricIndex]?.text?.trim());
 
   const activeLyric = shouldShowSubtitle ? displayLyrics[activeLyricIndex] : null;
 
@@ -286,13 +286,13 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
       </div>
 
       {/* Synchronized Subtitles (Positioned near bottom above controls, never in middle of video) */}
-      {activeLyric && (
-        <div
-          className={`absolute left-0 right-0 z-30 pointer-events-none flex justify-center px-4 transition-all duration-300 ease-out ${
-            showControls ? 'bottom-32 sm:bottom-36' : 'bottom-8 sm:bottom-12'
-          }`}
-        >
-          <div className="max-w-2xl sm:max-w-3xl text-center px-5 py-2.5 rounded-2xl bg-black/80 backdrop-blur-md border border-white/10 shadow-2xl transition-all duration-150">
+      <div
+        className={`absolute left-0 right-0 z-30 pointer-events-none flex justify-center px-4 transition-all duration-300 ease-out ${
+          showControls ? 'bottom-32 sm:bottom-36' : 'bottom-8 sm:bottom-12'
+        } ${activeLyric ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}
+      >
+        {activeLyric && (
+          <div className="max-w-2xl sm:max-w-3xl text-center px-5 py-2.5 rounded-2xl bg-black/80 backdrop-blur-md border border-white/10 shadow-2xl transition-all duration-200">
             <p className="text-white text-base sm:text-xl md:text-2xl font-black drop-shadow tracking-tight leading-snug">
               {activeLyric.text}
             </p>
@@ -302,8 +302,8 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
               </p>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Bottom Controls Bar (Spotify Image 5) */}
       <div

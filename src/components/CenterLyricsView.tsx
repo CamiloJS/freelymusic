@@ -60,8 +60,8 @@ export const CenterLyricsView: React.FC = () => {
       <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-neutral-950 via-neutral-950/80 to-transparent pointer-events-none z-10" />
       <div className="absolute inset-x-0 top-[65px] h-12 bg-gradient-to-b from-neutral-950 via-neutral-950/60 to-transparent pointer-events-none z-20" />
 
-      {/* Top Action Bar (z-30 ensures popover overlays lyrics) */}
-      <div className="relative z-30 flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40 backdrop-blur-md flex-shrink-0">
+      {/* Top Action Bar (z-40 ensures popover overlays lyrics) */}
+      <div className="relative z-40 flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40 backdrop-blur-md flex-shrink-0">
         <div className="flex items-center gap-3 truncate">
           <span className="text-xs font-black uppercase tracking-wider text-neutral-300">
             {sourceName}

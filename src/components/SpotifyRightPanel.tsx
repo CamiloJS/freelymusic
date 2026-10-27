@@ -15,7 +15,7 @@ import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
 import Video from 'lucide-react/dist/esm/icons/video.mjs';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
-import { formatTime } from '../utils/lyrics';
+import { formatTime, buildDisplayLyrics } from '../utils/lyrics';
 import { Song, Album, Playlist } from '../types';
 import { getAlbumsFromCatalog } from '../utils/albums';
 import { ArtistLinks } from './ArtistLinks';
@@ -48,6 +48,8 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
     setIsFullscreenNowPlaying,
     playSong,
     parsedLyrics,
+    translatedLyrics,
+    lyricsDisplayMode,
     isVideoMode,
     videoUrl,
     openVideo,
@@ -120,6 +122,37 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
       .filter((s) => Boolean(s.videoUrl) && s.id !== currentSong?.id)
       .slice(0, 4);
   }, [catalog, currentSong?.id]);
+  const displayLyrics = React.useMemo(
+    () => buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode),
+    [parsedLyrics, translatedLyrics, lyricsDisplayMode]
+  );
+
+  const isBeforeFirstLyric = parsedLyrics.length > 0 && currentTime < parsedLyrics[0].time - 0.2;
+  const isAfterLastLyric =
+    parsedLyrics.length > 0 &&
+    activeLyricIndex === parsedLyrics.length - 1 &&
+    currentTime > parsedLyrics[activeLyricIndex].time + 7;
+  const isInstrumentalGap =
+    parsedLyrics.length > 0 &&
+    activeLyricIndex >= 0 &&
+    activeLyricIndex < parsedLyrics.length - 1 &&
+    parsedLyrics[activeLyricIndex + 1].time - parsedLyrics[activeLyricIndex].time > 8 &&
+    currentTime >
+      parsedLyrics[activeLyricIndex].time +
+        Math.min(
+          7,
+          parsedLyrics[activeLyricIndex + 1].time - parsedLyrics[activeLyricIndex].time - 2
+        );
+
+  const shouldShowInlineSubtitle =
+    !isFullscreenNowPlaying &&
+    !isBeforeFirstLyric &&
+    !isAfterLastLyric &&
+    !isInstrumentalGap &&
+    activeLyricIndex >= 0 &&
+    Boolean(displayLyrics[activeLyricIndex]?.text?.trim());
+
+  const activeInlineLyric = shouldShowInlineSubtitle ? displayLyrics[activeLyricIndex] : null;
 
   const displayOrigin = React.useMemo(() => {
     if (!currentSong) return null;
@@ -308,48 +341,62 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
             >
               {isVideoMode && videoUrl ? (
                 <div className="relative w-full h-full bg-black flex items-center justify-center">
-                  <video
-                    ref={videoRef}
-                    src={videoUrl}
-                    poster={currentSong.coverUrl}
-                    autoPlay={isPlaying && !isFullscreenNowPlaying}
-                    playsInline
-                    onTimeUpdate={handleInlineVideoTimeUpdate}
-                    onEnded={() => closeVideo(videoRef.current?.currentTime)}
-                    onClick={togglePlayPause}
-                    className="w-full h-full object-contain cursor-pointer"
-                  />
+                  {!isFullscreenNowPlaying ? (
+                    <video
+                      ref={videoRef}
+                      src={videoUrl}
+                      poster={currentSong.coverUrl}
+                      autoPlay={isPlaying}
+                      playsInline
+                      onTimeUpdate={handleInlineVideoTimeUpdate}
+                      onEnded={() => closeVideo(videoRef.current?.currentTime)}
+                      onClick={togglePlayPause}
+                      className="w-full h-full object-contain cursor-pointer"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-black">
+                      {currentSong.coverUrl && (
+                        <img
+                          src={currentSong.coverUrl}
+                          alt={currentSong.title}
+                          className="w-full h-full object-contain opacity-50"
+                        />
+                      )}
+                    </div>
+                  )}
                   {/* Floating overlay on hover with play/pause and fullscreen button */}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between p-3 pointer-events-none">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePlayPause();
-                      }}
-                      className="p-2 rounded-full bg-black/70 hover:bg-black text-white pointer-events-auto transition-transform active:scale-95 shadow-md"
-                      title={isPlaying ? 'Pausar' : 'Reproducir'}
-                    >
-                      {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsFullscreenNowPlaying(true);
-                      }}
-                      className="px-3 py-1.5 rounded-full bg-black/70 hover:bg-black text-white text-xs font-bold backdrop-blur-md flex items-center gap-1.5 shadow-lg pointer-events-auto transition-transform active:scale-95"
-                      title="Pantalla Completa"
-                    >
-                      <Maximize2 className="w-3.5 h-3.5" />
-                      <span>Pantalla Completa</span>
-                    </button>
-                  </div>
+                  {!isFullscreenNowPlaying && (
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between p-3 pointer-events-none">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePlayPause();
+                        }}
+                        className="p-2 rounded-full bg-black/70 hover:bg-black text-white pointer-events-auto transition-transform active:scale-95 shadow-md"
+                        title={isPlaying ? 'Pausar' : 'Reproducir'}
+                      >
+                        {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsFullscreenNowPlaying(true);
+                        }}
+                        className="px-3 py-1.5 rounded-full bg-black/70 hover:bg-black text-white text-xs font-bold backdrop-blur-md flex items-center gap-1.5 shadow-lg pointer-events-auto transition-transform active:scale-95"
+                        title="Pantalla Completa"
+                      >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                        <span>Pantalla Completa</span>
+                      </button>
+                    </div>
+                  )}
                   {/* Subtle video subtitle overlay at bottom of right panel video */}
-                  {currentSong && parsedLyrics.length > 0 && activeLyricIndex >= 0 && parsedLyrics[activeLyricIndex]?.text && (
-                    <div className="absolute bottom-2 left-2 right-2 z-10 pointer-events-none text-center">
-                      <span className="inline-block px-2.5 py-1 rounded-lg bg-black/80 backdrop-blur-sm text-white text-[11px] font-bold border border-white/10 shadow truncate max-w-full">
-                        {parsedLyrics[activeLyricIndex].text}
+                  {!isFullscreenNowPlaying && activeInlineLyric && (
+                    <div className="absolute bottom-2 left-2 right-2 z-10 pointer-events-none text-center animate-in fade-in duration-150">
+                      <span className="inline-block px-2.5 py-1 rounded-lg bg-black/85 backdrop-blur-sm text-white text-[11px] font-bold border border-white/10 shadow truncate max-w-full">
+                        {activeInlineLyric.text}
                       </span>
                     </div>
                   )}

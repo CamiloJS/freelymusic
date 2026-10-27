@@ -131,7 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     suppressPlaylistClickRef.current = true;
     window.setTimeout(() => {
       suppressPlaylistClickRef.current = false;
-    }, 1000);
+    }, 300);
     setPlaylistMenu({ playlist, x: event.clientX, y: event.clientY });
   };
 
@@ -188,7 +188,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   );
 
   const startPlayingFromFavorites = () => {
-    if (userFavoriteSongs.length === 0) return;
     setIsCenterLyricsOpen(false);
     onSelectPlaylist('favorites');
   };

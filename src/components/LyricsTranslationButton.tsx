@@ -86,7 +86,7 @@ export const LyricsTranslationButton: React.FC<LyricsTranslationButtonProps> = (
   };
 
   return (
-    <div ref={containerRef} className={`relative inline-block ${isOpen ? 'z-50' : 'z-20'} ${className}`}>
+    <div ref={containerRef} className={`relative inline-block ${isOpen ? 'z-[70]' : 'z-20'} ${className}`}>
       {/* Subtle Google Translate style button (A - 文 icon) */}
       <div className="flex items-center gap-1">
         <button

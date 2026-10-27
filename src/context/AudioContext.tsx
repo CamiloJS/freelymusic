@@ -162,6 +162,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [activeVersionId, setActiveVersionIdState] = useState<string | null>(null);
   const [isKaraoke, setIsKaraoke] = useState<boolean>(false);
   const [isVideoMode, setIsVideoMode] = useState<boolean>(false);
+  const isVideoModeRef = useRef<boolean>(false);
+  useEffect(() => {
+    isVideoModeRef.current = isVideoMode;
+  }, [isVideoMode]);
 
   // Lyrics translation
   const [translatedLyrics, setTranslatedLyrics] = useState<LyricLine[]>([]);
@@ -202,12 +206,22 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
 
-    const onPlay = () => setIsPlaying(true);
+    const onPlay = () => {
+      if (!isVideoModeRef.current) {
+        setIsPlaying(true);
+      }
+    };
     const onPlaying = () => {
-      setIsPlaying(true);
+      if (!isVideoModeRef.current) {
+        setIsPlaying(true);
+      }
       setIsBuffering(false);
     };
-    const onPause = () => setIsPlaying(false);
+    const onPause = () => {
+      if (!isVideoModeRef.current) {
+        setIsPlaying(false);
+      }
+    };
     const onWaiting = () => setIsBuffering(true);
     const onStalled = () => setIsBuffering(true);
     const onCanPlay = () => {
@@ -579,12 +593,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     recordListeningTime,
   ]);
 
-  // Ensure the primary audio element is paused whenever in video mode so audio never duplicates
+  // Ensure the primary audio element is paused and muted whenever in video mode so audio never duplicates
   useEffect(() => {
-    if (isVideoMode && audioRef.current && !audioRef.current.paused) {
-      audioRef.current.pause();
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isVideoMode) {
+      audio.muted = true;
+      if (!audio.paused) {
+        audio.pause();
+      }
+    } else {
+      audio.muted = isMuted;
     }
-  }, [isVideoMode]);
+  }, [isVideoMode, isMuted]);
 
   // Load and play song (handling offline blob caching, versions and karaoke)
   const loadAndPlaySong = useCallback(
@@ -676,7 +697,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           audio.currentTime = 0;
         }
 
-        await audio.play();
+        if (isVideoModeRef.current) {
+          if (!song.videoUrl) {
+            setIsVideoMode(false);
+            audio.muted = isMuted;
+            await audio.play();
+          } else {
+            audio.muted = true;
+            audio.pause();
+          }
+        } else {
+          audio.muted = isMuted;
+          await audio.play();
+        }
       } catch (err) {
         if (requestId !== playRequestRef.current) return;
 
@@ -688,7 +721,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               blobUrlRef.current = null;
             }
             audio.src = baseUrl;
-            await audio.play();
+            if (isVideoModeRef.current && song.videoUrl) {
+              audio.muted = true;
+              audio.pause();
+            } else {
+              audio.muted = isMuted;
+              await audio.play();
+            }
             return;
           } catch {
             // fall through to the visible error below
@@ -789,7 +828,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const openVideo = useCallback(() => {
     if (!videoUrl) return;
-    audioRef.current?.pause();
+    if (audioRef.current) {
+      audioRef.current.muted = true;
+      audioRef.current.pause();
+    }
     setIsPlaying(true);
     setIsVideoMode(true);
     setIsRightPanelOpen(true);
@@ -800,6 +842,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsVideoMode(false);
     const audio = audioRef.current;
     if (!audio) return;
+
+    audio.muted = isMuted;
 
     if (typeof seconds === 'number' && Number.isFinite(seconds)) {
       const maxTime = Number.isFinite(audio.duration) && audio.duration > 0
@@ -813,7 +857,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     audio.play().catch((err) => {
       console.warn('No se pudo reanudar el audio al cerrar el video:', err);
     });
-  }, []);
+  }, [isMuted]);
 
   const syncMediaTime = useCallback((seconds: number) => {
     if (!Number.isFinite(seconds)) return;

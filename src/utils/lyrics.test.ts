@@ -84,5 +84,14 @@ describe('lyrics utils', () => {
     // Edge cases
     expect(buildDisplayLyrics([], translated, 'both')).toEqual([]);
     expect(buildDisplayLyrics(original, [], 'translation')).toEqual(original);
+
+    // Whitespace only lines
+    const withWhitespace = [
+      { time: 5, text: '   ' },
+      { time: 10, text: 'Real lyric' },
+    ];
+    const res = buildDisplayLyrics(withWhitespace, [], 'original');
+    expect(res[0].text.trim()).toBe('');
+    expect(res[1].text.trim()).toBe('Real lyric');
   });
 });

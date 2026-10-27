@@ -327,6 +327,7 @@ const MainLayout: React.FC = () => {
     setSelectedPlaylist(playlist);
     setCurrentTab('library');
     setIsCenterLyricsOpen(false);
+    setIsFullscreenNowPlaying(false);
 
     if (playlist === 'favorites') {
       if (window.location.hash !== '#/favorites') {
@@ -343,7 +344,7 @@ const MainLayout: React.FC = () => {
         window.location.hash = plHash;
       }
     }
-  }, [setIsCenterLyricsOpen]);
+  }, [setIsCenterLyricsOpen, setIsFullscreenNowPlaying]);
 
   const handleSetSelectedPlaylist = useCallback(
     (playlist: Playlist | 'favorites' | Album | null) => {
@@ -366,6 +367,7 @@ const MainLayout: React.FC = () => {
     setSelectedArtist(artistName);
     setCurrentTab('artist');
     setIsCenterLyricsOpen(false);
+    setIsFullscreenNowPlaying(false);
     window.location.hash = `#/artist/${encodeURIComponent(artistName)}`;
   };
 
