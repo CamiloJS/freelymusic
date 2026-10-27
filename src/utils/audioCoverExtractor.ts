@@ -13,6 +13,7 @@ export interface ExtractedAudioMetadata {
   title?: string;
   artist?: string;
   album?: string;
+  trackNumber?: number;
   year?: string;
   genre?: string;
   lyrics?: string;
@@ -258,6 +259,12 @@ export function parseId3(buffer: ArrayBuffer): Partial<ExtractedAudioMetadata> |
         result.artist = cleanArtistSeparators(decodeText(textBytes, encoding));
       } else if (frameId === 'TALB' || frameId === 'TAL') {
         result.album = decodeText(textBytes, encoding);
+      } else if (frameId === 'TRCK' || frameId === 'TRK') {
+        const trkText = decodeText(textBytes, encoding);
+        const trkMatch = trkText.match(/^(\d+)/);
+        if (trkMatch) {
+          result.trackNumber = parseInt(trkMatch[1], 10);
+        }
       } else if (frameId === 'TYER' || frameId === 'TDRC' || frameId === 'TYE') {
         const yr = decodeText(textBytes, encoding);
         const ym = yr.match(/\b(19\d{2}|20\d{2})\b/);
@@ -361,6 +368,9 @@ export function parseFlac(buffer: ArrayBuffer): Partial<ExtractedAudioMetadata> 
                 result.artist = cleanArtistSeparators(val);
               } else if (field === 'ALBUM' && !result.album) {
                 result.album = val;
+              } else if ((field === 'TRACKNUMBER' || field === 'TRACK') && !result.trackNumber) {
+                const tm = val.match(/^(\d+)/);
+                if (tm) result.trackNumber = parseInt(tm[1], 10);
               } else if ((field === 'DATE' || field === 'YEAR') && !result.year) {
                 const ym = val.match(/\b(19\d{2}|20\d{2})\b/);
                 result.year = ym ? ym[1] : val.slice(0, 4);

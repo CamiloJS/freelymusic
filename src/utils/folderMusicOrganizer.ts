@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 import { Song } from '../types';
 import { cleanArtistSeparators, splitArtistNames, parseAudioUrlMetadata } from './urlMetadataParser';
 import { extractMetadataFromAudioSource, autoDetectOnlineMetadata } from './audioCoverExtractor';
-import { searchLyrics } from '../services/metadataEnrichment';
+import { searchLyrics, searchCover } from '../services/metadataEnrichment';
 import { detectAudioDuration } from './audioDuration';
 
 export interface RawFolderItem {
@@ -19,6 +19,7 @@ export interface CandidateTrack {
   title: string;
   artist: string;
   album: string;
+  trackNumber?: number;
   year: string;
   genre: string;
   duration: number;
@@ -116,12 +117,22 @@ export function isTrackDuplicateInCatalog(
  */
 export function extractAlbumFromPath(relativePath: string): string {
   if (!relativePath) return '';
-  const parts = relativePath.split(/[/\\]+/).filter(Boolean);
+  let clean = relativePath;
+  try {
+    if (clean.includes('://')) {
+      clean = new URL(clean).pathname;
+    }
+  } catch {}
+  clean = decodeURIComponent(clean);
+  const parts = clean.split(/[/\\]+/).filter(Boolean);
   // If at least 2 parts (Folder/Song.mp3 or Root/Album/Song.mp3)
   if (parts.length >= 2) {
     // The directory containing the file is the second to last part
     const parentFolder = parts[parts.length - 2];
-    // Ignore generic root folder names like "Raras", "Music", "Descargas" if deeper folder exists
+    // Ignore random user IDs like "auDUHr1kjXjsgmOB"
+    if (/^[a-zA-Z0-9]{15,25}$/.test(parentFolder)) {
+      return '';
+    }
     return parentFolder.trim();
   }
   return '';
@@ -158,6 +169,18 @@ export async function unpackZipFile(zipBlobOrFile: Blob | File): Promise<RawFold
   return items;
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: any;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Analyzes and organizes an array of folder/zip files into Albums and Singles,
  * ensuring metadata detection, shared album covers, and duplicate prevention.
@@ -165,7 +188,8 @@ export async function unpackZipFile(zipBlobOrFile: Blob | File): Promise<RawFold
 export async function organizeFolderMusic(
   rawItems: RawFolderItem[],
   existingCatalog: Song[],
-  onProgress?: (processed: number, total: number, currentName: string) => void
+  onProgress?: (processed: number, total: number, currentName: string) => void,
+  options?: { searchOnline?: boolean }
 ): Promise<FolderAnalysisResult> {
   const audioItems = rawItems.filter((item) => AUDIO_EXT_REGEX.test(item.name || item.relativePath));
   const imageItems = rawItems.filter((item) => IMAGE_EXT_REGEX.test(item.name || item.relativePath));
@@ -210,6 +234,7 @@ export async function organizeFolderMusic(
     let title = parsedUrl.title || item.name.replace(AUDIO_EXT_REGEX, '').trim();
     let artist = parsedUrl.artists.join(', ');
     let album = folderAlbumName;
+    let trackNumber = parsedUrl.trackNumber;
     let year = parsedUrl.year || '2026';
     let genre = '';
     let isExplicit = Boolean(parsedUrl.isExplicit);
@@ -230,6 +255,9 @@ export async function organizeFolderMusic(
           if (extracted.album && extracted.album.trim()) {
             album = extracted.album.trim();
           }
+          if (extracted.trackNumber) {
+            trackNumber = extracted.trackNumber;
+          }
           if (extracted.year) year = extracted.year;
           if (extracted.genre) genre = extracted.genre;
           if (extracted.isExplicit !== undefined) isExplicit = Boolean(extracted.isExplicit);
@@ -241,7 +269,21 @@ export async function organizeFolderMusic(
       // non-blocking
     }
 
-    // 2. Check for companion folder cover image if embedded was missing
+    // 2. Fetch lyrics if not embedded and online search enabled
+    if (!lyricsLrc && title && artist && options?.searchOnline) {
+      try {
+        const fetchedLyrics = await withTimeout(
+          searchLyrics(title, artist, album || undefined, duration || undefined),
+          2000,
+          null
+        );
+        if (fetchedLyrics) lyricsLrc = fetchedLyrics;
+      } catch {
+        // non-blocking
+      }
+    }
+
+    // 3. Check for companion folder cover image if embedded was missing
     if (!coverUrl) {
       const parts = item.relativePath.split(/[/\\]+/).filter(Boolean);
       const dirKey = parts.length > 1 ? parts.slice(0, parts.length - 1).join('/') : '';
@@ -250,7 +292,21 @@ export async function organizeFolderMusic(
       }
     }
 
-    // 3. Fallback duration detection
+    // 4. Fallback online cover detection if still missing and online search enabled
+    if (!coverUrl && title && artist && options?.searchOnline) {
+      try {
+        const fetchedCover = await withTimeout(
+          searchCover(title, artist, album || undefined),
+          2000,
+          null
+        );
+        if (fetchedCover) coverUrl = fetchedCover;
+      } catch {
+        // non-blocking
+      }
+    }
+
+    // 5. Fallback duration detection
     try {
       if (item.url) {
         const d = await detectAudioDuration(item.url);
@@ -267,7 +323,7 @@ export async function organizeFolderMusic(
       title = title.replace(/[\(\[]\s*(?:explicit|dirty|uncensored|explicito|explícito|e)\s*[\)\]]/gi, '').trim();
     }
 
-    // 4. Duplicate check against existing catalog
+    // 6. Duplicate check against existing catalog
     const isDuplicate = isTrackDuplicateInCatalog({ title, artist, audioUrl: item.url }, existingCatalog);
 
     processedTracks.push({
@@ -275,6 +331,7 @@ export async function organizeFolderMusic(
       title,
       artist: artist || 'Artista Desconocido',
       album: album || '',
+      trackNumber,
       year: year || '2026',
       genre: genre || 'Pop',
       duration: duration || 180,
@@ -315,6 +372,25 @@ export async function organizeFolderMusic(
   for (const [albumKey, tracks] of albumGroupsMap.entries()) {
     // If 2 or more tracks share the same album -> Treat as Album!
     if (tracks.length >= 2) {
+      // Sort tracks in album:
+      // 1) By trackNumber if present
+      // 2) By natural alphanumeric order of relativePath / title
+      tracks.sort((a, b) => {
+        if (a.trackNumber !== undefined && b.trackNumber !== undefined && a.trackNumber !== b.trackNumber) {
+          return a.trackNumber - b.trackNumber;
+        }
+        if (a.trackNumber !== undefined && b.trackNumber === undefined) return -1;
+        if (a.trackNumber === undefined && b.trackNumber !== undefined) return 1;
+        return (a.relativePath || a.title).localeCompare(b.relativePath || b.title, undefined, { numeric: true });
+      });
+
+      // Ensure every track in the album has an explicit sequential trackNumber
+      tracks.forEach((track, idx) => {
+        if (!track.trackNumber || track.trackNumber <= 0) {
+          track.trackNumber = idx + 1;
+        }
+      });
+
       // Find the first track with a cover art
       const firstWithCover = tracks.find((t) => Boolean(t.coverUrl));
       const sharedCover = firstWithCover?.coverUrl || DEFAULT_FALLBACK_COVER;
@@ -374,7 +450,8 @@ export async function organizeFolderMusic(
 export async function fetchAndOrganizeRemoteFolder(
   targetUrl: string,
   existingCatalog: Song[],
-  onProgress?: (processed: number, total: number, currentName: string) => void
+  onProgress?: (processed: number, total: number, currentName: string) => void,
+  options?: { searchOnline?: boolean }
 ): Promise<FolderAnalysisResult> {
   const trimmed = targetUrl.trim();
   if (!trimmed) {
@@ -392,15 +469,20 @@ export async function fetchAndOrganizeRemoteFolder(
   if (uniqueDirectUrls.length > 1 || (uniqueDirectUrls.length === 1 && hasMultipleLinesOrSpaces) || (uniqueDirectUrls.length === 1 && !trimmed.toLowerCase().endsWith('.zip'))) {
     const rawItems: RawFolderItem[] = uniqueDirectUrls.map((url) => {
       const parsed = parseAudioUrlMetadata(url);
-      const filename = url.split('/').pop()?.split('?')[0] || 'song.mp3';
-      const cleanName = decodeURIComponent(filename);
+      let urlPath = url;
+      try {
+        if (url.includes('://')) {
+          urlPath = decodeURIComponent(new URL(url).pathname);
+        }
+      } catch {}
+      const filename = urlPath.split('/').pop() || 'song.mp3';
       return {
-        name: parsed.title ? `${parsed.title}.mp3` : cleanName,
-        relativePath: cleanName,
+        name: parsed.title ? `${parsed.title}.mp3` : filename,
+        relativePath: urlPath,
         url,
       };
     });
-    return organizeFolderMusic(rawItems, existingCatalog, onProgress);
+    return organizeFolderMusic(rawItems, existingCatalog, onProgress, options);
   }
 
   // 2. Single remote URL: check if it's a ZIP or remote directory/webpage
@@ -432,7 +514,7 @@ export async function fetchAndOrganizeRemoteFolder(
 
     const zipBlob = new Blob([arrayBuf], { type: 'application/zip' });
     const items = await unpackZipFile(zipBlob);
-    return organizeFolderMusic(items, existingCatalog, onProgress);
+    return organizeFolderMusic(items, existingCatalog, onProgress, options);
   }
 
   // If not zip, check if it contains audio links in HTML or plain text response
@@ -445,15 +527,20 @@ export async function fetchAndOrganizeRemoteFolder(
   if (uniqueUrls.length > 0) {
     const rawItems: RawFolderItem[] = uniqueUrls.map((url) => {
       const parsed = parseAudioUrlMetadata(url);
-      const filename = url.split('/').pop()?.split('?')[0] || 'song.mp3';
-      const cleanName = decodeURIComponent(filename);
+      let urlPath = url;
+      try {
+        if (url.includes('://')) {
+          urlPath = decodeURIComponent(new URL(url).pathname);
+        }
+      } catch {}
+      const filename = urlPath.split('/').pop() || 'song.mp3';
       return {
-        name: parsed.title ? `${parsed.title}.mp3` : cleanName,
-        relativePath: cleanName,
+        name: parsed.title ? `${parsed.title}.mp3` : filename,
+        relativePath: urlPath,
         url,
       };
     });
-    return organizeFolderMusic(rawItems, existingCatalog, onProgress);
+    return organizeFolderMusic(rawItems, existingCatalog, onProgress, options);
   }
 
   throw new Error(

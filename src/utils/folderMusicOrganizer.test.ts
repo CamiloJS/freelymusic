@@ -141,14 +141,56 @@ describe('folderMusicOrganizer', () => {
   it('correctly parses batch list of audio URLs without downloading entire files', async () => {
     const { fetchAndOrganizeRemoteFolder } = await import('./folderMusicOrganizer');
     const input = `
-      https://file.garden/auDUHr1kjXjsgmOB/Raras/Dua%20Lipa%20-%20Levitating.mp3
-      https://file.garden/auDUHr1kjXjsgmOB/Raras/The%20Weeknd%20-%20Blinding%20Lights.mp3
+      https://file.garden/auDUHr1kjXjsgmOB/Dua%20Lipa%20-%20Levitating.mp3
+      https://file.garden/auDUHr1kjXjsgmOB/The%20Weeknd%20-%20Blinding%20Lights.mp3
     `;
 
     const result = await fetchAndOrganizeRemoteFolder(input, []);
     expect(result.totalTracks).toBe(2);
     expect(result.singles.length).toBe(2);
-    expect(result.singles[0].audioUrl).toBe('https://file.garden/auDUHr1kjXjsgmOB/Raras/Dua%20Lipa%20-%20Levitating.mp3');
-    expect(result.singles[1].audioUrl).toBe('https://file.garden/auDUHr1kjXjsgmOB/Raras/The%20Weeknd%20-%20Blinding%20Lights.mp3');
+    expect(result.singles[0].audioUrl).toBe('https://file.garden/auDUHr1kjXjsgmOB/Dua%20Lipa%20-%20Levitating.mp3');
+    expect(result.singles[1].audioUrl).toBe('https://file.garden/auDUHr1kjXjsgmOB/The%20Weeknd%20-%20Blinding%20Lights.mp3');
+  });
+
+  it('correctly organizes multi-album links, assigns track numbers and separates singles', async () => {
+    const { fetchAndOrganizeRemoteFolder } = await import('./folderMusicOrganizer');
+    const input = `
+      # Album 1: Oasis
+      https://file.garden/auDUHr1kjXjsgmOB/Oasis/02%20-%20La%20Cancion.mp3
+      https://file.garden/auDUHr1kjXjsgmOB/Oasis/01%20-%20Mojita.mp3
+
+      # Album 2: After Hours
+      https://file.garden/auDUHr1kjXjsgmOB/After%20Hours/01%20-%20Alone%20Again.mp3
+      https://file.garden/auDUHr1kjXjsgmOB/After%20Hours/02%20-%20Too%20Late.mp3
+      https://file.garden/auDUHr1kjXjsgmOB/After%20Hours/03%20-%20Hardest%20To%20Love.mp3
+
+      # Single
+      https://file.garden/auDUHr1kjXjsgmOB/Sencillo%20Suelto.mp3
+    `;
+
+    const result = await fetchAndOrganizeRemoteFolder(input, []);
+    expect(result.totalTracks).toBe(6);
+    expect(result.albums.length).toBe(2);
+    expect(result.singles.length).toBe(1);
+
+    // Oasis album checks: tracks sorted 1, 2
+    const oasis = result.albums.find((a) => a.title.toLowerCase().includes('oasis'));
+    expect(oasis).toBeDefined();
+    expect(oasis!.tracks.length).toBe(2);
+    expect(oasis!.tracks[0].trackNumber).toBe(1);
+    expect(oasis!.tracks[0].title).toContain('Mojita');
+    expect(oasis!.tracks[1].trackNumber).toBe(2);
+    expect(oasis!.tracks[1].title).toContain('La Cancion');
+
+    // After Hours checks: tracks sorted 1, 2, 3
+    const afterHours = result.albums.find((a) => a.title.toLowerCase().includes('after hours'));
+    expect(afterHours).toBeDefined();
+    expect(afterHours!.tracks.length).toBe(3);
+    expect(afterHours!.tracks[0].trackNumber).toBe(1);
+    expect(afterHours!.tracks[1].trackNumber).toBe(2);
+    expect(afterHours!.tracks[2].trackNumber).toBe(3);
+
+    // Single checks
+    expect(result.singles[0].title).toBe('Sencillo Suelto');
   });
 });

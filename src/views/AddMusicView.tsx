@@ -26,6 +26,8 @@ import Archive from 'lucide-react/dist/esm/icons/archive.mjs';
 import CheckSquare from 'lucide-react/dist/esm/icons/check-square.mjs';
 import Square from 'lucide-react/dist/esm/icons/square.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
+import Link2 from 'lucide-react/dist/esm/icons/link-2.mjs';
+import ClipboardPaste from 'lucide-react/dist/esm/icons/clipboard-paste.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -95,8 +97,8 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   } = useMusic();
   const { playSong, currentSong, isPlaying } = useAudio();
 
-  // Mode: Single vs Album vs Folder
-  const [uploadMode, setUploadMode] = useState<'single' | 'album' | 'folder'>('single');
+  // Mode: Links (Batch) vs Single vs Album vs Folder
+  const [uploadMode, setUploadMode] = useState<'links' | 'single' | 'album' | 'folder'>('links');
 
   // Folder / Batch Upload State
   const [folderUrlInput, setFolderUrlInput] = useState('');
@@ -115,6 +117,39 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
   const zipInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Real-time link counter for batch links
+  const detectedLinkCount = useMemo(() => {
+    if (!folderUrlInput) return 0;
+    const matches = folderUrlInput.match(/https?:\/\/[^\s"'<>]+\.(?:mp3|flac|m4a|wav|aac|ogg|opus)(?:\?[^\s"'<>]*)?/gi);
+    return matches ? matches.length : 0;
+  }, [folderUrlInput]);
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        setFolderUrlInput((prev) => (prev ? `${prev.trim()}\n${text.trim()}` : text.trim()));
+      }
+    } catch {
+      // clipboard access fallback
+    }
+  };
+
+  const handleLoadLinksExample = () => {
+    const example = `# Álbum 1: Marina POP D
+https://file.garden/auDUHr1kjXjsgmOB/Marina%20POP%20D/01%20-%20BUTTERFLY.mp3
+https://file.garden/auDUHr1kjXjsgmOB/Marina%20POP%20D/02%20-%20PRINCESS%20OF%20POWER.mp3
+https://file.garden/auDUHr1kjXjsgmOB/Marina%20POP%20D/03%20-%20FINAL%20BOSS.mp3
+
+# Álbum 2: Oasis
+https://file.garden/auDUHr1kjXjsgmOB/Oasis/01%20-%20Mojita.mp3
+https://file.garden/auDUHr1kjXjsgmOB/Oasis/02%20-%20La%20Cancion.mp3
+
+# Canción Individual (Sencillo)
+https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
+    setFolderUrlInput(example);
+  };
 
   // Single Song Form State
   const [audioUrl, setAudioUrl] = useState('');
@@ -1268,6 +1303,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
           title: track.title,
           artist: track.artist,
           album: track.album || '',
+          trackNumber: track.trackNumber,
           year: track.year || '2026',
           genre: track.genre || 'Pop',
           duration: track.duration || 180,
@@ -1378,8 +1414,34 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* Mode Switcher: Canción Individual vs Álbum Completo vs Carpeta / ZIP */}
+      {/* Mode Switcher: Varios Links vs Carpeta Local vs Canción Individual vs Álbum Completo */}
       <div className="flex flex-wrap items-center gap-2 p-1.5 bg-neutral-900/90 border border-neutral-800 rounded-2xl w-fit shadow-lg">
+        <button
+          type="button"
+          onClick={() => setUploadMode('links')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all ${
+            uploadMode === 'links'
+              ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/25'
+              : 'text-neutral-400 hover:text-white'
+          }`}
+        >
+          <Link2 className="w-4 h-4" />
+          <span>🔗 Varios Links (Auto-clasificar)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setUploadMode('folder')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all ${
+            uploadMode === 'folder'
+              ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/25'
+              : 'text-neutral-400 hover:text-white'
+          }`}
+        >
+          <FolderArchive className="w-4 h-4" />
+          <span>📁 Carpeta / ZIP Local</span>
+        </button>
+
         <button
           type="button"
           onClick={() => setUploadMode('single')}
@@ -1403,27 +1465,14 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
           }`}
         >
           <Disc className="w-4 h-4" />
-          <span>Álbum Completo (Múltiples Pistas)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setUploadMode('folder')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all ${
-            uploadMode === 'folder'
-              ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/25'
-              : 'text-neutral-400 hover:text-white'
-          }`}
-        >
-          <FolderArchive className="w-4 h-4" />
-          <span>📁 Carpeta / ZIP (Auto-clasificar)</span>
+          <span>Álbum Manual</span>
         </button>
       </div>
 
-      {uploadMode === 'folder' ? (
-        /* Folder Upload Workspace */
+      {uploadMode === 'links' || uploadMode === 'folder' ? (
+        /* Batch Links & Folder Workspace */
         <div className="space-y-8 animate-in fade-in">
-          {/* Hidden File Inputs */}
+          {/* Hidden File Inputs for Folder mode */}
           <input
             type="file"
             ref={(el) => {
@@ -1445,107 +1494,162 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
             className="hidden"
           />
 
-          {/* Ingestion & Dropzone Area */}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDraggingOver(true);
-            }}
-            onDragLeave={() => setIsDraggingOver(false)}
-            onDrop={handleDrop}
-            className={`p-6 md:p-10 rounded-3xl border-2 transition-all space-y-6 ${
-              isDraggingOver
-                ? 'border-emerald-400 bg-emerald-500/10 shadow-2xl scale-[1.005]'
-                : 'border-dashed border-neutral-800 bg-neutral-900/40 hover:border-neutral-700'
-            }`}
-          >
-            <div className="text-center max-w-2xl mx-auto space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Clasificación Inteligente de Álbumes y Sencillos</span>
+          {uploadMode === 'links' ? (
+            /* Dedicated Batch Links Workspace */
+            <div className="p-6 md:p-10 rounded-3xl border border-neutral-800 bg-neutral-900/40 shadow-xl space-y-6">
+              <div className="max-w-3xl mx-auto space-y-3 text-center">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Auto-organización en Masa • 0 MB en Servidor • 100% Streaming</span>
+                </div>
+                <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
+                  Subir Varios Links (Álbumes y Canciones)
+                </h2>
+                <p className="text-xs md:text-sm text-neutral-400 leading-relaxed">
+                  Pega una lista con enlaces directos de tus canciones (File Garden, pCloud Direct, servidores de audio, etc.). Puedes incluir canciones de <strong className="text-emerald-400">múltiples álbumes</strong> y <strong className="text-cyan-400">canciones individuales juntos</strong>. Sonora las agrupará por álbum con su número de pista (#1, #2, #3...), asignará la portada compartida a todo el álbum, sincronizará letras LRC, clasificará los sencillos y <strong className="text-neutral-200">omitirá las canciones repetidas</strong> que ya existan en tu biblioteca.
+                </p>
               </div>
-              <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
-                Sube una Carpeta o Archivo .ZIP
-              </h2>
-              <p className="text-xs md:text-sm text-neutral-400 leading-relaxed">
-                Detecta automáticamente todas las canciones de tu carpeta. Si pertenecen a un álbum, las agrupa con la carátula de su primera pista para todas las demás; si son canciones sueltas, las deja como sencillos individuales. Extrae letras, etiquetas, explícito y <strong className="text-emerald-400">omite duplicados que ya existan en tu biblioteca</strong>.
-              </p>
-            </div>
 
-            {/* Ingestion Action Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-              <button
-                type="button"
-                onClick={() => folderInputRef.current?.click()}
-                className="p-5 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-emerald-500/60 hover:bg-neutral-900 group transition-all text-left flex items-start gap-4 shadow-xl active:scale-[0.99]"
-              >
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                  <Folder className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">
-                    Seleccionar Carpeta
-                  </h4>
-                  <p className="text-[11px] text-neutral-400 mt-1 leading-normal">
-                    Elige una carpeta desde tu equipo o móvil con todas sus canciones y subcarpetas.
-                  </p>
-                </div>
-              </button>
+              <div className="max-w-3xl mx-auto space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-bold text-neutral-200">
+                      Lista de Enlaces (.mp3, .flac, .m4a, .wav):
+                    </label>
+                    {detectedLinkCount > 0 && (
+                      <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        🎧 {detectedLinkCount} enlace{detectedLinkCount !== 1 ? 's' : ''} detectado{detectedLinkCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
 
-              <button
-                type="button"
-                onClick={() => zipInputRef.current?.click()}
-                className="p-5 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-cyan-500/60 hover:bg-neutral-900 group transition-all text-left flex items-start gap-4 shadow-xl active:scale-[0.99]"
-              >
-                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                  <Archive className="w-6 h-6" />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePasteFromClipboard}
+                      className="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-[11px] font-bold transition-colors flex items-center gap-1.5 shadow"
+                    >
+                      <ClipboardPaste className="w-3 h-3 text-emerald-400" />
+                      <span>Pegar portapapeles</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleLoadLinksExample}
+                      className="px-2.5 py-1 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 text-[11px] font-bold transition-colors"
+                    >
+                      🧪 Cargar ejemplo
+                    </button>
+                    {folderUrlInput && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFolderUrlInput('');
+                          setAnalysisResult(null);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-neutral-800/80 hover:bg-rose-950/60 text-neutral-400 hover:text-rose-400 text-[11px] font-bold transition-colors"
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">
-                    Subir Archivo .ZIP
-                  </h4>
-                  <p className="text-[11px] text-neutral-400 mt-1 leading-normal">
-                    Descomprime y organiza colecciones o carpetas de álbumes empaquetadas en .zip.
-                  </p>
-                </div>
-              </button>
-            </div>
 
-            {/* Remote URL Ingestion */}
-            <div className="max-w-2xl mx-auto pt-4 border-t border-neutral-800/80 space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-neutral-200">
-                  🌐 Enlaces en la nube (File Garden / Streaming directo):
-                </label>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
-                  0 MB en tu servidor
-                </span>
-              </div>
-              <p className="text-[11px] text-neutral-400 leading-relaxed">
-                Pega uno o varios enlaces de tus canciones en File Garden (uno por línea o separados por comas), o un archivo .zip en la nube. La música se reproduce en streaming directo desde File Garden <strong className="text-neutral-200">sin subir archivos pesados ni gastar tus 1 GB de almacenamiento</strong> en la página.
-              </p>
-              <div className="space-y-2">
                 <textarea
-                  rows={3}
+                  rows={7}
                   value={folderUrlInput}
                   onChange={(e) => setFolderUrlInput(e.target.value)}
-                  placeholder={`Pega aquí los enlaces directos de File Garden (uno por línea o separados por comas):\nhttps://file.garden/auDUHr1kjXjsgmOB/Raras/cancion1.mp3\nhttps://file.garden/auDUHr1kjXjsgmOB/Raras/cancion2.mp3`}
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono shadow-inner resize-y placeholder:text-neutral-600"
+                  placeholder={`Pega aquí todos los enlaces directos (uno por línea o separados por comas):\nhttps://file.garden/.../Album1/01%20Cancion.mp3\nhttps://file.garden/.../Album1/02%20Cancion.mp3\nhttps://file.garden/.../Album2/01%20Pista.mp3\nhttps://file.garden/.../Sencillo.mp3`}
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-2xl p-4 text-xs font-mono text-neutral-200 focus:outline-none focus:border-emerald-500 shadow-inner resize-y placeholder:text-neutral-600 leading-relaxed"
                 />
-                <div className="flex justify-end">
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                  <span className="text-[11px] text-neutral-500">
+                    ☁️ Los archivos se reproducen por streaming directo • 0 MB de audio en tu servidor
+                  </span>
                   <button
                     type="button"
                     disabled={isAnalyzingFolder || !folderUrlInput.trim()}
                     onClick={handleAnalyzeRemoteUrl}
-                    className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-black text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.99]"
+                    className="px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-black text-xs transition-all flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/25 active:scale-[0.99]"
                   >
                     <Sparkles className="w-4 h-4" />
-                    <span>Analizar Enlaces y Extraer Canciones</span>
+                    <span>
+                      {isAnalyzingFolder
+                        ? 'Analizando enlaces...'
+                        : `Analizar y Clasificar ${detectedLinkCount > 0 ? `(${detectedLinkCount} canciones)` : 'Enlaces'}`}
+                    </span>
                   </button>
                 </div>
               </div>
             </div>
-          </div>
+          ) : (
+            /* Local Folder & ZIP Dropzone Workspace */
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDraggingOver(true);
+              }}
+              onDragLeave={() => setIsDraggingOver(false)}
+              onDrop={handleDrop}
+              className={`p-6 md:p-10 rounded-3xl border-2 transition-all space-y-6 ${
+                isDraggingOver
+                  ? 'border-emerald-400 bg-emerald-500/10 shadow-2xl scale-[1.005]'
+                  : 'border-dashed border-neutral-800 bg-neutral-900/40 hover:border-neutral-700'
+              }`}
+            >
+              <div className="text-center max-w-2xl mx-auto space-y-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20">
+                  <FolderArchive className="w-3.5 h-3.5" />
+                  <span>Archivos Locales de tu Dispositivo</span>
+                </div>
+                <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
+                  Selecciona una Carpeta Local o Archivo .ZIP
+                </h2>
+                <p className="text-xs md:text-sm text-neutral-400 leading-relaxed">
+                  Elige una carpeta desde tu computadora o teléfono. Se extraerá la información de cada canción y se guardará en la memoria local sin conexión de este dispositivo.
+                </p>
+              </div>
+
+              {/* Ingestion Action Buttons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                <button
+                  type="button"
+                  onClick={() => folderInputRef.current?.click()}
+                  className="p-5 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-emerald-500/60 hover:bg-neutral-900 group transition-all text-left flex items-start gap-4 shadow-xl active:scale-[0.99]"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <Folder className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">
+                      Seleccionar Carpeta
+                    </h4>
+                    <p className="text-[11px] text-neutral-400 mt-1 leading-normal">
+                      Elige una carpeta desde tu equipo o móvil con todas sus canciones y subcarpetas.
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => zipInputRef.current?.click()}
+                  className="p-5 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-cyan-500/60 hover:bg-neutral-900 group transition-all text-left flex items-start gap-4 shadow-xl active:scale-[0.99]"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <Archive className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">
+                      Subir Archivo .ZIP
+                    </h4>
+                    <p className="text-[11px] text-neutral-400 mt-1 leading-normal">
+                      Descomprime y organiza colecciones o carpetas de álbumes empaquetadas en .zip.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Analysis Loading State */}
           {isAnalyzingFolder && (
@@ -1734,8 +1838,8 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                                     )}
                                   </button>
 
-                                  <span className="text-xs font-mono text-neutral-500 w-5 text-right flex-shrink-0">
-                                    {idx + 1}
+                                  <span className="text-xs font-mono text-neutral-400 font-bold w-6 text-right flex-shrink-0" title={`Pista #${track.trackNumber || idx + 1}`}>
+                                    #{track.trackNumber || idx + 1}
                                   </span>
 
                                   <div className="truncate min-w-0">
