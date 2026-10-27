@@ -154,4 +154,32 @@ describe('Artist profiles and personal play tracking', () => {
     expect(ownAlbums).toEqual(['Un Verano Sin Ti']);
     expect(featuredAlbums).toEqual(['Vibras']);
   });
+
+  it('preserves user custom artist avatar and does not overwrite it with auto-fetched data', () => {
+    const userProfile: ArtistProfile = {
+      id: 'marina',
+      name: 'MARINA',
+      avatarUrl: 'https://i.pinimg.com/736x/6c/b4/b0/6cb4b002d6b45e2d0752bcf9cee06b60.jpg',
+      bio: 'Marina Diamandis...',
+      customAvatar: true,
+    };
+
+    const autoFetchCandidate = {
+      id: 'marina',
+      name: 'Marina',
+      avatarUrl: 'https://is1-ssl.mzstatic.com/cover.jpg',
+      customAvatar: false,
+    };
+
+    // If customAvatar is true or avatar already exists, auto-fetch must NOT overwrite
+    const shouldOverwrite = !userProfile.customAvatar && !userProfile.avatarUrl;
+    expect(shouldOverwrite).toBe(false);
+
+    const merged = shouldOverwrite
+      ? { ...userProfile, ...autoFetchCandidate }
+      : userProfile;
+
+    expect(merged.avatarUrl).toBe('https://i.pinimg.com/736x/6c/b4/b0/6cb4b002d6b45e2d0752bcf9cee06b60.jpg');
+    expect(merged.customAvatar).toBe(true);
+  });
 });

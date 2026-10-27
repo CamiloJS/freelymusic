@@ -204,7 +204,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleOpenEdit = () => {
-    setEditAvatarUrl(profile?.avatarUrl || fallbackCover || '');
+    setEditAvatarUrl(profile?.avatarUrl || '');
     setEditHeaderUrl(profile?.headerUrl || '');
     setEditBio(profile?.bio || '');
     setLocalAliases(profile?.aliases || []);
@@ -238,13 +238,16 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
     e.preventDefault();
     setIsSaving(true);
     try {
+      const cleanAvatar = editAvatarUrl.trim();
       const updated: ArtistProfile = {
-        id: artistName.trim().toLowerCase(),
-        name: artistName.trim(),
-        avatarUrl: editAvatarUrl.trim() || undefined,
+        id: (profile?.id || artistName).trim().toLowerCase(),
+        name: (profile?.name || artistName).trim(),
+        avatarUrl: cleanAvatar || undefined,
         headerUrl: editHeaderUrl.trim() || undefined,
         bio: editBio.trim() || undefined,
         aliases: localAliases.length > 0 ? localAliases : undefined,
+        mergedInto: profile?.mergedInto,
+        customAvatar: Boolean(cleanAvatar),
       };
 
       await updateArtistProfile(updated);
@@ -701,14 +704,14 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
               </div>
             )}
 
-            <form onSubmit={handleSaveProfile} className="space-y-4">
+            <form noValidate onSubmit={handleSaveProfile} className="space-y-4">
               {/* Photo Preview & Upload */}
               <div>
                 <label className="block text-xs font-bold text-neutral-300 mb-2">Foto de Perfil del Artista</label>
                 <div className="flex items-center gap-4">
                   <div className="w-20 h-20 rounded-full overflow-hidden bg-neutral-800 border border-neutral-700 flex-shrink-0 shadow">
-                    {editAvatarUrl ? (
-                      <img src={editAvatarUrl} alt="Preview" className="w-full h-full object-cover" />
+                    {editAvatarUrl || fallbackCover ? (
+                      <img src={editAvatarUrl || fallbackCover} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-neutral-600">
                         <Music className="w-8 h-8" />
@@ -732,7 +735,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                       <span>Subir desde mi computador</span>
                     </button>
                     <input
-                      type="url"
+                      type="text"
                       value={editAvatarUrl}
                       onChange={(e) => setEditAvatarUrl(e.target.value)}
                       placeholder="O pega URL de imagen (https://...)"
@@ -748,7 +751,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                   Foto de Portada / Banner (Opcional)
                 </label>
                 <input
-                  type="url"
+                  type="text"
                   value={editHeaderUrl}
                   onChange={(e) => setEditHeaderUrl(e.target.value)}
                   placeholder="https://images.unsplash.com/... o enlace de portada"

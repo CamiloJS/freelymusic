@@ -135,6 +135,7 @@ export interface ArtistProfile {
   updatedAt?: string;
   aliases?: string[]; // e.g. ["J. Balvin", "J Balvin", "José Álvaro Osorio"]
   mergedInto?: string; // Canonical artist name if this artist is merged into another
+  customAvatar?: boolean; // True if the user manually set/uploaded a photo
 }
 
 export interface Playlist {

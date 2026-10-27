@@ -148,6 +148,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isCatalogReady, setIsCatalogReady] = useState<boolean>(
     () => getStoredCatalog().length > 0
   );
+  const [isArtistProfilesReady, setIsArtistProfilesReady] = useState<boolean>(false);
 
   const userDataRef = useRef(userData);
   const userSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -326,8 +327,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Artist profiles (realtime)
   useEffect(() => {
-    if (!isAuthenticated) return;
-
     let cancelled = false;
     let unsubscribe: (() => void) | null = null;
 
@@ -337,8 +336,12 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           (cloudArtists) => {
             setArtistProfiles(cloudArtists);
             saveStoredArtistProfiles(cloudArtists);
+            setIsArtistProfilesReady(true);
           },
-          (err) => console.warn('No se pudieron sincronizar los artistas:', err)
+          (err) => {
+            console.warn('No se pudieron sincronizar los artistas:', err);
+            setIsArtistProfilesReady(true);
+          }
         )
       )
       .then((unsub) => {
@@ -348,13 +351,21 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           unsubscribe = unsub;
         }
       })
-      .catch((err) => console.warn('No se pudo escuchar los artistas:', err));
+      .catch((err) => {
+        console.warn('No se pudo escuchar los artistas:', err);
+        setIsArtistProfilesReady(true);
+      });
+
+    const fallbackTimer = setTimeout(() => {
+      setIsArtistProfilesReady(true);
+    }, 3000);
 
     return () => {
       cancelled = true;
       unsubscribe?.();
+      clearTimeout(fallbackTimer);
     };
-  }, [isAuthenticated]);
+  }, []);
 
   // Sync offline downloaded song IDs
   const refreshDownloadedIds = useCallback(async () => {
@@ -1205,6 +1216,10 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         avatarUrl: targetExisting.avatarUrl || sourceExisting.avatarUrl,
         headerUrl: targetExisting.headerUrl || sourceExisting.headerUrl,
         bio: targetExisting.bio || sourceExisting.bio,
+        customAvatar:
+          targetExisting.customAvatar ||
+          sourceExisting.customAvatar ||
+          Boolean(targetExisting.avatarUrl || sourceExisting.avatarUrl),
         updatedAt: new Date().toISOString(),
       };
 
@@ -1341,7 +1356,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const autoAvatarCheckedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!catalog.length || !isCatalogReady) return;
+    if (!catalog.length || !isCatalogReady || !isArtistProfilesReady) return;
 
     const artistNames = new Set<string>();
     catalog.forEach((s) => {
@@ -1355,8 +1370,20 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const missing = Array.from(artistNames).filter((name) => {
       const key = name.toLowerCase().trim();
+      if (autoAvatarCheckedRef.current.has(key)) return false;
+
+      // Check resolved profile (following aliases & merges)
+      const resolved = getArtistProfile(name);
+      if (resolved?.customAvatar || resolved?.avatarUrl || resolved?.mergedInto) {
+        return false;
+      }
+
       const existing = artistProfiles.find((p) => p.id === key || p.name.toLowerCase() === key);
-      return !existing?.avatarUrl && !autoAvatarCheckedRef.current.has(key);
+      if (existing?.customAvatar || existing?.avatarUrl || existing?.mergedInto) {
+        return false;
+      }
+
+      return true;
     });
 
     if (missing.length === 0) return;
@@ -1371,11 +1398,20 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         try {
           const avatarUrl = await searchArtistAvatar(name);
-          if (avatarUrl) {
+          if (avatarUrl && !isCancelled) {
+            const current =
+              getArtistProfile(name) ||
+              artistProfiles.find((p) => p.id === key || p.name.toLowerCase() === key);
+            if (current?.customAvatar || current?.avatarUrl || current?.mergedInto) {
+              continue;
+            }
+
             await updateArtistProfile({
+              ...(current || {}),
               id: key,
-              name,
+              name: current?.name || name,
               avatarUrl,
+              customAvatar: false,
             });
           }
         } catch (e) {
@@ -1392,7 +1428,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isCancelled = true;
       clearTimeout(timer);
     };
-  }, [catalog, isCatalogReady, artistProfiles, updateArtistProfile]);
+  }, [catalog, isCatalogReady, isArtistProfilesReady, artistProfiles, getArtistProfile, updateArtistProfile]);
 
   // User Play Counts & Analytics Actions
   const recordSongPlay = useCallback(

@@ -453,13 +453,23 @@ export async function searchArtistAvatar(artistName: string): Promise<string | n
 
   // Fallback: iTunes album artwork for this artist
   try {
-    const itunesUrl = `${ITUNES_ENDPOINT}?term=${encodeURIComponent(clean)}&entity=album&limit=3`;
+    const itunesUrl = `${ITUNES_ENDPOINT}?term=${encodeURIComponent(clean)}&entity=album&limit=10`;
     const res = await fetch(itunesUrl, { headers: { Accept: 'application/json' } });
     if (res.ok) {
       const itunesData = await res.json();
       const results = (itunesData.results as Array<Record<string, unknown>>) || [];
-      if (results[0]?.artworkUrl100 && typeof results[0].artworkUrl100 === 'string') {
-        return results[0].artworkUrl100.replace(/\/\d+x\d+bb\./, '/600x600bb.');
+      // Crucial: Only accept an album if the artist name actually matches the requested artist!
+      // This prevents unrelated artists with single titles matching the artist name (e.g. Devito's single "Marina")
+      // from incorrectly overwriting the portrait of artist "Marina".
+      const matchingAlbum = results.find(
+        (item) =>
+          typeof item.artistName === 'string' &&
+          textMatch(item.artistName, clean) &&
+          typeof item.artworkUrl100 === 'string' &&
+          Boolean(item.artworkUrl100)
+      );
+      if (matchingAlbum?.artworkUrl100 && typeof matchingAlbum.artworkUrl100 === 'string') {
+        return matchingAlbum.artworkUrl100.replace(/\/\d+x\d+bb\./, '/600x600bb.');
       }
     }
   } catch {
