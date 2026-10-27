@@ -88,6 +88,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     getUserSongPlayCount,
     isAlbumSaved,
     toggleSaveAlbum,
+    updateFavoritesSort,
+    updatePlaylistSort,
+    favoritesSortBy,
+    favoritesSortDir,
+    playlistSortPreferences,
   } = useMusic();
 
   const { playSong, currentSong, isPlaying, togglePlayPause, isShuffle, toggleShuffle, openVideo } = useAudio();
@@ -113,6 +118,38 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       document.removeEventListener('mousedown', handleOutside);
     };
   }, [isSortMenuOpen]);
+
+  // Synchronize remembered sorting preference for current playlist or favorites across devices and reloads
+  useEffect(() => {
+    if (!selectedPlaylist) return;
+    if (selectedPlaylist === 'favorites') {
+      const savedBy =
+        favoritesSortBy ||
+        (localStorage.getItem('sonora_sort_favorites_by') as 'custom' | 'title' | 'artist' | 'album' | null) ||
+        'custom';
+      const savedDir =
+        favoritesSortDir ||
+        (localStorage.getItem('sonora_sort_favorites_dir') as 'asc' | 'desc' | null) ||
+        'desc';
+      setPlaylistSortBy(savedBy);
+      setPlaylistSortDir(savedDir);
+    } else if (typeof selectedPlaylist === 'object' && 'id' in selectedPlaylist) {
+      const pl = selectedPlaylist as Playlist;
+      const pref = playlistSortPreferences?.[pl.id];
+      const savedBy =
+        pl.sortBy ||
+        pref?.sortBy ||
+        (localStorage.getItem(`sonora_sort_${pl.id}_by`) as 'custom' | 'title' | 'artist' | 'album' | null) ||
+        'custom';
+      const savedDir =
+        pl.sortDir ||
+        pref?.sortDir ||
+        (localStorage.getItem(`sonora_sort_${pl.id}_dir`) as 'asc' | 'desc' | null) ||
+        'desc';
+      setPlaylistSortBy(savedBy);
+      setPlaylistSortDir(savedDir);
+    }
+  }, [selectedPlaylist, favoritesSortBy, favoritesSortDir, playlistSortPreferences]);
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; status: string } | null>(null);
   const [downloadMessage, setDownloadMessage] = useState('');
   const [showDeleteDownloadsConfirm, setShowDeleteDownloadsConfirm] = useState(false);
@@ -336,11 +373,27 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     };
 
     const handleToggleSortOption = (option: 'custom' | 'title' | 'artist' | 'album') => {
+      let nextSortBy = playlistSortBy;
+      let nextSortDir = playlistSortDir;
+
       if (playlistSortBy === option) {
-        setPlaylistSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+        nextSortDir = playlistSortDir === 'asc' ? 'desc' : 'asc';
       } else {
-        setPlaylistSortBy(option);
-        setPlaylistSortDir(option === 'custom' ? 'desc' : 'asc');
+        nextSortBy = option;
+        nextSortDir = option === 'custom' ? 'desc' : 'asc';
+      }
+
+      setPlaylistSortBy(nextSortBy);
+      setPlaylistSortDir(nextSortDir);
+
+      if (selectedPlaylist === 'favorites') {
+        updateFavoritesSort(nextSortBy, nextSortDir);
+      } else if (
+        selectedPlaylist &&
+        typeof selectedPlaylist === 'object' &&
+        'id' in selectedPlaylist
+      ) {
+        updatePlaylistSort(selectedPlaylist.id, nextSortBy, nextSortDir);
       }
     };
 

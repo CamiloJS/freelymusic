@@ -13,6 +13,7 @@ import Repeat1 from 'lucide-react/dist/esm/icons/repeat-1.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import Mic from 'lucide-react/dist/esm/icons/mic.mjs';
 import Video from 'lucide-react/dist/esm/icons/video.mjs';
+import FileText from 'lucide-react/dist/esm/icons/file-text.mjs';
 import ChevronLeft from 'lucide-react/dist/esm/icons/chevron-left.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
@@ -37,7 +38,14 @@ type TvTab = 'home' | 'search' | 'library';
 
 export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
   const { currentUser } = useAuth();
-  const { catalog, playlists, isFavorite, toggleFavorite, userFavoriteSongs } = useMusic();
+  const {
+    catalog,
+    playlists,
+    isFavorite,
+    toggleFavorite,
+    userFavoriteSongs,
+    getArtistProfile,
+  } = useMusic();
   const {
     currentSong,
     isPlaying,
@@ -54,6 +62,12 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
     translatedLyrics,
     lyricsDisplayMode,
     videoUrl,
+    isKaraoke,
+    hasInstrumental,
+    toggleKaraoke,
+    openVideo,
+    closeVideo,
+    syncMediaTime,
   } = useAudio();
   const { currentTime, duration, activeLyricIndex } = useAudioTime();
 
@@ -66,7 +80,7 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
     | null
   >(null);
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
-  const [isKaraokeActive, setIsKaraokeActive] = useState(false);
+  const [isLyricsActive, setIsLyricsActive] = useState(false);
   const [isVideoActive, setIsVideoActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showControlsTimer, setShowControlsTimer] = useState<number>(0);
@@ -75,6 +89,7 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const lyricsContainerRef = useRef<HTMLDivElement | null>(null);
   const activeLyricRef = useRef<HTMLDivElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Dominant colors for cinematic TV backdrop
   const { gradient } = useArtworkColor(currentSong?.coverUrl, currentSong?.title);
@@ -103,20 +118,45 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
     [parsedLyrics, translatedLyrics, lyricsDisplayMode]
   );
 
-  // Auto-scroll lyrics smoothly in TV Karaoke mode
+  // Auto-scroll lyrics smoothly in TV Lyrics mode
   useEffect(() => {
-    if (!isKaraokeActive || activeLyricIndex < 0) return;
+    if (!isLyricsActive || activeLyricIndex < 0) return;
     const activeEl = activeLyricRef.current;
     const container = lyricsContainerRef.current;
     if (activeEl && container) {
       const topOffset = activeEl.offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2;
       container.scrollTo({ top: Math.max(0, topOffset), behavior: 'smooth' });
     }
-  }, [isKaraokeActive, activeLyricIndex]);
+  }, [isLyricsActive, activeLyricIndex]);
+
+  // Video playback seamless management
+  const handleOpenVideo = useCallback(() => {
+    if (!videoUrl) return;
+    openVideo();
+    setIsVideoActive(true);
+  }, [videoUrl, openVideo]);
+
+  const handleCloseVideo = useCallback(() => {
+    const video = videoRef.current;
+    const finalTime = video && Number.isFinite(video.currentTime) ? video.currentTime : currentTime;
+    closeVideo(finalTime);
+    setIsVideoActive(false);
+  }, [closeVideo, currentTime]);
+
+  useEffect(() => {
+    if (isVideoActive && videoRef.current) {
+      try {
+        videoRef.current.currentTime = currentTime;
+        if (isPlaying) {
+          videoRef.current.play().catch(() => {});
+        }
+      } catch {}
+    }
+  }, [isVideoActive]);
 
   // TV Inactivity controls auto-dimming during playback
   useEffect(() => {
-    if (!isPlayerOpen && !isKaraokeActive) {
+    if (!isPlayerOpen && !isLyricsActive) {
       setControlsVisible(true);
       return;
     }
@@ -140,16 +180,16 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
       window.removeEventListener('mousemove', resetTimer);
       window.clearInterval(interval);
     };
-  }, [isPlayerOpen, isKaraokeActive, isPlaying, showControlsTimer]);
+  }, [isPlayerOpen, isLyricsActive, isPlaying, showControlsTimer]);
 
   // Back button handler for Smart TV remote
   const handleRemoteBack = useCallback(() => {
     if (isVideoActive) {
-      setIsVideoActive(false);
+      handleCloseVideo();
       return;
     }
-    if (isKaraokeActive) {
-      setIsKaraokeActive(false);
+    if (isLyricsActive) {
+      setIsLyricsActive(false);
       return;
     }
     if (isPlayerOpen) {
@@ -166,22 +206,41 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
     }
     // At root home, user pressing Back exits TV mode
     onExitTvMode();
-  }, [isVideoActive, isKaraokeActive, isPlayerOpen, selectedDetail, activeTab, onExitTvMode]);
+  }, [isVideoActive, handleCloseVideo, isLyricsActive, isPlayerOpen, selectedDetail, activeTab, onExitTvMode]);
 
   // Rewind / Fast Forward 10 seconds via TV remote
   const handleFastForward = useCallback(() => {
-    seek(Math.min(duration, currentTime + 10));
-  }, [seek, duration, currentTime]);
+    const target = Math.min(duration, currentTime + 10);
+    if (isVideoActive && videoRef.current) {
+      videoRef.current.currentTime = target;
+    }
+    seek(target);
+  }, [seek, duration, currentTime, isVideoActive]);
 
   const handleRewind = useCallback(() => {
-    seek(Math.max(0, currentTime - 10));
-  }, [seek, currentTime]);
+    const target = Math.max(0, currentTime - 10);
+    if (isVideoActive && videoRef.current) {
+      videoRef.current.currentTime = target;
+    }
+    seek(target);
+  }, [seek, currentTime, isVideoActive]);
+
+  const handleTogglePlayPause = useCallback(() => {
+    if (isVideoActive && videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play().catch(() => {});
+      } else {
+        videoRef.current.pause();
+      }
+    }
+    togglePlayPause();
+  }, [isVideoActive, togglePlayPause]);
 
   // Initialize TV remote D-Pad spatial navigation
   const { focusFirst } = useTvNavigation({
     containerRef,
     onBack: handleRemoteBack,
-    onPlayPause: togglePlayPause,
+    onPlayPause: handleTogglePlayPause,
     onNext: nextTrack,
     onPrev: prevTrack,
     onFastForward: handleFastForward,
@@ -195,28 +254,98 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
       focusFirst();
     }, 150);
     return () => window.clearTimeout(timer);
-  }, [activeTab, selectedDetail, isPlayerOpen, isKaraokeActive, focusFirst]);
+  }, [activeTab, selectedDetail, isPlayerOpen, isLyricsActive, focusFirst]);
 
-  // Search filtered results
+  // Search filtered results (Artists First!)
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const normQ = q.replace(/[\s._-]+/g, '');
+
+    // Extract all artists from catalog and profiles
+    const artistMap = new Map<string, { name: string; coverUrl?: string; songCount: number; songs: Song[] }>();
+    catalog.forEach((s) => {
+      const parts = s.artist.split(/[,&/]|feat\.|ft\./i).map((p) => p.trim()).filter(Boolean);
+      parts.forEach((p) => {
+        const prof = getArtistProfile(p);
+        const canonical = prof?.name || p;
+        const key = canonical.toLowerCase();
+        if (!artistMap.has(key)) {
+          artistMap.set(key, {
+            name: canonical,
+            coverUrl: prof?.avatarUrl || s.coverUrl,
+            songCount: 0,
+            songs: [],
+          });
+        }
+        const item = artistMap.get(key)!;
+        item.songCount += 1;
+        if (!item.coverUrl && s.coverUrl) item.coverUrl = s.coverUrl;
+        if (!item.songs.some((song) => song.id === s.id)) {
+          item.songs.push(s);
+        }
+      });
+    });
+
+    const allExtractedArtists = Array.from(artistMap.values());
+
     if (!q) {
       return {
-        songs: catalog.slice(0, 12),
-        albums: allAlbums.slice(0, 6),
-        playlists: playlists.slice(0, 6),
+        artists: allExtractedArtists.slice(0, 10),
+        songs: catalog.slice(0, 15),
+        albums: allAlbums.slice(0, 8),
+        playlists: playlists.slice(0, 8),
       };
     }
+
+    // Match artists: exact, prefix, contains, or fuzzy
+    const matchedArtists = allExtractedArtists
+      .filter((art) => {
+        const artNorm = art.name.toLowerCase();
+        const artFuzzy = artNorm.replace(/[\s._-]+/g, '');
+        return artNorm.includes(q) || artFuzzy.includes(normQ);
+      })
+      .sort((a, b) => {
+        const aNorm = a.name.toLowerCase();
+        const bNorm = b.name.toLowerCase();
+        if (aNorm === q) return -1;
+        if (bNorm === q) return 1;
+        if (aNorm.startsWith(q)) return -1;
+        if (bNorm.startsWith(q)) return 1;
+        return b.songCount - a.songCount;
+      });
+
+    const matchedSongs = catalog.filter((s) => {
+      const titleNorm = s.title.toLowerCase();
+      const artistNorm = s.artist.toLowerCase();
+      return (
+        titleNorm.includes(q) ||
+        artistNorm.includes(q) ||
+        titleNorm.replace(/[\s._-]+/g, '').includes(normQ) ||
+        artistNorm.replace(/[\s._-]+/g, '').includes(normQ)
+      );
+    });
+
+    const matchedAlbums = allAlbums.filter((a) => {
+      const nameNorm = a.name.toLowerCase();
+      const artistNorm = a.artist.toLowerCase();
+      return (
+        nameNorm.includes(q) ||
+        artistNorm.includes(q) ||
+        nameNorm.replace(/[\s._-]+/g, '').includes(normQ)
+      );
+    });
+
+    const matchedPlaylists = playlists.filter((p) =>
+      p.name.toLowerCase().includes(q)
+    );
+
     return {
-      songs: catalog.filter(
-        (s) => s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q)
-      ),
-      albums: allAlbums.filter(
-        (a) => a.name.toLowerCase().includes(q) || a.artist.toLowerCase().includes(q)
-      ),
-      playlists: playlists.filter((p) => p.name.toLowerCase().includes(q)),
+      artists: matchedArtists,
+      songs: matchedSongs,
+      albums: matchedAlbums,
+      playlists: matchedPlaylists,
     };
-  }, [catalog, allAlbums, playlists, searchQuery]);
+  }, [searchQuery, catalog, allAlbums, playlists, getArtistProfile]);
 
   // Hero featured item: current song's album, or first user playlist, or first catalog album
   const featuredHero = useMemo(() => {
@@ -279,6 +408,29 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
           : 'linear-gradient(180deg, #121217 0%, #08080a 100%)',
       }}
     >
+      {/* Dynamic Animated Blurred Backdrop based on current playing song */}
+      {currentSong?.coverUrl && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div
+            className={`w-full h-full bg-cover bg-center transition-all duration-700 ${
+              isPlaying ? 'animate-tv-rhythm' : ''
+            }`}
+            style={{
+              backgroundImage: `url(${currentSong.coverUrl})`,
+              filter: isLyricsActive
+                ? 'blur(52px) brightness(0.22) saturate(1.4)'
+                : 'blur(30px) brightness(0.38) saturate(1.3)',
+              transform: 'scale(1.18)',
+            }}
+          />
+          <div
+            className={`absolute inset-0 transition-colors duration-500 ${
+              isLyricsActive ? 'bg-black/70' : 'bg-black/45'
+            }`}
+          />
+        </div>
+      )}
+
       {/* 1. TOP BAR (Matching Spotify TV Reference Image) */}
       <header className="flex items-center justify-between px-8 py-5 flex-shrink-0 z-30 bg-black/40 backdrop-blur-md border-b border-white/10">
         {/* Left: Now Playing Mini Card */}
@@ -315,9 +467,11 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
               </div>
             </button>
           ) : (
-            <div className="flex items-center gap-2.5 text-white/70 px-3 py-1.5 rounded-xl bg-white/5 text-xs font-semibold">
-              <Tv className="w-4 h-4 text-emerald-400" />
-              <span>Modo TV Activo</span>
+            <div className="flex items-center gap-2.5 text-white/90 px-3 py-1.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+                <Disc className="w-4 h-4 text-emerald-400" />
+              </div>
+              <span className="font-extrabold text-sm tracking-wide">Sonora</span>
             </div>
           )}
         </div>
@@ -373,17 +527,6 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
           >
             <Library className="w-4 h-4" />
             <span>Tu biblioteca</span>
-          </button>
-
-          <button
-            data-tv-focus="true"
-            tabIndex={0}
-            onClick={onExitTvMode}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full text-xs font-bold text-white/70 bg-white/5 hover:bg-red-500/20 hover:text-red-400 focus:bg-red-500 focus:text-white focus:outline-none focus:ring-4 focus:ring-white transition-all ml-2"
-            title="Salir de la interfaz de TV"
-          >
-            <Tv className="w-4 h-4" />
-            <span>Salir de Modo TV</span>
           </button>
         </nav>
 
@@ -724,54 +867,143 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
               </div>
             </div>
 
-            {/* Results Grid */}
-            <div className="space-y-4">
-              <h2 className="text-xl font-extrabold text-white">
-                {searchQuery ? `Resultados para "${searchQuery}"` : 'Canciones sugeridas'}
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {searchResults.songs.map((song) => (
-                  <button
-                    key={song.id}
-                    data-tv-focus="true"
-                    tabIndex={0}
-                    onClick={() => {
-                      playSong(song, searchResults.songs, { type: 'catalog', name: 'Búsqueda TV' });
-                    }}
-                    className="flex items-center gap-3.5 p-3 rounded-2xl bg-white/5 hover:bg-white/15 focus:bg-white/20 focus:ring-4 focus:ring-white focus:outline-none transition-all text-left border border-white/5 shadow"
-                  >
-                    <div className="w-14 h-14 rounded-xl overflow-hidden bg-neutral-800 flex-shrink-0 shadow">
-                      {song.coverUrl ? (
-                        <img
-                          src={song.coverUrl}
-                          alt={song.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Disc className="w-6 h-6 text-neutral-500 m-4" />
-                      )}
-                    </div>
-                    <div className="truncate flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-sm text-white truncate">
-                          {song.title}
+            {/* Results Grid - ARTISTS FIRST */}
+            <div className="space-y-6">
+              {/* 1. MATCHED ARTISTS (Shown first as requested) */}
+              {searchResults.artists.length > 0 && (
+                <div className="space-y-3">
+                  <h2 className="text-xl font-extrabold text-white">
+                    {searchQuery ? 'Artistas encontrados' : 'Artistas sugeridos'}
+                  </h2>
+                  <div className="flex items-center gap-5 overflow-x-auto pb-3 pt-1 scrollbar-none">
+                    {searchResults.artists.map((art) => (
+                      <button
+                        key={`search-art-${art.name}`}
+                        data-tv-focus="true"
+                        tabIndex={0}
+                        onClick={() => {
+                          setSelectedDetail({
+                            type: 'favorites',
+                            title: `Música de ${art.name}`,
+                            songs: art.songs,
+                          });
+                        }}
+                        className="w-44 p-4 rounded-2xl bg-white/5 hover:bg-white/15 focus:bg-white/20 focus:ring-4 focus:ring-white focus:outline-none transition-all flex flex-col items-center text-center group flex-shrink-0 border border-white/5 shadow-md"
+                      >
+                        <div className="w-28 h-28 rounded-full overflow-hidden bg-neutral-800 mb-3 shadow-lg border border-white/10 group-hover:scale-105 transition-transform duration-300">
+                          {art.coverUrl ? (
+                            <img
+                              src={art.coverUrl}
+                              alt={art.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-neutral-500 font-black text-2xl">
+                              {art.name.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <span className="font-extrabold text-sm text-white truncate max-w-full">
+                          {art.name}
                         </span>
-                        {song.isExplicit && (
-                          <span className="text-[10px] font-black bg-neutral-400 text-black px-1 rounded">
-                            E
-                          </span>
+                        <span className="text-xs text-neutral-400 mt-1">
+                          Artista • {art.songCount} {art.songCount === 1 ? 'canción' : 'canciones'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 2. MATCHED ALBUMS (If any) */}
+              {searchResults.albums.length > 0 && (
+                <div className="space-y-3">
+                  <h2 className="text-xl font-extrabold text-white">Álbumes</h2>
+                  <div className="flex items-center gap-5 overflow-x-auto pb-3 pt-1 scrollbar-none">
+                    {searchResults.albums.map((alb) => (
+                      <button
+                        key={`search-alb-${alb.name}`}
+                        data-tv-focus="true"
+                        tabIndex={0}
+                        onClick={() => {
+                          setSelectedDetail({
+                            type: 'album',
+                            album: alb,
+                            songs: alb.songs,
+                          });
+                        }}
+                        className="w-44 p-3 rounded-2xl bg-white/5 hover:bg-white/15 focus:bg-white/20 focus:ring-4 focus:ring-white focus:outline-none transition-all flex flex-col text-left group flex-shrink-0 border border-white/5 shadow-md"
+                      >
+                        <div className="w-full aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow">
+                          {alb.coverUrl ? (
+                            <img
+                              src={alb.coverUrl}
+                              alt={alb.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-neutral-600">
+                              <Disc className="w-10 h-10" />
+                            </div>
+                          )}
+                        </div>
+                        <span className="font-extrabold text-sm text-white truncate">{alb.name}</span>
+                        <span className="text-xs text-neutral-400 mt-1 truncate">{alb.artist}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 3. MATCHED SONGS */}
+              <div className="space-y-3">
+                <h2 className="text-xl font-extrabold text-white">
+                  {searchQuery ? `Canciones para "${searchQuery}"` : 'Canciones sugeridas'}
+                </h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {searchResults.songs.map((song) => (
+                    <button
+                      key={song.id}
+                      data-tv-focus="true"
+                      tabIndex={0}
+                      onClick={() => {
+                        playSong(song, searchResults.songs, { type: 'catalog', name: 'Búsqueda TV' });
+                      }}
+                      className="flex items-center gap-3.5 p-3 rounded-2xl bg-white/5 hover:bg-white/15 focus:bg-white/20 focus:ring-4 focus:ring-white focus:outline-none transition-all text-left border border-white/5 shadow"
+                    >
+                      <div className="w-14 h-14 rounded-xl overflow-hidden bg-neutral-800 flex-shrink-0 shadow">
+                        {song.coverUrl ? (
+                          <img
+                            src={song.coverUrl}
+                            alt={song.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Disc className="w-6 h-6 text-neutral-500 m-4" />
                         )}
                       </div>
-                      <span className="block text-xs text-neutral-400 truncate mt-0.5">
-                        {song.artist}
-                      </span>
-                    </div>
-                    <div className="text-xs text-neutral-400 font-semibold flex-shrink-0">
-                      {formatTime(song.duration)}
-                    </div>
-                  </button>
-                ))}
+                      <div className="truncate flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm text-white truncate">
+                            {song.title}
+                          </span>
+                          {song.isExplicit && (
+                            <span className="text-[10px] font-black bg-neutral-400 text-black px-1 rounded">
+                              E
+                            </span>
+                          )}
+                        </div>
+                        <span className="block text-xs text-neutral-400 truncate mt-0.5">
+                          {song.artist}
+                        </span>
+                      </div>
+                      <div className="text-xs text-neutral-400 font-semibold flex-shrink-0">
+                        {formatTime(song.duration)}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -1015,19 +1247,45 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
       {/* 3. SPOTIFY TV FULLSCREEN PLAYER & KARAOKE MODAL */}
       {isPlayerOpen && currentSong && (
         <div
-          className="fixed inset-0 z-50 bg-[#07070a] flex flex-col justify-between p-8 md:p-12 animate-in fade-in duration-300"
+          className="fixed inset-0 z-50 bg-[#07070a] flex flex-col justify-between p-8 md:p-12 animate-in fade-in duration-300 overflow-hidden"
           style={{
             background: gradient
               ? `radial-gradient(circle at 30% 40%, ${gradient} 0%, #08080c 70%, #030305 100%)`
               : 'radial-gradient(circle at 30% 40%, #1f2937 0%, #050507 100%)',
           }}
         >
+          {/* Dynamic Animated Blurred Backdrop for Fullscreen Player */}
+          {currentSong?.coverUrl && (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+              <div
+                className={`w-full h-full bg-cover bg-center transition-all duration-700 ${
+                  isPlaying ? 'animate-tv-rhythm' : ''
+                }`}
+                style={{
+                  backgroundImage: `url(${currentSong.coverUrl})`,
+                  filter: isLyricsActive
+                    ? 'blur(55px) brightness(0.20) saturate(1.4)'
+                    : 'blur(32px) brightness(0.40) saturate(1.3)',
+                  transform: 'scale(1.2)',
+                }}
+              />
+              <div
+                className={`absolute inset-0 transition-colors duration-500 ${
+                  isLyricsActive ? 'bg-black/75' : 'bg-black/45'
+                }`}
+              />
+            </div>
+          )}
+
           {/* Top Bar inside TV Player */}
           <div className="flex items-center justify-between z-20 flex-shrink-0">
             <button
               data-tv-focus="true"
               tabIndex={0}
-              onClick={() => setIsPlayerOpen(false)}
+              onClick={() => {
+                if (isVideoActive) handleCloseVideo();
+                setIsPlayerOpen(false);
+              }}
               className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-sm focus:outline-none focus:ring-4 focus:ring-white transition-all shadow"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -1035,20 +1293,50 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
             </button>
 
             <div className="flex items-center gap-3">
-              {/* Karaoke Toggle Button */}
+              {/* Lyrics Toggle Button */}
               <button
                 data-tv-focus="true"
                 tabIndex={0}
-                onClick={() => setIsKaraokeActive((prev) => !prev)}
+                onClick={() => setIsLyricsActive((prev) => !prev)}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm focus:outline-none focus:ring-4 focus:ring-white transition-all shadow ${
-                  isKaraokeActive
-                    ? 'bg-emerald-500 text-black font-extrabold'
+                  isLyricsActive
+                    ? 'bg-white text-black font-extrabold shadow-lg scale-105'
                     : 'bg-white/10 hover:bg-white/20 text-white'
                 }`}
-                title="Modo Karaoke TV"
+                title="Mostrar u ocultar letra sincronizada"
+              >
+                <FileText className="w-4 h-4" />
+                <span>{isLyricsActive ? 'Ocultar Letra' : 'Letras'}</span>
+              </button>
+
+              {/* Karaoke Toggle Button (Instrumental audio) */}
+              <button
+                data-tv-focus="true"
+                tabIndex={0}
+                onClick={() => {
+                  if (hasInstrumental || currentSong?.instrumentalUrl) {
+                    toggleKaraoke();
+                  } else {
+                    alert('Esta canción no cuenta con pista instrumental / karaoke');
+                  }
+                }}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm focus:outline-none focus:ring-4 focus:ring-white transition-all shadow ${
+                  isKaraoke
+                    ? 'bg-emerald-500 text-black font-extrabold shadow-lg scale-105'
+                    : hasInstrumental || currentSong?.instrumentalUrl
+                    ? 'bg-white/10 hover:bg-white/20 text-white'
+                    : 'bg-white/5 text-white/40'
+                }`}
+                title={
+                  hasInstrumental || currentSong?.instrumentalUrl
+                    ? isKaraoke
+                      ? 'Pista instrumental activa. Clic para volver a voz original'
+                      : 'Activar pista instrumental para karaoke'
+                    : 'Sin pista instrumental disponible'
+                }
               >
                 <Mic className="w-4 h-4" />
-                <span>{isKaraokeActive ? 'Ocultar Letra' : 'Karaoke'}</span>
+                <span>{isKaraoke ? 'Karaoke Activo (Voz OFF)' : 'Modo Karaoke'}</span>
               </button>
 
               {/* Video Toggle Button (if available) */}
@@ -1056,10 +1344,16 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
                 <button
                   data-tv-focus="true"
                   tabIndex={0}
-                  onClick={() => setIsVideoActive((prev) => !prev)}
+                  onClick={() => {
+                    if (isVideoActive) {
+                      handleCloseVideo();
+                    } else {
+                      handleOpenVideo();
+                    }
+                  }}
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm focus:outline-none focus:ring-4 focus:ring-white transition-all shadow ${
                     isVideoActive
-                      ? 'bg-blue-500 text-white font-extrabold'
+                      ? 'bg-blue-500 text-white font-extrabold shadow-lg scale-105'
                       : 'bg-white/10 hover:bg-white/20 text-white'
                   }`}
                   title="Ver Video Musical"
@@ -1071,14 +1365,14 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
             </div>
           </div>
 
-          {/* Center Content: Artwork + Metadata OR Karaoke Lyrics */}
-          <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-12 my-6 min-h-0 overflow-hidden">
-            {/* If in video mode, render video frame */}
+          {/* Center Content: Artwork + Metadata OR Synchronized Lyrics OR Video Player */}
+          <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-12 my-6 min-h-0 overflow-hidden relative z-10">
+            {/* If in video mode, render dedicated TV video frame */}
             {isVideoActive && videoUrl ? (
-              <div className="w-full max-w-4xl aspect-video rounded-3xl overflow-hidden shadow-2xl border border-white/20 bg-black">
+              <div className="w-full max-w-4xl aspect-video rounded-3xl overflow-hidden shadow-2xl border border-white/20 bg-black flex items-center justify-center relative">
                 {videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') ? (
                   <iframe
-                    src={videoUrl.replace('watch?v=', 'embed/')}
+                    src={`${videoUrl.replace('watch?v=', 'embed/')}?autoplay=1&start=${Math.floor(currentTime)}&enablejsapi=1`}
                     title="Video musical"
                     className="w-full h-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -1086,15 +1380,20 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
                   />
                 ) : (
                   <video
+                    ref={videoRef}
                     src={videoUrl}
                     controls
                     autoPlay
+                    playsInline
+                    onTimeUpdate={(e) => syncMediaTime(e.currentTarget.currentTime)}
+                    onPlay={() => !isPlaying && togglePlayPause()}
+                    onPause={() => isPlaying && togglePlayPause()}
                     className="w-full h-full object-contain"
                   />
                 )}
               </div>
-            ) : isKaraokeActive ? (
-              /* SPOTIFY TV KARAOKE VIEW: Auto-scrolling Synchronized LRC Lyrics */
+            ) : isLyricsActive ? (
+              /* SPOTIFY TV LYRICS VIEW: Auto-scrolling Synchronized LRC Lyrics */
               <div className="flex-1 flex flex-col md:flex-row items-center gap-10 h-full max-w-6xl w-full">
                 {/* Mini song info on the left */}
                 <div className="w-64 flex flex-col items-center text-center flex-shrink-0">
@@ -1143,10 +1442,10 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
                     })
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-neutral-400 space-y-3">
-                      <Mic className="w-12 h-12 text-neutral-600" />
+                      <FileText className="w-12 h-12 text-neutral-600" />
                       <p className="text-2xl font-bold">Sin letra sincronizada</p>
                       <p className="text-sm text-neutral-500">
-                        Disfruta el ritmo de la música instrumental
+                        Disfruta el ritmo de la música
                       </p>
                     </div>
                   )}

@@ -214,30 +214,6 @@ export const SpotifySideDrawer: React.FC<SpotifySideDrawerProps> = ({
               </span>
             </button>
 
-            {/* Modo Smart TV (Visible para todos) */}
-            {onOpenTvMode && (
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenTvMode();
-                }}
-                className="w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
-              >
-                <div className="p-1.5 rounded-lg text-emerald-400 group-hover:text-emerald-300 flex-shrink-0">
-                  <Tv className="w-5 h-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <span className="text-sm font-semibold text-white block truncate">
-                    Modo Smart TV
-                  </span>
-                  <span className="text-xs text-neutral-400 block truncate">
-                    Interfaz para televisor y control remoto
-                  </span>
-                </div>
-              </button>
-            )}
-
             {/* Configuración y privacidad (Solo perfil principal) */}
             {isMainProfile && (
               <button

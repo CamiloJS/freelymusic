@@ -23,7 +23,7 @@ import Settings from 'lucide-react/dist/esm/icons/settings.mjs';
 import Disc3 from 'lucide-react/dist/esm/icons/disc-3.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 import Tv from 'lucide-react/dist/esm/icons/tv.mjs';
-import { getStoredTvMode, setStoredTvMode } from './utils/tvDetection';
+import { getStoredTvMode, setStoredTvMode, isSmartTV } from './utils/tvDetection';
 
 // Views and modals are split into separate chunks: the first paint no longer
 // has to download Admin, Add Music, the artist page or every modal.
@@ -150,6 +150,15 @@ const MainLayout: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isTvMode, setIsTvMode] = useState<boolean>(() => getStoredTvMode());
+
+  useEffect(() => {
+    const handleHash = () => {
+      const isTv = isSmartTV();
+      setIsTvMode(isTv);
+    };
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
 
   const handleToggleTvMode = useCallback((enabled: boolean) => {
     setIsTvMode(enabled);
@@ -571,15 +580,6 @@ const MainLayout: React.FC = () => {
 
         {/* Right: User Profile & Preferences Button */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleToggleTvMode(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:text-white transition-all text-xs font-bold shadow-sm"
-            title="Abrir interfaz para Smart TV (Control remoto)"
-          >
-            <Tv className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-            <span className="hidden sm:inline">Modo TV</span>
-          </button>
-
           <button
             onClick={() => {
               if (window.innerWidth < 768) {

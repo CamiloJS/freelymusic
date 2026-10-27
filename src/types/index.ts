@@ -147,6 +147,8 @@ export interface Playlist {
   songIds: string[];
   createdAt: string;
   updatedAt: string;
+  sortBy?: 'custom' | 'title' | 'artist' | 'album';
+  sortDir?: 'asc' | 'desc';
 }
 
 export interface PlayEvent {
@@ -169,6 +171,12 @@ export interface UserLibraryData {
   totalListenSeconds?: number; // accumulated listening time
   songListenSeconds?: Record<string, number>; // songId -> seconds listened
   artistListenSeconds?: Record<string, number>; // primary artist -> seconds listened
+  favoritesSortBy?: 'custom' | 'title' | 'artist' | 'album';
+  favoritesSortDir?: 'asc' | 'desc';
+  playlistSortPreferences?: Record<
+    string,
+    { sortBy: 'custom' | 'title' | 'artist' | 'album'; sortDir: 'asc' | 'desc' }
+  >;
   updatedAt?: string; // last local write, used for cross-device conflict resolution
 }
 

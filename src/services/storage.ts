@@ -537,6 +537,11 @@ function normalizePlaylist(raw: Partial<Playlist> | null | undefined): Playlist 
       typeof raw.updatedAt === 'string' && raw.updatedAt
         ? raw.updatedAt
         : new Date().toISOString(),
+    sortBy:
+      raw.sortBy === 'title' || raw.sortBy === 'artist' || raw.sortBy === 'album' || raw.sortBy === 'custom'
+        ? raw.sortBy
+        : undefined,
+    sortDir: raw.sortDir === 'asc' || raw.sortDir === 'desc' ? raw.sortDir : undefined,
   };
 }
 
@@ -657,6 +662,24 @@ export function normalizeUserData(raw: Partial<UserLibraryData> | null | undefin
         : 0,
     songListenSeconds: normalizeSecondsMap(source.songListenSeconds),
     artistListenSeconds: normalizeSecondsMap(source.artistListenSeconds),
+    favoritesSortBy:
+      source.favoritesSortBy === 'title' ||
+      source.favoritesSortBy === 'artist' ||
+      source.favoritesSortBy === 'album' ||
+      source.favoritesSortBy === 'custom'
+        ? source.favoritesSortBy
+        : undefined,
+    favoritesSortDir:
+      source.favoritesSortDir === 'asc' || source.favoritesSortDir === 'desc'
+        ? source.favoritesSortDir
+        : undefined,
+    playlistSortPreferences:
+      source.playlistSortPreferences && typeof source.playlistSortPreferences === 'object'
+        ? (source.playlistSortPreferences as Record<
+            string,
+            { sortBy: 'custom' | 'title' | 'artist' | 'album'; sortDir: 'asc' | 'desc' }
+          >)
+        : undefined,
     updatedAt:
       typeof source.updatedAt === 'string' && source.updatedAt ? source.updatedAt : undefined,
   };

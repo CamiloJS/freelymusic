@@ -7,6 +7,15 @@ export function isSmartTV(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = (navigator.userAgent || '').toLowerCase();
 
+  // URL hash or query param override (e.g. #/tv or ?tv=1)
+  if (typeof window !== 'undefined') {
+    const hash = (window.location.hash || '').toLowerCase();
+    const search = (window.location.search || '').toLowerCase();
+    if (hash.includes('/tv') || search.includes('tv=1')) {
+      return true;
+    }
+  }
+
   const tvTokens = [
     'smart-tv',
     'smarttv',
@@ -18,6 +27,8 @@ export function isSmartTV(): boolean {
     'netcast',
     'viera',
     'vidaa',
+    'hisense',
+    'vidaaos',
     'opera tv',
     'tizen',
     'webos',
@@ -31,6 +42,13 @@ export function isSmartTV(): boolean {
     'smart_tv',
     'smartbox',
     'tvbox',
+    'dtv',
+    'tsbnet',
+    'crkey',
+    'large screen',
+    'aquos',
+    'philipstv',
+    'tpvision',
   ];
 
   return tvTokens.some((token) => ua.includes(token));

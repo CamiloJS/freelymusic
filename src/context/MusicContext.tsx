@@ -82,6 +82,21 @@ interface MusicContextType {
   deletePlaylist: (playlistId: string) => void;
   addSongToPlaylist: (playlistId: string, songId: string) => void;
   removeSongFromPlaylist: (playlistId: string, songId: string) => void;
+  updateFavoritesSort: (
+    sortBy: 'custom' | 'title' | 'artist' | 'album',
+    sortDir: 'asc' | 'desc'
+  ) => void;
+  updatePlaylistSort: (
+    playlistId: string,
+    sortBy: 'custom' | 'title' | 'artist' | 'album',
+    sortDir: 'asc' | 'desc'
+  ) => void;
+  favoritesSortBy?: 'custom' | 'title' | 'artist' | 'album';
+  favoritesSortDir?: 'asc' | 'desc';
+  playlistSortPreferences?: Record<
+    string,
+    { sortBy: 'custom' | 'title' | 'artist' | 'album'; sortDir: 'asc' | 'desc' }
+  >;
 
   // Artist Profiles
   artistProfiles: ArtistProfile[];
@@ -759,6 +774,49 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
   };
 
+  const updateFavoritesSort = useCallback(
+    (sortBy: 'custom' | 'title' | 'artist' | 'album', sortDir: 'asc' | 'desc') => {
+      try {
+        localStorage.setItem('sonora_sort_favorites_by', sortBy);
+        localStorage.setItem('sonora_sort_favorites_dir', sortDir);
+      } catch {}
+
+      mutateUserData((prev) => ({
+        ...prev,
+        favoritesSortBy: sortBy,
+        favoritesSortDir: sortDir,
+      }));
+    },
+    [mutateUserData]
+  );
+
+  const updatePlaylistSort = useCallback(
+    (
+      playlistId: string,
+      sortBy: 'custom' | 'title' | 'artist' | 'album',
+      sortDir: 'asc' | 'desc'
+    ) => {
+      try {
+        localStorage.setItem(`sonora_sort_${playlistId}_by`, sortBy);
+        localStorage.setItem(`sonora_sort_${playlistId}_dir`, sortDir);
+      } catch {}
+
+      mutateUserData((prev) => ({
+        ...prev,
+        playlists: prev.playlists.map((pl) =>
+          pl.id === playlistId
+            ? { ...pl, sortBy, sortDir, updatedAt: new Date().toISOString() }
+            : pl
+        ),
+        playlistSortPreferences: {
+          ...(prev.playlistSortPreferences || {}),
+          [playlistId]: { sortBy, sortDir },
+        },
+      }));
+    },
+    [mutateUserData]
+  );
+
   const deletePlaylist = (playlistId: string) => {
     mutateUserData((previous) => ({
       ...previous,
@@ -1422,6 +1480,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         deletePlaylist,
         addSongToPlaylist,
         removeSongFromPlaylist,
+        updateFavoritesSort,
+        updatePlaylistSort,
+        favoritesSortBy: userData.favoritesSortBy,
+        favoritesSortDir: userData.favoritesSortDir,
+        playlistSortPreferences: userData.playlistSortPreferences,
         artistProfiles,
         getArtistProfile,
         updateArtistProfile,
