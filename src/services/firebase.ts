@@ -190,7 +190,11 @@ export async function saveSongToFirestore(song: Song): Promise<boolean> {
   if (!cleanSong) return false;
 
   try {
-    await ensureAuth();
+    const authenticated = await ensureAuth();
+    if (!authenticated) {
+      console.warn('Firebase anon auth pending, cannot save song to Firestore');
+      return false;
+    }
     await setDoc(doc(db, ...BASE_PATH, 'catalog', cleanSong.id), sanitizeForFirestore(cleanSong), { merge: true });
     return true;
   } catch (err) {
@@ -206,25 +210,21 @@ export async function saveSongsToFirestore(songs: Song[]): Promise<boolean> {
   if (!db || cleanSongs.length === 0) return false;
 
   try {
-    await Promise.race([
-      ensureAuth(),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2500)),
-    ]);
+    const authenticated = await ensureAuth();
+    if (!authenticated) {
+      console.warn('Firebase anon auth pending, cannot save songs batch to Firestore');
+      return false;
+    }
 
-    // Chunk into sub-batches of 40 documents to stay well below Firestore payload and time limits
-    const BATCH_SIZE = 40;
+    // Chunk into sub-batches of 25 documents to stay well below Firestore limits
+    const BATCH_SIZE = 25;
     for (let i = 0; i < cleanSongs.length; i += BATCH_SIZE) {
       const chunk = cleanSongs.slice(i, i + BATCH_SIZE);
       const batch = writeBatch(db);
       chunk.forEach((song) => {
         batch.set(doc(db!, ...BASE_PATH, 'catalog', song.id), sanitizeForFirestore(song), { merge: true });
       });
-
-      // Avoid hanging indefinitely if network is sluggish or offline
-      await Promise.race([
-        batch.commit(),
-        new Promise<void>((resolve) => setTimeout(resolve, 3500)),
-      ]);
+      await batch.commit();
     }
     return true;
   } catch (err) {

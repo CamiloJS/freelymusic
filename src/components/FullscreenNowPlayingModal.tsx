@@ -22,7 +22,7 @@ import Check from 'lucide-react/dist/esm/icons/check.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import UserRound from 'lucide-react/dist/esm/icons/user-round.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
-import { useAudio, useAudioTime } from '../context/AudioContext';
+import { useAudio, useAudioTime, type PlaybackSource } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { buildDisplayLyrics, formatTime } from '../utils/lyrics';
 import { Album, Playlist, Song } from '../types';
@@ -133,33 +133,45 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
 
   const albums = useMemo(() => getAlbumsFromCatalog(catalog), [catalog]);
 
+  const validatedSource = useMemo((): PlaybackSource | null => {
+    if (!currentSong || !playbackSource) return null;
+    if (playbackSource.type === 'album') {
+      const alb = currentSong.album?.trim().toLowerCase();
+      const src = playbackSource.name?.trim().toLowerCase();
+      if (alb && src && alb !== src) {
+        return alb !== 'sencillo' ? { type: 'album', name: currentSong.album.trim() } : null;
+      }
+    }
+    return playbackSource;
+  }, [playbackSource, currentSong]);
+
   const sourceSubtitle = useMemo(() => {
-    if (playbackSource?.type === 'playlist') return 'DE LA PLAYLIST';
-    if (playbackSource?.type === 'album') return 'DEL ÁLBUM';
-    if (playbackSource?.type === 'artist') return 'DEL ARTISTA';
-    if (playbackSource?.type === 'favorites') return 'DE TUS ME GUSTA';
-    if (playbackSource?.type === 'search') return 'DE LA BÚSQUEDA';
+    if (validatedSource?.type === 'playlist') return 'DE LA PLAYLIST';
+    if (validatedSource?.type === 'album') return 'DEL ÁLBUM';
+    if (validatedSource?.type === 'artist') return 'DEL ARTISTA';
+    if (validatedSource?.type === 'favorites') return 'DE TUS ME GUSTA';
+    if (validatedSource?.type === 'search') return 'DE LA BÚSQUEDA';
     return 'REPRODUCIENDO';
-  }, [playbackSource]);
+  }, [validatedSource]);
 
   const sourceTitle = useMemo(() => {
-    if (playbackSource?.type === 'search' || playbackSource?.name?.startsWith('Buscar "')) {
-      return playbackSource.name;
+    if (validatedSource?.type === 'search' || validatedSource?.name?.startsWith('Buscar "')) {
+      return validatedSource.name;
     }
-    if (playbackSource?.name) return playbackSource.name;
+    if (validatedSource?.name) return validatedSource.name;
     if (currentSong?.album && currentSong.album.toLowerCase() !== 'sencillo') {
       return currentSong.album;
     }
     return 'Tus me gusta';
-  }, [playbackSource, currentSong]);
+  }, [validatedSource, currentSong]);
 
   if (!isFullscreenNowPlaying || !currentSong) return null;
 
   const handleOriginClick = () => {
     setIsFullscreenNowPlaying(false);
-    const sourceName = playbackSource?.name;
+    const sourceName = validatedSource?.name;
 
-    if (playbackSource?.type === 'search' || sourceName?.startsWith('Buscar "')) {
+    if (validatedSource?.type === 'search' || sourceName?.startsWith('Buscar "')) {
       if (onNavigateSearch) {
         onNavigateSearch();
         return;
@@ -167,7 +179,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
     }
 
     if (
-      playbackSource?.type === 'favorites' ||
+      validatedSource?.type === 'favorites' ||
       sourceName?.toLowerCase() === 'tus me gusta'
     ) {
       if (onSelectPlaylist) {
@@ -178,7 +190,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
 
     const matchingPlaylist = playlists.find(
       (p) =>
-        (playbackSource?.id && p.id === playbackSource.id) ||
+        (validatedSource?.id && p.id === validatedSource.id) ||
         (sourceName && p.name.trim().toLowerCase() === sourceName.trim().toLowerCase())
     );
     if (matchingPlaylist && onSelectPlaylist) {
@@ -187,7 +199,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
     }
 
     const targetAlbumName =
-      (playbackSource?.type === 'album' && sourceName ? sourceName : null) ||
+      (validatedSource?.type === 'album' && sourceName ? sourceName : null) ||
       currentSong?.album;
 
     if (targetAlbumName && targetAlbumName.trim().toLowerCase() !== 'sencillo') {
@@ -225,9 +237,9 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
       }
     }
 
-    if (playbackSource?.type === 'artist' || (sourceName && /^artista:/i.test(sourceName))) {
+    if (validatedSource?.type === 'artist' || (sourceName && /^artista:/i.test(sourceName))) {
       const artistName =
-        playbackSource?.id || sourceName?.replace(/^artista:\s*/i, '').trim() || currentSong?.artist;
+        validatedSource?.id || sourceName?.replace(/^artista:\s*/i, '').trim() || currentSong?.artist;
       if (artistName && onSelectArtist) {
         onSelectArtist(artistName);
         return;
@@ -721,13 +733,21 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
               <ChevronDown className="w-5 h-5" />
             </button>
 
-            <button
-              type="button"
-              onClick={handleOriginClick}
-              className="text-xs font-black uppercase tracking-wider text-white/75 hover:text-white hover:underline truncate transition-colors cursor-pointer"
-            >
-              {playbackSource?.name || 'TUS ME GUSTA'}
-            </button>
+            <div className="flex flex-col min-w-0 max-w-md">
+              {sourceSubtitle && (
+                <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 truncate block">
+                  {sourceSubtitle}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleOriginClick}
+                className="text-xs font-black uppercase tracking-wider text-white/75 hover:text-white hover:underline truncate transition-colors cursor-pointer text-left"
+                title={`Ir a ${sourceTitle}`}
+              >
+                {sourceTitle}
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">

@@ -48,7 +48,17 @@ export const CenterLyricsView: React.FC = () => {
 
   if (!currentSong) return null;
 
-  const sourceName = playbackSource?.name || 'Tus me gusta';
+  const sourceName = useMemo(() => {
+    if (!currentSong) return 'Tus me gusta';
+    if (playbackSource?.type === 'album') {
+      const alb = currentSong.album?.trim().toLowerCase();
+      const src = playbackSource.name?.trim().toLowerCase();
+      if (alb && src && alb !== src) {
+        return alb !== 'sencillo' ? currentSong.album : 'Tus me gusta';
+      }
+    }
+    return playbackSource?.name || (currentSong.album && currentSong.album.toLowerCase() !== 'sencillo' ? currentSong.album : 'Tus me gusta');
+  }, [playbackSource, currentSong]);
 
   return (
     <div className="center-lyrics-container flex-1 flex flex-col h-full bg-neutral-950 relative overflow-hidden select-none animate-in fade-in duration-300">

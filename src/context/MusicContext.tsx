@@ -47,7 +47,7 @@ interface MusicContextType {
   catalog: Song[];
   librarySongs: Song[];
   isCatalogReady: boolean;
-  addTrackToCatalog: (song: Omit<Song, 'id' | 'createdAt' | 'addedBy'>) => Song;
+  addTrackToCatalog: (song: Omit<Song, 'id' | 'createdAt' | 'addedBy'>) => Promise<Song>;
   addMultipleTracksToCatalog: (songs: Omit<Song, 'id' | 'createdAt' | 'addedBy'>[]) => Promise<Song[]>;
   updateCatalogTrack: (song: Song) => void;
   deleteCatalogTrack: (songId: string) => void;
@@ -254,12 +254,8 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [currentUser.id, isAuthenticated]);
 
-  // Catalog: one realtime listener is the single source of truth. Local songs
-  // are only kept in a small outbox, so a deleted track can never be
-  // resurrected by another device's stale cache.
+  // Catalog: one realtime listener is the single source of truth across all devices.
   useEffect(() => {
-    if (!isAuthenticated) return;
-
     let cancelled = false;
     let unsubscribe: (() => void) | null = null;
     const readyTimer = setTimeout(() => setIsCatalogReady(true), 5000);
@@ -278,9 +274,24 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (!deletedIds.has(song.id)) map.set(song.id, song);
       });
 
-      const merged = Array.from(map.values());
-      setCatalog(merged);
-      saveStoredCatalog(merged);
+      // Preserve recent locally added songs (created within the last 3 minutes)
+      // so a lagging cloud snapshot NEVER deletes a song the user just added!
+      setCatalog((currentCatalog) => {
+        const now = Date.now();
+        currentCatalog.forEach((localSong) => {
+          if (!map.has(localSong.id) && !deletedIds.has(localSong.id)) {
+            const age = now - new Date(localSong.createdAt).getTime();
+            if (age < 180000) {
+              map.set(localSong.id, localSong);
+            }
+          }
+        });
+
+        const merged = Array.from(map.values());
+        saveStoredCatalog(merged);
+        return merged;
+      });
+
       setIsCatalogReady(true);
       clearTimeout(readyTimer);
 
@@ -427,7 +438,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [catalog, userData.playlists, artistProfiles, currentUser?.avatarUrl]);
 
   // Catalog actions
-  const addTrackToCatalog = (songData: Omit<Song, 'id' | 'createdAt' | 'addedBy'>): Song => {
+  const addTrackToCatalog = async (
+    songData: Omit<Song, 'id' | 'createdAt' | 'addedBy'>
+  ): Promise<Song> => {
     const newSong: Song = {
       ...songData,
       id: `song-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -447,12 +460,17 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return updated;
     });
 
-    void loadFirebaseService()
-      .then((firebase) => firebase.saveSongToFirestore(cleanSong))
-      .then((ok) => {
-        if (ok) removeStoredPendingSong(cleanSong.id);
-      })
-      .catch((err) => console.warn('La canción quedó pendiente de sincronizar:', err));
+    try {
+      const firebase = await loadFirebaseService();
+      if (firebase) {
+        const ok = await firebase.saveSongToFirestore(cleanSong);
+        if (ok) {
+          removeStoredPendingSong(cleanSong.id);
+        }
+      }
+    } catch (err) {
+      console.warn('La canción quedó guardada localmente y pendiente de sincronizar en la nube:', err);
+    }
 
     return cleanSong;
   };
@@ -484,14 +502,10 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return updated;
     });
 
-    // Cloud synchronization in background with timeout protection
     try {
       const firebase = await loadFirebaseService();
       if (firebase) {
-        const saved = await Promise.race([
-          firebase.saveSongsToFirestore(newSongs),
-          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000)),
-        ]);
+        const saved = await firebase.saveSongsToFirestore(newSongs);
         if (saved) {
           newSongs.forEach((song) => removeStoredPendingSong(song.id));
         }

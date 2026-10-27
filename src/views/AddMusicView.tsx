@@ -186,6 +186,7 @@ https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
   ]);
   const [bulkTrackCountInput, setBulkTrackCountInput] = useState('5');
   const [isSavingAlbum, setIsSavingAlbum] = useState(false);
+  const [isSavingTrack, setIsSavingTrack] = useState(false);
 
   const handleAddArtist = () => {
     setArtistList([...artistList, '']);
@@ -888,7 +889,7 @@ https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
   };
 
   // Save track to repository
-  const handleSaveTrack = (e: React.FormEvent) => {
+  const handleSaveTrack = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalArtist = artistList
       .map(cleanArtistSeparators)
@@ -902,8 +903,9 @@ https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
       return;
     }
 
+    setIsSavingTrack(true);
     try {
-      const newSong = addTrackToCatalog({
+      const newSong = await addTrackToCatalog({
         title: title.trim(),
         artist: finalArtist,
         album: album.trim() || 'Sencillo',
@@ -931,7 +933,7 @@ https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
           })),
       });
 
-      setSuccessMessage(`¡"${newSong.title}" guardada exitosamente en el repositorio en la nube!`);
+      setSuccessMessage(`¡"${newSong.title}" guardada exitosamente en el catálogo global!`);
 
       if (autoEnrich) {
         void enrichSongMetadata(newSong)
@@ -976,6 +978,8 @@ https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
     } catch (err: unknown) {
       setErrorMessage((err as Error).message || 'Error al guardar la canción.');
       setTimeout(() => setErrorMessage(''), 4000);
+    } finally {
+      setIsSavingTrack(false);
     }
   };
 
@@ -2369,10 +2373,11 @@ https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm tracking-wide shadow-xl shadow-emerald-500/25 transition-all transform active:scale-[0.99] flex items-center justify-center gap-2"
+                  disabled={isSavingTrack}
+                  className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-black text-sm tracking-wide shadow-xl shadow-emerald-500/25 transition-all transform active:scale-[0.99] flex items-center justify-center gap-2"
                 >
                   <Plus className="w-5 h-5 stroke-[3]" />
-                  <span>Guardar Canción en el Catálogo Global</span>
+                  <span>{isSavingTrack ? 'Guardando Canción en la Nube...' : 'Guardar Canción en el Catálogo Global'}</span>
                 </button>
               </div>
             </form>

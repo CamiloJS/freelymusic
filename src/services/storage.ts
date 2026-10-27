@@ -487,6 +487,10 @@ export function normalizeSong(raw: Partial<Song> | null | undefined): Song | nul
     year: typeof raw.year === 'string' ? raw.year : undefined,
     trackNumber:
       Number.isFinite(trackNumber) && trackNumber > 0 ? trackNumber : undefined,
+    discNumber:
+      Number.isFinite(Number(raw.discNumber)) && Number(raw.discNumber) > 0
+        ? Number(raw.discNumber)
+        : undefined,
     isExplicit: Boolean(raw.isExplicit),
     addedBy: typeof raw.addedBy === 'string' ? raw.addedBy : undefined,
     createdAt:

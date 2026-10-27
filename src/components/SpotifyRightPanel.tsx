@@ -13,7 +13,7 @@ import ExternalLink from 'lucide-react/dist/esm/icons/external-link.mjs';
 import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right.mjs';
 import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
 import Video from 'lucide-react/dist/esm/icons/video.mjs';
-import { useAudio, useAudioTime } from '../context/AudioContext';
+import { useAudio, useAudioTime, type PlaybackSource } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime, buildDisplayLyrics } from '../utils/lyrics';
 import { Song, Album, Playlist } from '../types';
@@ -181,33 +181,46 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
 
   const activeInlineLyric = shouldShowInlineSubtitle ? displayLyrics[activeLyricIndex] : null;
 
+  const validatedSource = React.useMemo((): PlaybackSource | null => {
+    if (!currentSong || !playbackSource) return null;
+    // Check if album source is stale (e.g. played YHLQMDLG before, now playing a different song/album)
+    if (playbackSource.type === 'album') {
+      const alb = currentSong.album?.trim().toLowerCase();
+      const src = playbackSource.name?.trim().toLowerCase();
+      if (alb && src && alb !== src) {
+        return alb !== 'sencillo' ? { type: 'album', name: currentSong.album.trim() } : null;
+      }
+    }
+    return playbackSource;
+  }, [playbackSource, currentSong]);
+
   const sourceSubtitle = React.useMemo(() => {
-    if (playbackSource?.type === 'playlist') return 'DE LA PLAYLIST';
-    if (playbackSource?.type === 'album') return 'DEL ÁLBUM';
-    if (playbackSource?.type === 'artist') return 'DEL ARTISTA';
-    if (playbackSource?.type === 'favorites') return 'DE TUS ME GUSTA';
-    if (playbackSource?.type === 'search') return 'DE LA BÚSQUEDA';
+    if (validatedSource?.type === 'playlist') return 'DE LA PLAYLIST';
+    if (validatedSource?.type === 'album') return 'DEL ÁLBUM';
+    if (validatedSource?.type === 'artist') return 'DEL ARTISTA';
+    if (validatedSource?.type === 'favorites') return 'DE TUS ME GUSTA';
+    if (validatedSource?.type === 'search') return 'DE LA BÚSQUEDA';
     return null;
-  }, [playbackSource]);
+  }, [validatedSource]);
 
   const displayOrigin = React.useMemo(() => {
     if (!currentSong) return null;
-    if (playbackSource?.type === 'search' || playbackSource?.name?.startsWith('Buscar "')) {
-      return playbackSource.name;
+    if (validatedSource?.type === 'search' || validatedSource?.name?.startsWith('Buscar "')) {
+      return validatedSource.name;
     }
-    if (!playbackSource?.name) {
+    if (!validatedSource?.name) {
       return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
         ? currentSong.album
         : null;
     }
     // If it says "Artista: ...", remove it as requested (redundant)
-    if (/^artista:/i.test(playbackSource.name.trim())) {
+    if (/^artista:/i.test(validatedSource.name.trim())) {
       return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
         ? currentSong.album
         : null;
     }
-    return playbackSource.name;
-  }, [playbackSource, currentSong?.album, currentSong]);
+    return validatedSource.name;
+  }, [validatedSource, currentSong]);
 
   if (!isRightPanelOpen || !currentSong) return null;
 

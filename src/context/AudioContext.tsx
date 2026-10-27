@@ -894,7 +894,22 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // If source is not explicitly passed:
         // Check if the song is continuing the active queue (e.g. next/prev track)
         const isContinuingQueue = queue.some((s) => s.id === song.id);
-        if (!isContinuingQueue) {
+        if (isContinuingQueue) {
+          // If continuing queue, but previous source was an album and current song's album differs,
+          // update or clear the album source to avoid displaying wrong album
+          setPlaybackSource((prev) => {
+            if (prev?.type === 'album') {
+              const currentSongAlb = song.album?.trim().toLowerCase();
+              const prevAlb = prev.name?.trim().toLowerCase();
+              if (currentSongAlb && prevAlb && currentSongAlb !== prevAlb) {
+                return currentSongAlb !== 'sencillo'
+                  ? { type: 'album', name: song.album.trim() }
+                  : null;
+              }
+            }
+            return prev;
+          });
+        } else {
           if (song.album && song.album.trim().toLowerCase() !== 'sencillo') {
             setPlaybackSource({ type: 'album', name: song.album.trim() });
           } else {
