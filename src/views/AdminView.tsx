@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
+import Search from 'lucide-react/dist/esm/icons/search.mjs';
 import ShieldAlert from 'lucide-react/dist/esm/icons/shield-alert.mjs';
 import Link2 from 'lucide-react/dist/esm/icons/link-2.mjs';
 import Users from 'lucide-react/dist/esm/icons/users.mjs';
@@ -68,7 +69,19 @@ export const AdminView: React.FC = () => {
   const [fbStatusMessage, setFbStatusMessage] = useState('');
 
   // Tab 3: Song Configuration & Editing in Global Catalog
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState('');
   const [editingSong, setEditingSong] = useState<Song | null>(null);
+
+  const filteredCatalog = useMemo(() => {
+    const q = catalogSearchQuery.trim().toLowerCase();
+    if (!q) return catalog;
+    return catalog.filter(
+      (s) =>
+        s.title.toLowerCase().includes(q) ||
+        s.artist.toLowerCase().includes(q) ||
+        (s.album && s.album.toLowerCase().includes(q))
+    );
+  }, [catalog, catalogSearchQuery]);
   const [editTitle, setEditTitle] = useState('');
   const [editArtistList, setEditArtistList] = useState<string[]>(['']);
   const [editAlbum, setEditAlbum] = useState('');
@@ -869,8 +882,34 @@ export const AdminView: React.FC = () => {
             </button>
           </div>
 
+          {/* Search box for catalog */}
+          <div className="relative mb-4">
+            <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={catalogSearchQuery}
+              onChange={(e) => setCatalogSearchQuery(e.target.value)}
+              placeholder="Buscar canción en el catálogo por título, artista o álbum..."
+              className="w-full bg-neutral-950/80 border border-neutral-800 rounded-xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500 transition-colors"
+            />
+            {catalogSearchQuery && (
+              <button
+                onClick={() => setCatalogSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white p-1"
+                title="Limpiar búsqueda"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
           <div className="divide-y divide-neutral-800/40 max-h-[600px] overflow-y-auto">
-            {catalog.map((song) => (
+            {filteredCatalog.length === 0 ? (
+              <div className="py-8 text-center text-xs text-neutral-500 italic">
+                No se encontraron canciones que coincidan con "{catalogSearchQuery}".
+              </div>
+            ) : (
+              filteredCatalog.map((song) => (
               <div
                 key={song.id}
                 className="flex items-center justify-between py-3 px-2 hover:bg-neutral-800/30 rounded-xl transition-colors"
@@ -931,7 +970,7 @@ export const AdminView: React.FC = () => {
                   </button>
                 </div>
               </div>
-            ))}
+            )))}
           </div>
 
           {/* EDIT SONG MODAL */}

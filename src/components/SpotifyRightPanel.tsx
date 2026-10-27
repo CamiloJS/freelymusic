@@ -317,23 +317,30 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
               </div>
             </div>
 
-            {/* Letra Card */}
+            {/* Letra Card (Dynamic ambient colors from artwork, not always blue) */}
             <div
               onClick={() => setIsCenterLyricsOpen(true)}
-              className="bg-gradient-to-br from-cyan-950 via-sky-950 to-neutral-950 border border-sky-900/40 p-4 rounded-2xl cursor-pointer group hover:border-sky-500/50 transition-all shadow-xl space-y-2 relative overflow-hidden"
+              className="bg-neutral-900/90 border border-white/10 p-4 rounded-2xl cursor-pointer group hover:border-emerald-500/50 transition-all shadow-xl space-y-2 relative overflow-hidden"
             >
-              <div className="flex items-center justify-between text-sky-400 text-xs font-bold">
+              {/* Cover dynamic background blur for this card */}
+              <div
+                className="absolute inset-0 bg-cover bg-center filter blur-2xl scale-125 opacity-30 saturate-150 pointer-events-none transition-all duration-700"
+                style={{ backgroundImage: `url(${currentSong.coverUrl})` }}
+              />
+              <div className="absolute inset-0 bg-black/60 pointer-events-none" />
+
+              <div className="relative z-10 flex items-center justify-between text-white text-xs font-bold">
                 <span className="flex items-center gap-1.5">
-                  <Mic2 className="w-3.5 h-3.5" />
+                  <Mic2 className="w-3.5 h-3.5 text-emerald-400" />
                   Letra
                 </span>
-                <span className="text-[10px] uppercase font-bold text-sky-300 group-hover:underline flex items-center gap-0.5">
+                <span className="text-[10px] uppercase font-bold text-white/70 group-hover:text-white group-hover:underline flex items-center gap-0.5">
                   Ver completa <ChevronRight className="w-3 h-3" />
                 </span>
               </div>
 
               {lyricSnippet.length > 0 ? (
-                <div className="space-y-1.5 pt-1 max-h-56 overflow-hidden">
+                <div className="relative z-10 space-y-1.5 pt-1 max-h-56 overflow-hidden">
                   {lyricSnippet.map((line, idx) => {
                     const actualIdx = startLyricIndex + idx;
                     const isActive = actualIdx === activeLyricIndex;
@@ -342,8 +349,8 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
                         key={idx}
                         className={`text-xs md:text-sm leading-relaxed transition-all ${
                           isActive
-                            ? 'text-white font-extrabold scale-101 origin-left'
-                            : 'text-sky-300/60 font-medium'
+                            ? 'text-white font-extrabold scale-101 origin-left drop-shadow'
+                            : 'text-white/45 font-medium'
                         }`}
                       >
                         {line.text}
@@ -352,7 +359,7 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
                   })}
                 </div>
               ) : (
-                <p className="text-xs text-neutral-400 pt-1">
+                <p className="relative z-10 text-xs text-neutral-400 pt-1">
                   {currentSong.lyricsLrc ? 'Toca para ver la letra sincronizada' : 'Sin letras registradas en esta canción.'}
                 </p>
               )}

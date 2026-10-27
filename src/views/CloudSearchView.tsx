@@ -33,20 +33,90 @@ interface CloudSearchViewProps {
   onSelectAlbum?: (album: Album) => void;
 }
 
+function normalizeSearchText(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 function findMatchingLyricSnippet(song: Song, query: string): string | null {
-  if (!query || query.length < 2) return null;
-  const q = query.toLowerCase();
+  if (!query || query.trim().length < 2) return null;
+  const normQ = normalizeSearchText(query);
   const text = song.lyricsLrc || song.plainLyrics || '';
   if (!text) return null;
 
   const lines = text.split('\n');
   for (const rawLine of lines) {
     const clean = rawLine.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '').trim();
-    if (clean.toLowerCase().includes(q)) {
+    if (!clean) continue;
+    const normLine = normalizeSearchText(clean);
+    if (normLine.includes(normQ)) {
       return clean;
     }
   }
+
+  // Also check if all tokens of query match within a single line
+  const tokens = normQ.split(/\s+/).filter(Boolean);
+  if (tokens.length > 1) {
+    for (const rawLine of lines) {
+      const clean = rawLine.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '').trim();
+      if (!clean) continue;
+      const normLine = normalizeSearchText(clean);
+      if (tokens.every((token) => normLine.includes(token))) {
+        return clean;
+      }
+    }
+  }
+
   return null;
+}
+
+function scoreSongSearch(song: Song, query: string): { score: number; snippet: string | null } {
+  if (!query) return { score: 0, snippet: null };
+  const normQ = normalizeSearchText(query);
+  if (!normQ) return { score: 0, snippet: null };
+
+  const normTitle = normalizeSearchText(song.title);
+  const normArtist = normalizeSearchText(song.artist);
+  const normAlbum = song.album ? normalizeSearchText(song.album) : '';
+  const normGenre = song.genre ? normalizeSearchText(song.genre) : '';
+
+  // Cross-field combinations (allows "Aitana En el coche" or "En el coche Aitana")
+  const combined = `${normTitle} ${normArtist} ${normAlbum} ${normGenre} ${normArtist} ${normTitle}`;
+
+  // 1. Exact match on title or artist
+  if (normTitle === normQ) return { score: 100, snippet: null };
+  if (normArtist === normQ) return { score: 95, snippet: null };
+
+  // 2. Starts with query
+  if (normTitle.startsWith(normQ)) return { score: 90, snippet: null };
+  if (normArtist.startsWith(normQ)) return { score: 85, snippet: null };
+
+  // 3. Substring match
+  if (normTitle.includes(normQ)) return { score: 80, snippet: null };
+  if (normArtist.includes(normQ)) return { score: 75, snippet: null };
+  if (combined.includes(normQ)) return { score: 70, snippet: null };
+
+  // 4. Token-level matching (all words in query must exist in combined song info)
+  const tokens = normQ.split(/\s+/).filter(Boolean);
+  if (tokens.length > 0) {
+    const allTokensPresent = tokens.every((tok) => combined.includes(tok));
+    if (allTokensPresent) {
+      const titleMatches = tokens.filter((t) => normTitle.includes(t)).length;
+      const artistMatches = tokens.filter((t) => normArtist.includes(t)).length;
+      return { score: 50 + titleMatches * 10 + artistMatches * 8, snippet: null };
+    }
+  }
+
+  // 5. Lyrics snippet search
+  const snippet = findMatchingLyricSnippet(song, query);
+  if (snippet) {
+    return { score: 40, snippet };
+  }
+
+  return { score: 0, snippet: null };
 }
 
 export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
@@ -69,17 +139,18 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
   const [recentSearches, setRecentSearches] = useState<string[]>(() => getRecentSearches());
 
   const filteredSongs = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
+    const q = searchQuery.trim();
     if (!q) return [];
 
-    return catalog.filter((song) => {
-      const titleMatch = song.title.toLowerCase().includes(q);
-      const artistMatch = song.artist.toLowerCase().includes(q);
-      const albumMatch = song.album ? song.album.toLowerCase().includes(q) : false;
-      const genreMatch = song.genre ? song.genre.toLowerCase().includes(q) : false;
-      const lyricsMatch = findMatchingLyricSnippet(song, q) !== null;
-      return titleMatch || artistMatch || albumMatch || genreMatch || lyricsMatch;
-    });
+    const scored = catalog
+      .map((song) => {
+        const result = scoreSongSearch(song, q);
+        return { song, score: result.score };
+      })
+      .filter((item) => item.score > 0);
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((item) => item.song);
   }, [catalog, searchQuery]);
 
   const selectRecent = (term: string) => {

@@ -406,6 +406,31 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setTranslationUpdatedAt(null);
   }, [currentSong?.id, activeVersionId, isKaraoke]);
 
+  // Pre-load cached translation if one is already saved in cloud or local cache
+  useEffect(() => {
+    if (!currentSong || !effectiveLyricsLrc) return;
+    const reqId = translationRequestRef.current;
+
+    void translateLyricsWithCache({
+      songId: currentSong.id,
+      versionId: activeVersionId || 'original',
+      lrc: effectiveLyricsLrc,
+      targetLang: translationLang || 'es',
+      songTitle: currentSong.title,
+      artist: currentSong.artist,
+    })
+      .then((result) => {
+        if (result && result.cached && reqId === translationRequestRef.current) {
+          setTranslatedLyrics(result.lines);
+          setTranslationProvider(result.provider);
+          setTranslationUpdatedAt(result.updatedAt);
+        }
+      })
+      .catch(() => {
+        // Silent background preload
+      });
+  }, [currentSong?.id, activeVersionId, effectiveLyricsLrc, translationLang]);
+
   // Record personal play event after ~3 seconds of continuous playback
   useEffect(() => {
     if (

@@ -3,9 +3,10 @@ import { parseLrc } from '../utils/lyrics';
 import { loadFirebaseService } from './firebaseLoader';
 
 const MYMEMORY_ENDPOINT = 'https://api.mymemory.translated.net/get';
-const MAX_CHUNK_CHARS = 420;
+const GOOGLE_TRANSLATE_ENDPOINT = 'https://translate.googleapis.com/translate_a/single';
+const MAX_CHUNK_CHARS = 1200;
 const LOCAL_CACHE_PREFIX = 'musica_lyrics_translation_';
-const PROVIDER_NAME = 'MyMemory';
+const PROVIDER_NAME = 'Google Translate';
 
 export interface TranslateLyricsOptions {
   songId: string;
@@ -125,6 +126,11 @@ export function applyFeminineConcordance(text: string): string {
     [/\b(fui|era|seré|soy|he sido)\s+el primero\b/gi, '$1 la primera'],
     [/\b(fui|era|seré|soy|he sido)\s+un chico malo\b/gi, '$1 una chica mala'],
     [/\b(fui|era|seré|soy|he sido)\s+un buen chico\b/gi, '$1 una buena chica'],
+    [/\b(de|por|para|al)\s+estar solo\b/gi, '$1 estar sola'],
+    [/\b(de|por|para|al)\s+sentirme solo\b/gi, '$1 sentirme sola'],
+    [/\b(de|por|para|al)\s+quedarme solo\b/gi, '$1 quedarme sola'],
+    [/\b(de|por|para|al)\s+vivir solo\b/gi, '$1 vivir sola'],
+    [/\b(soy|era|fui)\s+un tonto\b/gi, '$1 una tonta'],
   ];
 
   for (const [pattern, repl] of replacements) {
@@ -215,11 +221,50 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function translateChunkWithGoogle(
+  text: string,
+  sourceLang: string,
+  targetLang: string
+): Promise<string> {
+  const sl = sourceLang === 'auto' ? 'auto' : sourceLang;
+  const url = `${GOOGLE_TRANSLATE_ENDPOINT}?client=gtx&sl=${encodeURIComponent(
+    sl
+  )}&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(text)}`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Google Translate respondió ${response.status}`);
+  }
+
+  const payload = await response.json();
+  if (Array.isArray(payload) && Array.isArray(payload[0])) {
+    const combined = payload[0]
+      .map((item: unknown) =>
+        Array.isArray(item) && typeof item[0] === 'string' ? item[0] : ''
+      )
+      .join('');
+    if (combined.trim()) {
+      return combined;
+    }
+  }
+
+  throw new Error('Google Translate devolvió respuesta vacía');
+}
+
 async function translateChunk(
   text: string,
   sourceLang: string,
   targetLang: string
 ): Promise<string> {
+  // 1. Try Google Translate first (best quality, preserves newlines, no restrictive quota)
+  try {
+    const googleResult = await translateChunkWithGoogle(text, sourceLang, targetLang);
+    return decodeHtmlEntities(googleResult);
+  } catch (googleError) {
+    console.warn('Fallo Google Translate, reintentando con MyMemory:', googleError);
+  }
+
+  // 2. Fallback to MyMemory
   const url = `${MYMEMORY_ENDPOINT}?q=${encodeURIComponent(
     text
   )}&langpair=${encodeURIComponent(sourceLang)}|${encodeURIComponent(targetLang)}`;
