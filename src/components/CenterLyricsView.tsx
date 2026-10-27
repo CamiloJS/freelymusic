@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
 import Minimize2 from 'lucide-react/dist/esm/icons/minimize-2.mjs';
 import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
@@ -23,12 +23,20 @@ export const CenterLyricsView: React.FC = () => {
   const activeLineRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll to active lyric smoothly
+  // Auto-scroll to active lyric smoothly without moving outer parent layout
   useEffect(() => {
-    if (activeLineRef.current) {
-      activeLineRef.current.scrollIntoView({
+    if (activeLyricIndex < 0) return;
+    if (activeLineRef.current && scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const activeEl = activeLineRef.current;
+      const containerHeight = container.clientHeight;
+      const activeTop = activeEl.offsetTop;
+      const activeHeight = activeEl.clientHeight;
+
+      const targetScroll = activeTop - containerHeight / 2 + activeHeight / 2;
+      container.scrollTo({
+        top: Math.max(0, targetScroll),
         behavior: 'smooth',
-        block: 'center',
       });
     }
   }, [activeLyricIndex]);
@@ -36,10 +44,9 @@ export const CenterLyricsView: React.FC = () => {
   if (!currentSong) return null;
 
   const sourceName = playbackSource?.name || 'Tus me gusta';
-  const displayLyrics = buildDisplayLyrics(
-    parsedLyrics,
-    translatedLyrics,
-    lyricsDisplayMode
+  const displayLyrics = useMemo(
+    () => buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode),
+    [parsedLyrics, translatedLyrics, lyricsDisplayMode]
   );
 
   return (
@@ -51,9 +58,10 @@ export const CenterLyricsView: React.FC = () => {
       />
       <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-neutral-950/70 to-neutral-950 pointer-events-none" />
       <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-neutral-950 via-neutral-950/80 to-transparent pointer-events-none z-10" />
+      <div className="absolute inset-x-0 top-[65px] h-12 bg-gradient-to-b from-neutral-950 via-neutral-950/60 to-transparent pointer-events-none z-20" />
 
-      {/* Top Action Bar */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 z-10 bg-black/30 backdrop-blur-md flex-shrink-0">
+      {/* Top Action Bar (z-30 ensures popover overlays lyrics) */}
+      <div className="relative z-30 flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40 backdrop-blur-md flex-shrink-0">
         <div className="flex items-center gap-3 truncate">
           <span className="text-xs font-black uppercase tracking-wider text-neutral-300">
             {sourceName}
@@ -97,7 +105,7 @@ export const CenterLyricsView: React.FC = () => {
       {/* Scrolling Lyrics Area */}
       <div
         ref={scrollContainerRef}
-        className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-6 md:px-12 py-12 pb-32 space-y-7 text-center md:text-left scroll-smooth"
+        className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-6 md:px-12 pt-16 pb-36 space-y-7 text-center md:text-left scroll-smooth"
       >
         {parsedLyrics.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3">

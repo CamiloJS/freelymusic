@@ -44,6 +44,7 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
     rightPanelTab,
     setRightPanelTab,
     setIsCenterLyricsOpen,
+    isFullscreenNowPlaying,
     setIsFullscreenNowPlaying,
     playSong,
     parsedLyrics,
@@ -66,7 +67,17 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
   // Sync video time and playback when entering video mode or seeking
   React.useEffect(() => {
     const video = videoRef.current;
-    if (isVideoMode && video) {
+    if (!video) return;
+
+    if (isFullscreenNowPlaying) {
+      video.pause();
+      video.muted = true;
+      return;
+    }
+
+    video.muted = isMuted;
+
+    if (isVideoMode) {
       if (Math.abs(video.currentTime - currentTime) > 1) {
         try {
           video.currentTime = currentTime;
@@ -79,16 +90,18 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
       } else {
         video.pause();
       }
+    } else {
+      video.pause();
     }
-  }, [isVideoMode, isPlaying]);
+  }, [isVideoMode, isPlaying, isFullscreenNowPlaying, isMuted]);
 
   // Keep volume synced with audio player
   React.useEffect(() => {
     const video = videoRef.current;
     if (video) {
-      video.volume = isMuted ? 0 : volume;
+      video.volume = isMuted || isFullscreenNowPlaying ? 0 : volume;
     }
-  }, [volume, isMuted]);
+  }, [volume, isMuted, isFullscreenNowPlaying]);
 
   const handleInlineVideoTimeUpdate = () => {
     const video = videoRef.current;
@@ -288,19 +301,23 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
             )}
 
             {/* High-res Cover Art OR Inline Video (Spotify Image 4) */}
-            <div className="aspect-square w-full rounded-2xl overflow-hidden bg-neutral-900 shadow-2xl relative group flex items-center justify-center">
+            <div
+              className={`${
+                isVideoMode && videoUrl ? 'aspect-video bg-black' : 'aspect-square bg-neutral-900'
+              } w-full rounded-2xl overflow-hidden shadow-2xl relative group flex items-center justify-center transition-all duration-200`}
+            >
               {isVideoMode && videoUrl ? (
-                <div className="relative w-full h-full bg-black">
+                <div className="relative w-full h-full bg-black flex items-center justify-center">
                   <video
                     ref={videoRef}
                     src={videoUrl}
                     poster={currentSong.coverUrl}
-                    autoPlay={isPlaying}
+                    autoPlay={isPlaying && !isFullscreenNowPlaying}
                     playsInline
                     onTimeUpdate={handleInlineVideoTimeUpdate}
                     onEnded={() => closeVideo(videoRef.current?.currentTime)}
                     onClick={togglePlayPause}
-                    className="w-full h-full object-cover cursor-pointer"
+                    className="w-full h-full object-contain cursor-pointer"
                   />
                   {/* Floating overlay on hover with play/pause and fullscreen button */}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between p-3 pointer-events-none">
@@ -328,6 +345,14 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
                       <span>Pantalla Completa</span>
                     </button>
                   </div>
+                  {/* Subtle video subtitle overlay at bottom of right panel video */}
+                  {currentSong && parsedLyrics.length > 0 && activeLyricIndex >= 0 && parsedLyrics[activeLyricIndex]?.text && (
+                    <div className="absolute bottom-2 left-2 right-2 z-10 pointer-events-none text-center">
+                      <span className="inline-block px-2.5 py-1 rounded-lg bg-black/80 backdrop-blur-sm text-white text-[11px] font-bold border border-white/10 shadow truncate max-w-full">
+                        {parsedLyrics[activeLyricIndex].text}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>

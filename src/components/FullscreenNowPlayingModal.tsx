@@ -66,12 +66,20 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
   const activeLineRef = useRef<HTMLDivElement | null>(null);
   const lyricsScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll to active lyric smoothly like Apple Music
+  // Auto-scroll to active lyric smoothly like Apple Music without shifting parent layout
   useEffect(() => {
-    if (activeLineRef.current) {
-      activeLineRef.current.scrollIntoView({
+    if (activeLyricIndex < 0) return;
+    if (activeLineRef.current && lyricsScrollRef.current) {
+      const container = lyricsScrollRef.current;
+      const activeEl = activeLineRef.current;
+      const containerHeight = container.clientHeight;
+      const activeTop = activeEl.offsetTop;
+      const activeHeight = activeEl.clientHeight;
+
+      const targetScroll = activeTop - containerHeight / 2 + activeHeight / 2;
+      container.scrollTo({
+        top: Math.max(0, targetScroll),
         behavior: 'smooth',
-        block: 'center',
       });
     }
   }, [activeLyricIndex]);
@@ -192,8 +200,8 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
           <button
             type="button"
             onClick={() => {
-              setIsFullscreenNowPlaying(false);
               openVideo();
+              setIsFullscreenNowPlaying(true);
             }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-bold transition-all backdrop-blur-md"
             title="Ver videoclip"

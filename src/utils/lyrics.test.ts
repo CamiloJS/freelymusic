@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseLrc, getActiveLyricIndex, formatTime } from './lyrics';
+import { parseLrc, getActiveLyricIndex, formatTime, buildDisplayLyrics } from './lyrics';
 
 describe('lyrics utils', () => {
   it('parses standard LRC format correctly', () => {
@@ -51,5 +51,38 @@ describe('lyrics utils', () => {
     expect(formatTime(65)).toBe('1:05');
     expect(formatTime(3665)).toBe('1:01:05');
     expect(formatTime(-5)).toBe('0:00');
+  });
+
+  it('builds display lyrics correctly for different modes', () => {
+    const original = [
+      { time: 5, text: 'Hello' },
+      { time: 10, text: 'World' },
+    ];
+    const translated = [
+      { time: 5, text: 'Hola' },
+      { time: 10, text: 'Mundo' },
+    ];
+
+    // Original mode
+    const orig = buildDisplayLyrics(original, translated, 'original');
+    expect(orig).toEqual(original);
+
+    // Translation mode
+    const trans = buildDisplayLyrics(original, translated, 'translation');
+    expect(trans).toEqual([
+      { time: 5, text: 'Hola' },
+      { time: 10, text: 'Mundo' },
+    ]);
+
+    // Both mode
+    const both = buildDisplayLyrics(original, translated, 'both');
+    expect(both).toEqual([
+      { time: 5, text: 'Hello', translation: 'Hola' },
+      { time: 10, text: 'World', translation: 'Mundo' },
+    ]);
+
+    // Edge cases
+    expect(buildDisplayLyrics([], translated, 'both')).toEqual([]);
+    expect(buildDisplayLyrics(original, [], 'translation')).toEqual(original);
   });
 });

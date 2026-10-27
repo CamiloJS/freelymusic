@@ -162,13 +162,23 @@ const MainLayout: React.FC = () => {
           if (pl) {
             setSelectedPlaylist(pl);
           } else {
-            setSelectedPlaylist({
-              id: param,
-              name: param,
-              userId: '',
-              songIds: [],
-              createdAt: '',
-              updatedAt: '',
+            setSelectedPlaylist((prev) => {
+              if (
+                prev &&
+                typeof prev === 'object' &&
+                'id' in prev &&
+                (prev.id === param || prev.name.trim().toLowerCase() === param.trim().toLowerCase())
+              ) {
+                return prev;
+              }
+              return {
+                id: param,
+                name: param,
+                userId: '',
+                songIds: [],
+                createdAt: '',
+                updatedAt: '',
+              };
             });
           }
           setCurrentTab('library');
@@ -186,14 +196,24 @@ const MainLayout: React.FC = () => {
           if (found) {
             setSelectedPlaylist(found);
           } else {
-            const matchingSongs = catalog.filter(
-              (s) => s.album && s.album.trim().toLowerCase() === param.trim().toLowerCase()
-            );
-            setSelectedPlaylist({
-              name: param,
-              artist: matchingSongs[0]?.artist || '',
-              coverUrl: matchingSongs[0]?.coverUrl || '',
-              songs: matchingSongs,
+            setSelectedPlaylist((prev) => {
+              if (
+                prev &&
+                typeof prev === 'object' &&
+                'songs' in prev &&
+                prev.name.trim().toLowerCase() === param.trim().toLowerCase()
+              ) {
+                return prev;
+              }
+              const matchingSongs = catalog.filter(
+                (s) => s.album && s.album.trim().toLowerCase() === param.trim().toLowerCase()
+              );
+              return {
+                name: param,
+                artist: matchingSongs[0]?.artist || '',
+                coverUrl: matchingSongs[0]?.coverUrl || '',
+                songs: matchingSongs,
+              };
             });
           }
           setCurrentTab('library');
@@ -303,19 +323,41 @@ const MainLayout: React.FC = () => {
     setSongToAddToPlaylist(song);
   };
 
-  const handleSelectPlaylist = (playlist: Playlist | 'favorites' | Album) => {
+  const handleSelectPlaylist = useCallback((playlist: Playlist | 'favorites' | Album) => {
     setSelectedPlaylist(playlist);
     setCurrentTab('library');
     setIsCenterLyricsOpen(false);
 
     if (playlist === 'favorites') {
-      window.location.hash = '#/favorites';
+      if (window.location.hash !== '#/favorites') {
+        window.location.hash = '#/favorites';
+      }
     } else if ('songs' in playlist) {
-      window.location.hash = `#/album/${encodeURIComponent(playlist.name)}`;
+      const albumHash = `#/album/${encodeURIComponent(playlist.name)}`;
+      if (window.location.hash !== albumHash) {
+        window.location.hash = albumHash;
+      }
     } else {
-      window.location.hash = `#/playlist/${encodeURIComponent(playlist.id)}`;
+      const plHash = `#/playlist/${encodeURIComponent(playlist.id)}`;
+      if (window.location.hash !== plHash) {
+        window.location.hash = plHash;
+      }
     }
-  };
+  }, [setIsCenterLyricsOpen]);
+
+  const handleSetSelectedPlaylist = useCallback(
+    (playlist: Playlist | 'favorites' | Album | null) => {
+      if (playlist === null) {
+        setSelectedPlaylist(null);
+        if (window.location.hash !== '#/library') {
+          window.location.hash = '#/library';
+        }
+      } else {
+        handleSelectPlaylist(playlist);
+      }
+    },
+    [handleSelectPlaylist]
+  );
 
   const handleSelectArtist = (artistName: string) => {
     if (currentTab !== 'artist') {
@@ -332,10 +374,7 @@ const MainLayout: React.FC = () => {
   };
 
   const handleSelectAlbum = (album: Album) => {
-    setSelectedPlaylist(album);
-    setCurrentTab('library');
-    setIsCenterLyricsOpen(false);
-    window.location.hash = `#/album/${encodeURIComponent(album.name)}`;
+    handleSelectPlaylist(album);
   };
 
   const handleNavigateTab = (tab: string) => {
@@ -350,6 +389,8 @@ const MainLayout: React.FC = () => {
       setSelectedArtist(null);
       window.location.hash = '#/search';
     } else if (tab === 'library') {
+      setSelectedPlaylist(null);
+      setSelectedArtist(null);
       window.location.hash = '#/library';
     } else {
       setSelectedPlaylist(null);
@@ -391,8 +432,9 @@ const MainLayout: React.FC = () => {
                   handleBackFromArtist();
                 } else if (currentTab === 'library' && selectedPlaylist) {
                   setSelectedPlaylist(null);
+                  window.location.hash = '#/library';
                 } else if (currentTab !== 'home') {
-                  setCurrentTab('home');
+                  handleNavigateTab('home');
                 } else {
                   window.history.back();
                 }
@@ -526,7 +568,7 @@ const MainLayout: React.FC = () => {
                 {currentTab === 'library' && (
                   <LibraryView
                     selectedPlaylist={selectedPlaylist}
-                    setSelectedPlaylist={setSelectedPlaylist}
+                    setSelectedPlaylist={handleSetSelectedPlaylist}
                     onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
                     onOpenAddToPlaylist={handleOpenAddToPlaylist}
                     onOpenImportPlaylist={() => setIsImportPlaylistOpen(true)}

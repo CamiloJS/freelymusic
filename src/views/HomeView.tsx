@@ -370,7 +370,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 key={pl.id}
                 onClick={() => {
                   onSelectPlaylist(pl);
-                  onNavigate('library');
                 }}
                 className="bg-neutral-900/50 hover:bg-neutral-800/60 p-3.5 rounded-2xl border border-neutral-800/60 cursor-pointer group transition-all"
               >

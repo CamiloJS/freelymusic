@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
@@ -33,18 +33,29 @@ export const LyricsModal: React.FC = () => {
     lyricsDisplayMode,
   } = useAudio();
   const { currentTime, duration, activeLyricIndex } = useAudioTime();
-  const displayLyrics = buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode);
+  const displayLyrics = useMemo(
+    () => buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode),
+    [parsedLyrics, translatedLyrics, lyricsDisplayMode]
+  );
 
   const { isFavorite, toggleFavorite } = useMusic();
   const activeLineRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-scroll to active lyric line
+  // Auto-scroll to active lyric line smoothly without shifting layout
   useEffect(() => {
-    if (activeLineRef.current && showLyricsView) {
-      activeLineRef.current.scrollIntoView({
+    if (activeLyricIndex < 0) return;
+    if (activeLineRef.current && containerRef.current && showLyricsView) {
+      const container = containerRef.current;
+      const activeEl = activeLineRef.current;
+      const containerHeight = container.clientHeight;
+      const activeTop = activeEl.offsetTop;
+      const activeHeight = activeEl.clientHeight;
+
+      const targetScroll = activeTop - containerHeight / 2 + activeHeight / 2;
+      container.scrollTo({
+        top: Math.max(0, targetScroll),
         behavior: 'smooth',
-        block: 'center',
       });
     }
   }, [activeLyricIndex, showLyricsView]);
@@ -64,7 +75,7 @@ export const LyricsModal: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none" />
 
       {/* Top Header Bar */}
-      <header className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-white/5 backdrop-blur-md">
+      <header className="relative z-30 flex items-center justify-between px-6 py-4 border-b border-white/5 backdrop-blur-md">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl overflow-hidden bg-neutral-800 flex-shrink-0 shadow">
             <img src={currentSong.coverUrl} alt={currentSong.title} className="w-full h-full object-cover" />

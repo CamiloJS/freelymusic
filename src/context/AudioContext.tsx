@@ -579,6 +579,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     recordListeningTime,
   ]);
 
+  // Ensure the primary audio element is paused whenever in video mode so audio never duplicates
+  useEffect(() => {
+    if (isVideoMode && audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+    }
+  }, [isVideoMode]);
+
   // Load and play song (handling offline blob caching, versions and karaoke)
   const loadAndPlaySong = useCallback(
     async (

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
@@ -156,12 +156,37 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
   const liked = isFavorite(currentSong.id);
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  const displayLyrics = buildDisplayLyrics(
-    parsedLyrics,
-    translatedLyrics,
-    lyricsDisplayMode
+  const displayLyrics = useMemo(
+    () => buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode),
+    [parsedLyrics, translatedLyrics, lyricsDisplayMode]
   );
-  const activeLyric = displayLyrics[activeLyricIndex];
+
+  const isBeforeFirstLyric = parsedLyrics.length > 0 && currentTime < parsedLyrics[0].time - 0.2;
+  const isAfterLastLyric =
+    parsedLyrics.length > 0 &&
+    activeLyricIndex === parsedLyrics.length - 1 &&
+    currentTime > parsedLyrics[activeLyricIndex].time + 7;
+  const isInstrumentalGap =
+    parsedLyrics.length > 0 &&
+    activeLyricIndex >= 0 &&
+    activeLyricIndex < parsedLyrics.length - 1 &&
+    parsedLyrics[activeLyricIndex + 1].time - parsedLyrics[activeLyricIndex].time > 8 &&
+    currentTime >
+      parsedLyrics[activeLyricIndex].time +
+        Math.min(
+          7,
+          parsedLyrics[activeLyricIndex + 1].time - parsedLyrics[activeLyricIndex].time - 2
+        );
+
+  const shouldShowSubtitle =
+    showSubtitles &&
+    !isBeforeFirstLyric &&
+    !isAfterLastLyric &&
+    !isInstrumentalGap &&
+    activeLyricIndex >= 0 &&
+    Boolean(displayLyrics[activeLyricIndex]?.text);
+
+  const activeLyric = shouldShowSubtitle ? displayLyrics[activeLyricIndex] : null;
 
   const sourceName = playbackSource?.name || currentSong.album || 'CUARTO AZUL';
 
@@ -260,19 +285,19 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
         </div>
       </div>
 
-      {/* Synchronized Subtitles (Centered at the bottom of the video, toggleable) */}
-      {showSubtitles && activeLyric && activeLyric.text && (
+      {/* Synchronized Subtitles (Positioned near bottom above controls, never in middle of video) */}
+      {activeLyric && (
         <div
-          className={`relative z-20 px-6 max-w-3xl mx-auto w-full text-center transition-all duration-300 pointer-events-none mb-4 ${
-            showControls ? 'translate-y-0' : 'translate-y-8'
+          className={`absolute left-0 right-0 z-30 pointer-events-none flex justify-center px-4 transition-all duration-300 ease-out ${
+            showControls ? 'bottom-32 sm:bottom-36' : 'bottom-8 sm:bottom-12'
           }`}
         >
-          <div className="inline-block px-5 py-2.5 rounded-2xl bg-black/75 border border-white/10 backdrop-blur-md shadow-2xl space-y-1">
-            <p className="text-white text-lg sm:text-2xl md:text-3xl font-black drop-shadow-lg tracking-tight leading-snug">
+          <div className="max-w-2xl sm:max-w-3xl text-center px-5 py-2.5 rounded-2xl bg-black/80 backdrop-blur-md border border-white/10 shadow-2xl transition-all duration-150">
+            <p className="text-white text-base sm:text-xl md:text-2xl font-black drop-shadow tracking-tight leading-snug">
               {activeLyric.text}
             </p>
             {activeLyric.translation && (
-              <p className="text-emerald-300 text-xs sm:text-sm md:text-base font-semibold drop-shadow">
+              <p className="text-emerald-300 text-xs sm:text-sm md:text-base font-semibold drop-shadow mt-1">
                 {activeLyric.translation}
               </p>
             )}

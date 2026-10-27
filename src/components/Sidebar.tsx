@@ -120,7 +120,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigateToPlaylist = (playlist: Playlist) => {
     setIsCenterLyricsOpen(false);
     onSelectPlaylist(playlist);
-    setCurrentTab('library');
   };
 
   const openPlaylistMenu = (
@@ -192,7 +191,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (userFavoriteSongs.length === 0) return;
     setIsCenterLyricsOpen(false);
     onSelectPlaylist('favorites');
-    setCurrentTab('library');
   };
 
   return (
@@ -391,7 +389,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onClick={() => {
                     setIsCenterLyricsOpen(false);
                     onSelectPlaylist(album);
-                    setCurrentTab('library');
                   }}
                   className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors group ${
                     isSelected ? 'bg-neutral-850 text-white' : 'hover:bg-neutral-900/70'
