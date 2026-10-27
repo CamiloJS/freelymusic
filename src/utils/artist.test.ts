@@ -64,4 +64,94 @@ describe('Artist profiles and personal play tracking', () => {
     expect(countSong1).toBe(3);
     expect(countSong3).toBe(0);
   });
+
+  it('matches artist aliases and variations (e.g. J Balvin vs J. Balvin)', () => {
+    const aliases = new Set(['j balvin', 'jbalvin', 'j. balvin']);
+    const songs: Song[] = [
+      {
+        id: '1',
+        title: 'Mi Gente',
+        artist: 'J Balvin, Willy William',
+        album: 'Vibras',
+        coverUrl: '',
+        audioUrl: '',
+        duration: 180,
+        createdAt: '',
+      },
+      {
+        id: '2',
+        title: '6 AM',
+        artist: 'J. Balvin, Farruko',
+        album: 'La Familia',
+        coverUrl: '',
+        audioUrl: '',
+        duration: 190,
+        createdAt: '',
+      },
+      {
+        id: '3',
+        title: 'Dákiti',
+        artist: 'Bad Bunny, Jhayco',
+        album: 'El Último Tour Del Mundo',
+        coverUrl: '',
+        audioUrl: '',
+        duration: 200,
+        createdAt: '',
+      },
+    ];
+
+    const matchedSongs = songs.filter((song) => {
+      const parts = song.artist.split(/[,&/]|feat\.|ft\./i).map((p) => p.trim().toLowerCase());
+      return parts.some((p) => aliases.has(p) || aliases.has(p.replace(/[\s._-]+/g, '')));
+    });
+
+    expect(matchedSongs).toHaveLength(2);
+    expect(matchedSongs.map((s) => s.title)).toEqual(['Mi Gente', '6 AM']);
+  });
+
+  it('separates own albums from collaborative featured albums (También aparece en)', () => {
+    const artistName = 'Bad Bunny';
+    const aliases = new Set(['bad bunny', 'badbunny']);
+
+    const albums = [
+      {
+        name: 'Un Verano Sin Ti',
+        artist: 'Bad Bunny',
+        songs: [
+          { title: 'Moscow Mule', artist: 'Bad Bunny' },
+          { title: 'Tarot', artist: 'Bad Bunny, Jhayco' },
+        ],
+      },
+      {
+        name: 'Vibras',
+        artist: 'J Balvin',
+        songs: [
+          { title: 'Si Tu Novio Te Deja Sola', artist: 'J Balvin, Bad Bunny' },
+          { title: 'Mi Gente', artist: 'J Balvin, Willy William' },
+        ],
+      },
+    ];
+
+    const ownAlbums: string[] = [];
+    const featuredAlbums: string[] = [];
+
+    albums.forEach((alb) => {
+      const albArtistNorm = alb.artist.trim().toLowerCase();
+      const isDirectOwner = aliases.has(albArtistNorm);
+      const primaryCount = alb.songs.filter((s) => {
+        const first = s.artist.split(/[,&/]|feat\.|ft\./i)[0].trim().toLowerCase();
+        return aliases.has(first);
+      }).length;
+      const isMajority = primaryCount / alb.songs.length >= 0.5;
+
+      if (isDirectOwner || isMajority) {
+        ownAlbums.push(alb.name);
+      } else {
+        featuredAlbums.push(alb.name);
+      }
+    });
+
+    expect(ownAlbums).toEqual(['Un Verano Sin Ti']);
+    expect(featuredAlbums).toEqual(['Vibras']);
+  });
 });

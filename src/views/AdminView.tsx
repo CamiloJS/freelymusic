@@ -93,6 +93,7 @@ export const AdminView: React.FC = () => {
   const [editLyricsLrc, setEditLyricsLrc] = useState('');
   const [editIsExplicit, setEditIsExplicit] = useState(false);
   const [editTrackNumber, setEditTrackNumber] = useState<number | undefined>(undefined);
+  const [editDiscNumber, setEditDiscNumber] = useState<number | undefined>(undefined);
   const [editDuration, setEditDuration] = useState(180);
   const [editMedia, setEditMedia] = useState<SongMediaValue>({ ...EMPTY_SONG_MEDIA });
   const [isEnrichmentOpen, setIsEnrichmentOpen] = useState(false);
@@ -107,6 +108,7 @@ export const AdminView: React.FC = () => {
     setEditAlbum(song.album || '');
     setEditAlbumArtist(song.albumArtist || '');
     setEditTrackNumber(song.trackNumber);
+    setEditDiscNumber(song.discNumber);
     setEditGenre(song.genre || '');
     setEditYear(song.year || '2026');
     setEditCoverUrl(song.coverUrl);
@@ -151,6 +153,7 @@ export const AdminView: React.FC = () => {
       album: editAlbum.trim() || 'Sencillo',
       albumArtist: editAlbumArtist.trim() ? cleanArtistSeparators(editAlbumArtist.trim()) : undefined,
       trackNumber: editTrackNumber ? Number(editTrackNumber) : undefined,
+      discNumber: editDiscNumber ? Number(editDiscNumber) : undefined,
       genre: editGenre.trim() || 'General',
       year: editYear.trim() || '2026',
       coverUrl: editCoverUrl.trim(),
@@ -1056,8 +1059,8 @@ export const AdminView: React.FC = () => {
                     ))}
                   </div>
 
-                  {/* Album, Track # & Year */}
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  {/* Album, Track #, Disc # & Year */}
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-neutral-300 mb-1.5">Álbum</label>
                       <input
@@ -1079,13 +1082,25 @@ export const AdminView: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-neutral-300 mb-1.5">Nº de Pista (Track #)</label>
+                      <label className="block text-xs font-bold text-neutral-300 mb-1.5">Nº de Pista (#)</label>
                       <input
                         type="number"
                         min="1"
                         value={editTrackNumber || ''}
                         onChange={(e) => setEditTrackNumber(e.target.value ? parseInt(e.target.value, 10) : undefined)}
                         placeholder="Ej. 1"
+                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-300 mb-1.5">Nº de Disco (CD #)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={editDiscNumber || ''}
+                        onChange={(e) => setEditDiscNumber(e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                        placeholder="Ej. 1 o 2"
                         className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
                       />
                     </div>

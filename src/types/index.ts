@@ -92,6 +92,7 @@ export interface Song {
   genre?: string;
   year?: string;
   trackNumber?: number;
+  discNumber?: number;
   isExplicit?: boolean;
   addedBy?: string;
   createdAt: string;
@@ -122,6 +123,7 @@ export interface Album {
   year?: string;
   genre?: string;
   songs: Song[];
+  totalDiscs?: number;
 }
 
 export interface ArtistProfile {
@@ -131,6 +133,8 @@ export interface ArtistProfile {
   headerUrl?: string;
   bio?: string;
   updatedAt?: string;
+  aliases?: string[]; // e.g. ["J. Balvin", "J Balvin", "José Álvaro Osorio"]
+  mergedInto?: string; // Canonical artist name if this artist is merged into another
 }
 
 export interface Playlist {

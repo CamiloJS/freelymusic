@@ -64,4 +64,22 @@ describe('parseAudioUrlMetadata', () => {
     expect(res.title).toBe('Midnight City');
     expect(res.artists).toEqual([]);
   });
+
+  it('detects multi-disc numbers in filenames (e.g. 1-01, 2-04, CD1-05)', () => {
+    const res1 = parseAudioUrlMetadata('https://example.com/audio/1-01%20David%20Guetta%20-%20Titanium.mp3');
+    expect(res1.discNumber).toBe(1);
+    expect(res1.trackNumber).toBe(1);
+    expect(res1.title).toBe('Titanium');
+    expect(res1.artists).toEqual(['David Guetta']);
+
+    const res2 = parseAudioUrlMetadata('https://example.com/audio/2-05%20Lady%20Gaga%20-%20Bloody%20Mary.mp3');
+    expect(res2.discNumber).toBe(2);
+    expect(res2.trackNumber).toBe(5);
+    expect(res2.title).toBe('Bloody Mary');
+
+    const res3 = parseAudioUrlMetadata('https://example.com/audio/CD2-03%20-%20Turn%20Me%20On.mp3');
+    expect(res3.discNumber).toBe(2);
+    expect(res3.trackNumber).toBe(3);
+    expect(res3.title).toBe('Turn Me On');
+  });
 });

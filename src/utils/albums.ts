@@ -56,13 +56,20 @@ export function getAlbumsFromCatalog(catalog: Song[]): Album[] {
     const validCover = alb.songs.find((s) => Boolean(s.coverUrl))?.coverUrl;
     if (validCover) alb.coverUrl = validCover;
 
-    // 3. Sort tracks by trackNumber if available
+    // 3. Sort tracks by discNumber, then trackNumber if available
     alb.songs.sort((a, b) => {
+      const discA = typeof a.discNumber === 'number' && a.discNumber > 0 ? a.discNumber : 1;
+      const discB = typeof b.discNumber === 'number' && b.discNumber > 0 ? b.discNumber : 1;
+      if (discA !== discB) return discA - discB;
+
       const numA = typeof a.trackNumber === 'number' && a.trackNumber > 0 ? a.trackNumber : 999;
       const numB = typeof b.trackNumber === 'number' && b.trackNumber > 0 ? b.trackNumber : 999;
       if (numA !== numB) return numA - numB;
       return a.title.localeCompare(b.title);
     });
+
+    const maxDisc = Math.max(1, ...alb.songs.map((s) => s.discNumber || 1));
+    alb.totalDiscs = maxDisc;
   });
 
   return Array.from(map.values());

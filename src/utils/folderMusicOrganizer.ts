@@ -20,6 +20,7 @@ export interface CandidateTrack {
   artist: string;
   album: string;
   trackNumber?: number;
+  discNumber?: number;
   year: string;
   genre: string;
   duration: number;
@@ -42,6 +43,7 @@ export interface CandidateAlbum {
   coverUrl: string;
   year: string;
   genre: string;
+  totalDiscs?: number;
   tracks: CandidateTrack[];
 }
 
@@ -127,15 +129,47 @@ export function extractAlbumFromPath(relativePath: string): string {
   const parts = clean.split(/[/\\]+/).filter(Boolean);
   // If at least 2 parts (Folder/Song.mp3 or Root/Album/Song.mp3)
   if (parts.length >= 2) {
-    // The directory containing the file is the second to last part
-    const parentFolder = parts[parts.length - 2];
+    const parentFolder = parts[parts.length - 2].trim();
     // Ignore random user IDs like "auDUHr1kjXjsgmOB"
     if (/^[a-zA-Z0-9]{15,25}$/.test(parentFolder)) {
       return '';
     }
-    return parentFolder.trim();
+
+    // If parentFolder is a Disc folder like "CD 1", "CD1", "Disc 2", "Disco 1"
+    if (/^(?:cd|disc|disco)\s*\d+$/i.test(parentFolder) && parts.length >= 3) {
+      const grandparent = parts[parts.length - 3].trim();
+      if (!/^[a-zA-Z0-9]{15,25}$/.test(grandparent)) {
+        return grandparent;
+      }
+    }
+
+    return parentFolder;
   }
   return '';
+}
+
+/**
+ * Extracts disc number from directory path if available.
+ * E.g. "David Guetta/CD 2/01.mp3" -> 2
+ */
+export function extractDiscNumberFromPath(relativePath: string): number | undefined {
+  if (!relativePath) return undefined;
+  let clean = relativePath;
+  try {
+    if (clean.includes('://')) {
+      clean = new URL(clean).pathname;
+    }
+  } catch {}
+  clean = decodeURIComponent(clean);
+  const parts = clean.split(/[/\\]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const parentFolder = parts[parts.length - 2].trim();
+    const match = parentFolder.match(/^(?:cd|disc|disco)\s*(\d+)$/i);
+    if (match) {
+      return parseInt(match[1], 10);
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -230,11 +264,13 @@ export async function organizeFolderMusic(
     const sourceData = item.file || item.blob || item.url || '';
     const parsedUrl = parseAudioUrlMetadata(item.url || item.name);
     const folderAlbumName = extractAlbumFromPath(item.relativePath);
+    const discFromPath = extractDiscNumberFromPath(item.relativePath);
 
     let title = parsedUrl.title || item.name.replace(AUDIO_EXT_REGEX, '').trim();
     let artist = parsedUrl.artists.join(', ');
     let album = folderAlbumName;
     let trackNumber = parsedUrl.trackNumber;
+    let discNumber = discFromPath || parsedUrl.discNumber || 1;
     let year = parsedUrl.year || '2026';
     let genre = '';
     let isExplicit = Boolean(parsedUrl.isExplicit);
@@ -332,6 +368,7 @@ export async function organizeFolderMusic(
       artist: artist || 'Artista Desconocido',
       album: album || '',
       trackNumber,
+      discNumber,
       year: year || '2026',
       genre: genre || 'Pop',
       duration: duration || 180,
@@ -373,9 +410,14 @@ export async function organizeFolderMusic(
     // If 2 or more tracks share the same album -> Treat as Album!
     if (tracks.length >= 2) {
       // Sort tracks in album:
-      // 1) By trackNumber if present
-      // 2) By natural alphanumeric order of relativePath / title
+      // 1) By discNumber (ascending)
+      // 2) By trackNumber if present
+      // 3) By natural alphanumeric order of relativePath / title
       tracks.sort((a, b) => {
+        const discA = a.discNumber || 1;
+        const discB = b.discNumber || 1;
+        if (discA !== discB) return discA - discB;
+
         if (a.trackNumber !== undefined && b.trackNumber !== undefined && a.trackNumber !== b.trackNumber) {
           return a.trackNumber - b.trackNumber;
         }
@@ -384,12 +426,23 @@ export async function organizeFolderMusic(
         return (a.relativePath || a.title).localeCompare(b.relativePath || b.title, undefined, { numeric: true });
       });
 
-      // Ensure every track in the album has an explicit sequential trackNumber
-      tracks.forEach((track, idx) => {
-        if (!track.trackNumber || track.trackNumber <= 0) {
-          track.trackNumber = idx + 1;
-        }
+      // Group by disc and ensure sequential trackNumber per disc if missing
+      const discGroups = new Map<number, CandidateTrack[]>();
+      tracks.forEach((track) => {
+        const d = track.discNumber || 1;
+        if (!discGroups.has(d)) discGroups.set(d, []);
+        discGroups.get(d)!.push(track);
       });
+
+      discGroups.forEach((discTracks) => {
+        discTracks.forEach((track, idx) => {
+          if (!track.trackNumber || track.trackNumber <= 0) {
+            track.trackNumber = idx + 1;
+          }
+        });
+      });
+
+      const totalDiscs = Math.max(1, ...tracks.map((t) => t.discNumber || 1));
 
       // Find the first track with a cover art
       const firstWithCover = tracks.find((t) => Boolean(t.coverUrl));
@@ -415,6 +468,7 @@ export async function organizeFolderMusic(
         coverUrl: sharedCover,
         year: albumYear,
         genre: albumGenre,
+        totalDiscs,
         tracks,
       });
     } else {

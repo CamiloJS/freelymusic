@@ -1304,6 +1304,7 @@ https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
           artist: track.artist,
           album: track.album || '',
           trackNumber: track.trackNumber,
+          discNumber: track.discNumber || 1,
           year: track.year || '2026',
           genre: track.genre || 'Pop',
           duration: track.duration || 180,

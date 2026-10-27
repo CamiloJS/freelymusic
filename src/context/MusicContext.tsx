@@ -87,6 +87,9 @@ interface MusicContextType {
   artistProfiles: ArtistProfile[];
   getArtistProfile: (artistName: string) => ArtistProfile | null;
   updateArtistProfile: (artist: ArtistProfile) => Promise<void>;
+  mergeArtists: (sourceArtistName: string, targetArtistName: string) => Promise<void>;
+  addArtistAlias: (artistName: string, alias: string) => Promise<void>;
+  removeArtistAlias: (artistName: string, alias: string) => Promise<void>;
   followedArtists: string[];
   isFollowingArtist: (artistName: string) => boolean;
   toggleFollowArtist: (artistName: string) => void;
@@ -974,12 +977,63 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Artist Profiles Actions
   const getArtistProfile = useCallback(
     (artistName: string): ArtistProfile | null => {
-      const norm = artistName.trim().toLowerCase();
-      return (
-        artistProfiles.find(
-          (artist) => artist.id === norm || artist.name.trim().toLowerCase() === norm
-        ) || null
+      if (!artistName) return null;
+      const raw = artistName.trim();
+      const norm = raw.toLowerCase();
+      const fuzzy = norm.replace(/[\s._-]+/g, '');
+
+      // 1. Direct match by id or name
+      const direct = artistProfiles.find(
+        (artist) => artist.id === norm || artist.name.trim().toLowerCase() === norm
       );
+      if (direct) {
+        if (direct.mergedInto) {
+          const targetNorm = direct.mergedInto.trim().toLowerCase();
+          const target = artistProfiles.find(
+            (a) => a.id === targetNorm || a.name.trim().toLowerCase() === targetNorm
+          );
+          if (target) return target;
+        }
+        return direct;
+      }
+
+      // 2. Match by aliases
+      const byAlias = artistProfiles.find((artist) =>
+        artist.aliases?.some(
+          (alias) =>
+            alias.trim().toLowerCase() === norm ||
+            alias.trim().toLowerCase().replace(/[\s._-]+/g, '') === fuzzy
+        )
+      );
+      if (byAlias) {
+        if (byAlias.mergedInto) {
+          const targetNorm = byAlias.mergedInto.trim().toLowerCase();
+          const target = artistProfiles.find(
+            (a) => a.id === targetNorm || a.name.trim().toLowerCase() === targetNorm
+          );
+          if (target) return target;
+        }
+        return byAlias;
+      }
+
+      // 3. Match by stripped punctuation fuzzy (e.g. "j. balvin" vs "j balvin")
+      const byFuzzy = artistProfiles.find(
+        (artist) =>
+          artist.id.replace(/[\s._-]+/g, '') === fuzzy ||
+          artist.name.trim().toLowerCase().replace(/[\s._-]+/g, '') === fuzzy
+      );
+      if (byFuzzy) {
+        if (byFuzzy.mergedInto) {
+          const targetNorm = byFuzzy.mergedInto.trim().toLowerCase();
+          const target = artistProfiles.find(
+            (a) => a.id === targetNorm || a.name.trim().toLowerCase() === targetNorm
+          );
+          if (target) return target;
+        }
+        return byFuzzy;
+      }
+
+      return null;
     },
     [artistProfiles]
   );
@@ -1054,6 +1108,176 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const firebase = await loadFirebaseService();
     await firebase.saveArtistProfileToFirestore(updated);
   }, []);
+
+  const mergeArtists = useCallback(
+    async (sourceArtistName: string, targetArtistName: string) => {
+      const sName = sourceArtistName.trim();
+      const tName = targetArtistName.trim();
+      if (!sName || !tName || sName.toLowerCase() === tName.toLowerCase()) return;
+
+      const sNorm = sName.toLowerCase();
+      const tNorm = tName.toLowerCase();
+
+      // Find or create target profile
+      const targetExisting =
+        artistProfiles.find((a) => a.id === tNorm || a.name.toLowerCase() === tNorm) || {
+          id: tNorm,
+          name: tName,
+        };
+
+      // Find or create source profile
+      const sourceExisting =
+        artistProfiles.find((a) => a.id === sNorm || a.name.toLowerCase() === sNorm) || {
+          id: sNorm,
+          name: sName,
+        };
+
+      // Collect all aliases
+      const newAliases = Array.from(
+        new Set([
+          ...(targetExisting.aliases || []),
+          sName,
+          ...(sourceExisting.aliases || []),
+        ])
+      ).filter((a) => a.toLowerCase() !== tNorm);
+
+      const updatedTarget: ArtistProfile = {
+        ...targetExisting,
+        aliases: newAliases,
+        avatarUrl: targetExisting.avatarUrl || sourceExisting.avatarUrl,
+        headerUrl: targetExisting.headerUrl || sourceExisting.headerUrl,
+        bio: targetExisting.bio || sourceExisting.bio,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const updatedSource: ArtistProfile = {
+        ...sourceExisting,
+        mergedInto: tName,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Update artist profiles state & storage
+      setArtistProfiles((prev) => {
+        const withoutSourceOrTarget = prev.filter(
+          (a) => a.id !== sNorm && a.id !== tNorm
+        );
+        const next = [...withoutSourceOrTarget, updatedTarget, updatedSource];
+        saveStoredArtistProfiles(next);
+        return next;
+      });
+      saveStoredArtistProfile(updatedTarget);
+      saveStoredArtistProfile(updatedSource);
+
+      const firebase = await loadFirebaseService();
+      await firebase.saveArtistProfileToFirestore(updatedTarget);
+      await firebase.saveArtistProfileToFirestore(updatedSource);
+
+      // Unify songs in catalog: update artist names
+      const songsToUpdate: Song[] = [];
+      const updatedCatalog = catalog.map((song) => {
+        let changed = false;
+        let newArtist = song.artist;
+        let newAlbumArtist = song.albumArtist;
+
+        // Check if artist matches source
+        const parts = song.artist.split(/,\s*/);
+        const newParts = parts.map((part) => {
+          if (part.trim().toLowerCase() === sNorm) {
+            changed = true;
+            return tName;
+          }
+          return part;
+        });
+
+        if (changed) {
+          newArtist = Array.from(new Set(newParts)).join(', ');
+        }
+
+        if (song.albumArtist && song.albumArtist.trim().toLowerCase() === sNorm) {
+          newAlbumArtist = tName;
+          changed = true;
+        }
+
+        if (changed) {
+          const updatedSong: Song = {
+            ...song,
+            artist: newArtist,
+            albumArtist: newAlbumArtist,
+          };
+          songsToUpdate.push(updatedSong);
+          return updatedSong;
+        }
+        return song;
+      });
+
+      if (songsToUpdate.length > 0) {
+        setCatalog(updatedCatalog);
+        saveStoredCatalog(updatedCatalog);
+        addMultipleStoredPendingSongs(songsToUpdate);
+        await firebase.saveSongsToFirestore(songsToUpdate);
+      }
+    },
+    [artistProfiles, catalog]
+  );
+
+  const addArtistAlias = useCallback(
+    async (artistName: string, alias: string) => {
+      const aName = artistName.trim();
+      const aAlias = alias.trim();
+      if (!aName || !aAlias || aName.toLowerCase() === aAlias.toLowerCase()) return;
+
+      const norm = aName.toLowerCase();
+      const existing =
+        artistProfiles.find((a) => a.id === norm || a.name.toLowerCase() === norm) || {
+          id: norm,
+          name: aName,
+        };
+
+      const currentAliases = existing.aliases || [];
+      if (currentAliases.some((a) => a.toLowerCase() === aAlias.toLowerCase())) return;
+
+      const updated: ArtistProfile = {
+        ...existing,
+        aliases: [...currentAliases, aAlias],
+        updatedAt: new Date().toISOString(),
+      };
+
+      setArtistProfiles((prev) => {
+        const next = [...prev.filter((a) => a.id !== norm), updated];
+        saveStoredArtistProfiles(next);
+        return next;
+      });
+      saveStoredArtistProfile(updated);
+      const firebase = await loadFirebaseService();
+      await firebase.saveArtistProfileToFirestore(updated);
+    },
+    [artistProfiles]
+  );
+
+  const removeArtistAlias = useCallback(
+    async (artistName: string, alias: string) => {
+      const aName = artistName.trim();
+      const norm = aName.toLowerCase();
+      const existing = artistProfiles.find((a) => a.id === norm || a.name.toLowerCase() === norm);
+      if (!existing || !existing.aliases) return;
+
+      const updated: ArtistProfile = {
+        ...existing,
+        aliases: existing.aliases.filter((a) => a.toLowerCase() !== alias.trim().toLowerCase()),
+        updatedAt: new Date().toISOString(),
+      };
+
+      setArtistProfiles((prev) => {
+        const next = [...prev.filter((a) => a.id !== norm), updated];
+        saveStoredArtistProfiles(next);
+        return next;
+      });
+      saveStoredArtistProfile(updated);
+      const firebase = await loadFirebaseService();
+      await firebase.saveArtistProfileToFirestore(updated);
+    },
+    [artistProfiles]
+  );
 
   // Auto-fetch official artist portraits for any artist lacking a profile photo
   const autoAvatarCheckedRef = useRef<Set<string>>(new Set());
@@ -1201,6 +1425,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         artistProfiles,
         getArtistProfile,
         updateArtistProfile,
+        mergeArtists,
+        addArtistAlias,
+        removeArtistAlias,
         followedArtists: userData.followedArtists || [],
         isFollowingArtist,
         toggleFollowArtist,

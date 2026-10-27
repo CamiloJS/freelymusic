@@ -44,6 +44,8 @@ function normalizeSearchText(text: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -221,11 +223,12 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
       for (const rawName of uniqueIndividualArtists) {
         const name = rawName.trim();
         if (!name) continue;
-        const key = name.toLowerCase();
+        const profile = getArtistProfile(name);
+        const canonical = profile?.name || name;
+        const key = canonical.toLowerCase();
 
         if (!map.has(key)) {
-          const profile = getArtistProfile(name);
-          map.set(key, { name: profile?.name || name, songs: [] });
+          map.set(key, { name: canonical, songs: [] });
         }
         const entry = map.get(key)!;
         if (!entry.songs.some((s) => s.id === song.id)) {

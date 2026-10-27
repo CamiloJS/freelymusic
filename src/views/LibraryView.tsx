@@ -267,10 +267,23 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const playlistSongs: Song[] = isFavorites
       ? userFavoriteSongs
       : isAlbum && albumObj
-      ? [...albumObj.songs].sort((a, b) => (a.trackNumber || 0) - (b.trackNumber || 0))
+      ? [...albumObj.songs].sort((a, b) => {
+          const discA = a.discNumber || 1;
+          const discB = b.discNumber || 1;
+          if (discA !== discB) return discA - discB;
+          return (a.trackNumber || 0) - (b.trackNumber || 0);
+        })
       : playlistObj?.songIds
           .map((id) => catalog.find((s) => s.id === id))
           .filter((s): s is Song => Boolean(s)) || [];
+
+    const isMultiDiscAlbum = isAlbum && (
+      (albumObj?.totalDiscs || 1) > 1 ||
+      playlistSongs.some((s) => (s.discNumber || 1) > 1)
+    );
+    const totalDiscsCount = isMultiDiscAlbum
+      ? Math.max(1, ...playlistSongs.map((s) => s.discNumber || 1))
+      : 1;
 
     const totalSeconds = playlistSongs.reduce((acc, s) => acc + (s?.duration || 0), 0);
     const areAllDownloaded = playlistSongs.length > 0 && playlistSongs.every((s) => isDownloaded(s.id));
@@ -494,6 +507,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 <>
                   <span>•</span>
                   <span>{albumObj.year}</span>
+                </>
+              )}
+              {isAlbum && isMultiDiscAlbum && (
+                <>
+                  <span>•</span>
+                  <span className="text-emerald-400 font-extrabold">{totalDiscsCount} discos</span>
                 </>
               )}
               <span>•</span>
@@ -755,19 +774,30 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   const downloaded = isDownloaded(song.id);
                   const isSaved = isFavorite(song.id) || isSongInLibrary(song.id);
                   const playCount = getUserSongPlayCount(song.id);
+                  const currentDisc = song.discNumber || 1;
+                  const prevDisc = idx > 0 ? (sortedAndFilteredSongs[idx - 1]?.discNumber || 1) : null;
+                  const isFirstTrackOfDisc = isAlbum && isMultiDiscAlbum && (idx === 0 || currentDisc !== prevDisc);
 
                   return (
-                    <div
-                      key={song.id}
-                      onClick={() =>
-                        playSong(song, sortedAndFilteredSongs, {
-                          type: sourceType,
-                          name: sourceName,
-                          id: isFavorites ? 'favorites' : isAlbum ? albumObj?.name : playlistObj?.id,
-                        })
-                      }
-                      className="flex items-center gap-3 px-2 sm:px-3 py-2.5 rounded-xl hover:bg-[#181818] active:bg-[#242424] cursor-pointer group transition-colors"
-                    >
+                    <React.Fragment key={song.id}>
+                      {isFirstTrackOfDisc && (
+                        <div className="flex items-center gap-2 pt-6 pb-2 px-3 text-neutral-400 border-b border-neutral-800/80 mb-1">
+                          <Disc className="w-4 h-4 text-emerald-400" />
+                          <span className="text-xs font-black tracking-wider uppercase text-white">
+                            Disco {currentDisc}
+                          </span>
+                        </div>
+                      )}
+                      <div
+                        onClick={() =>
+                          playSong(song, sortedAndFilteredSongs, {
+                            type: sourceType,
+                            name: sourceName,
+                            id: isFavorites ? 'favorites' : isAlbum ? albumObj?.name : playlistObj?.id,
+                          })
+                        }
+                        className="flex items-center gap-3 px-2 sm:px-3 py-2.5 rounded-xl hover:bg-[#181818] active:bg-[#242424] cursor-pointer group transition-colors"
+                      >
                       {/* Index (album) or Artwork Thumbnail (playlist) */}
                       {isAlbum ? (
                         <div className="w-8 flex items-center justify-center flex-shrink-0">
@@ -902,6 +932,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         <MoreVertical className="w-4 h-4" />
                       </button>
                     </div>
+                  </React.Fragment>
                   );
                 })
               )}

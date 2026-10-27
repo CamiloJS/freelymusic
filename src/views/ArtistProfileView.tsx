@@ -15,6 +15,8 @@ import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
 import Flame from 'lucide-react/dist/esm/icons/flame.mjs';
 import ArrowLeft from 'lucide-react/dist/esm/icons/arrow-left.mjs';
 import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
+import GitMerge from 'lucide-react/dist/esm/icons/git-merge.mjs';
+import Tag from 'lucide-react/dist/esm/icons/tag.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -44,8 +46,12 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
   const { currentUser, isAdmin } = useAuth();
   const {
     catalog,
+    artistProfiles,
     getArtistProfile,
     updateArtistProfile,
+    mergeArtists,
+    addArtistAlias,
+    removeArtistAlias,
     isFavorite,
     toggleFavorite,
     isDownloaded,
@@ -59,26 +65,110 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
 
   // Artist profile from cloud/storage
   const profile = getArtistProfile(artistName);
+  const canonicalName = profile?.name || artistName;
+
+  // Build comprehensive set of artist aliases & punctuation variations (e.g. J Balvin vs J. Balvin)
+  const artistAliases = useMemo(() => {
+    const set = new Set<string>();
+    const addVar = (str: string) => {
+      if (!str) return;
+      const clean = str.trim().toLowerCase();
+      set.add(clean);
+      set.add(clean.replace(/[\s._-]+/g, ''));
+      set.add(clean.replace(/[._-]+/g, ' ').replace(/\s+/g, ' '));
+    };
+
+    addVar(artistName);
+    addVar(canonicalName);
+
+    if (profile?.aliases) {
+      profile.aliases.forEach(addVar);
+    }
+
+    // Check profiles that have been merged into this artist
+    artistProfiles.forEach((p) => {
+      if (
+        p.mergedInto &&
+        (p.mergedInto.toLowerCase() === artistName.toLowerCase() ||
+          p.mergedInto.toLowerCase() === canonicalName.toLowerCase())
+      ) {
+        addVar(p.name);
+        p.aliases?.forEach(addVar);
+      }
+    });
+
+    return set;
+  }, [artistName, canonicalName, profile?.aliases, artistProfiles]);
 
   // Filter songs that belong to this artist (main artist or collaboration)
   const artistSongs = useMemo(() => {
-    const q = artistName.trim().toLowerCase();
     return catalog.filter((song) => {
+      if (!song.artist) return false;
       const parts = song.artist.split(/[,&/]|feat\.|ft\./i).map((p) => p.trim().toLowerCase());
-      return parts.includes(q) || song.artist.toLowerCase().includes(q);
-    });
-  }, [catalog, artistName]);
+      const matchesPart = parts.some((p) => {
+        const stripped = p.replace(/[\s._-]+/g, '');
+        return artistAliases.has(p) || artistAliases.has(stripped);
+      });
+      if (matchesPart) return true;
 
-  // Filter albums where artist is present
-  const artistAlbums = useMemo(() => {
-    const allAlbums = getAlbumsFromCatalog(catalog);
-    const q = artistName.trim().toLowerCase();
-    return allAlbums.filter((alb) => {
-      const isAlbumArtist = alb.artist.toLowerCase().includes(q);
-      const hasSongInAlbum = alb.songs.some((s) => s.artist.toLowerCase().includes(q));
-      return isAlbumArtist || hasSongInAlbum;
+      if (song.albumArtist) {
+        const albParts = song.albumArtist.split(/[,&/]|feat\.|ft\./i).map((p) => p.trim().toLowerCase());
+        if (albParts.some((p) => artistAliases.has(p) || artistAliases.has(p.replace(/[\s._-]+/g, '')))) {
+          return true;
+        }
+      }
+      return false;
     });
-  }, [catalog, artistName]);
+  }, [catalog, artistAliases]);
+
+  // Separate albums into:
+  // 1. "Álbumes" (albums where this artist is the main owner/primary creator)
+  // 2. "También aparece en" (albums by other artists where this artist is a guest/collaborator)
+  const { ownAlbums, featuredAlbums } = useMemo(() => {
+    const allAlbums = getAlbumsFromCatalog(catalog);
+    const own: Album[] = [];
+    const featured: Album[] = [];
+
+    allAlbums.forEach((alb) => {
+      // Check if artist is in this album
+      const hasArtistSong = alb.songs.some((song) => {
+        const parts = song.artist.split(/[,&/]|feat\.|ft\./i).map((p) => p.trim().toLowerCase());
+        return parts.some((p) => artistAliases.has(p) || artistAliases.has(p.replace(/[\s._-]+/g, '')));
+      });
+
+      if (!hasArtistSong) return;
+
+      // Check if this album belongs to this artist:
+      // a) Album artist matches this artist or alias
+      const albArtistNorm = alb.artist.trim().toLowerCase();
+      const albArtistFuzzy = albArtistNorm.replace(/[\s._-]+/g, '');
+      const isDirectOwner = artistAliases.has(albArtistNorm) || artistAliases.has(albArtistFuzzy);
+
+      // b) Or in the majority of songs (>= 50%), this artist is the PRIMARY artist (first name)
+      const primaryMatchesCount = alb.songs.filter((song) => {
+        const firstArtist = (song.albumArtist || song.artist)
+          .split(/[,&/]|feat\.|ft\./i)[0]
+          .trim()
+          .toLowerCase();
+        return artistAliases.has(firstArtist) || artistAliases.has(firstArtist.replace(/[\s._-]+/g, ''));
+      }).length;
+
+      const isMajorityOwner = alb.songs.length > 0 && primaryMatchesCount / alb.songs.length >= 0.5;
+
+      if (isDirectOwner || isMajorityOwner) {
+        own.push(alb);
+      } else {
+        featured.push(alb);
+      }
+    });
+
+    return { ownAlbums: own, featuredAlbums: featured };
+  }, [catalog, artistAliases]);
+
+  const allArtistAlbums = useMemo(
+    () => [...ownAlbums, ...featuredAlbums],
+    [ownAlbums, featuredAlbums]
+  );
 
   // Best fallback image from artist songs
   const fallbackCover = useMemo(() => {
@@ -86,12 +176,30 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
     return songWithCover?.coverUrl || '';
   }, [artistSongs]);
 
-  // Edit Artist Modal State (Admin only)
+  // List of other artists in the library for the merge selector
+  const allOtherArtists = useMemo(() => {
+    const names = new Set<string>();
+    catalog.forEach((s) => {
+      const parts = s.artist.split(/[,&/]|feat\.|ft\./i).map((p) => p.trim());
+      parts.forEach((p) => {
+        if (p && !artistAliases.has(p.toLowerCase())) {
+          names.add(p);
+        }
+      });
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [catalog, artistAliases]);
+
+  // Edit Artist Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
   const [editHeaderUrl, setEditHeaderUrl] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [localAliases, setLocalAliases] = useState<string[]>([]);
+  const [selectedMergeArtist, setSelectedMergeArtist] = useState('');
+  const [newAliasInput, setNewAliasInput] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isMerging, setIsMerging] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -99,6 +207,9 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
     setEditAvatarUrl(profile?.avatarUrl || fallbackCover || '');
     setEditHeaderUrl(profile?.headerUrl || '');
     setEditBio(profile?.bio || '');
+    setLocalAliases(profile?.aliases || []);
+    setSelectedMergeArtist('');
+    setNewAliasInput('');
     setSaveSuccessMsg('');
     setIsEditModalOpen(true);
   };
@@ -113,8 +224,6 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
     }
 
     try {
-      // Raw FileReader base64 could be several MB and exceed Firestore's 1 MB
-      // document limit. Compress it like the other image uploads.
       const compressed = await compressImage(file, 500, 0.8);
       if (compressed) {
         setEditAvatarUrl(compressed);
@@ -135,6 +244,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
         avatarUrl: editAvatarUrl.trim() || undefined,
         headerUrl: editHeaderUrl.trim() || undefined,
         bio: editBio.trim() || undefined,
+        aliases: localAliases.length > 0 ? localAliases : undefined,
       };
 
       await updateArtistProfile(updated);
@@ -149,6 +259,48 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleMergeArtists = async () => {
+    if (!selectedMergeArtist) return;
+    const confirm = window.confirm(
+      `¿Deseas mezclar "${selectedMergeArtist}" con "${artistName}"? Todas las canciones y álbumes de ambos se unificarán en este perfil.`
+    );
+    if (!confirm) return;
+
+    setIsMerging(true);
+    try {
+      await mergeArtists(selectedMergeArtist, artistName);
+      setLocalAliases((prev) => Array.from(new Set([...prev, selectedMergeArtist])));
+      setSaveSuccessMsg(`¡"${selectedMergeArtist}" se unificó correctamente con "${artistName}"!`);
+      setSelectedMergeArtist('');
+    } catch (err) {
+      console.error(err);
+      alert('Error al mezclar artistas');
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
+  const handleAddAlias = async () => {
+    const val = newAliasInput.trim();
+    if (!val) return;
+    if (localAliases.some((a) => a.toLowerCase() === val.toLowerCase())) {
+      setNewAliasInput('');
+      return;
+    }
+    const nextAliases = [...localAliases, val];
+    setLocalAliases(nextAliases);
+    setNewAliasInput('');
+    await addArtistAlias(artistName, val);
+    setSaveSuccessMsg(`Alias "${val}" añadido.`);
+    setTimeout(() => setSaveSuccessMsg(''), 2500);
+  };
+
+  const handleRemoveAlias = async (aliasToRemove: string) => {
+    const nextAliases = localAliases.filter((a) => a !== aliasToRemove);
+    setLocalAliases(nextAliases);
+    await removeArtistAlias(artistName, aliasToRemove);
   };
 
   const displayAvatar = profile?.avatarUrl || fallbackCover;
@@ -278,7 +430,13 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
             <div className="flex items-center gap-2 text-xs text-neutral-400 font-semibold pt-1 artist-stats">
               <span>{artistSongs.length} canciones en catálogo</span>
               <span>•</span>
-              <span>{artistAlbums.length} álbumes</span>
+              <span>{ownAlbums.length + featuredAlbums.length} álbumes</span>
+              {localAliases.length > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="text-emerald-400 font-bold">{localAliases.length} alias</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -302,16 +460,16 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
           </button>
         </div>
 
-        {/* Section 1: Discografía / Álbumes (Se muestran primero por solicitud) */}
-        {artistAlbums.length > 0 && (
+        {/* Section 1: Álbumes principales del artista */}
+        {ownAlbums.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-2xl font-black text-white flex items-center gap-2">
               <Disc className="w-6 h-6 text-emerald-400" />
-              <span>Discografía y Álbumes</span>
+              <span>Álbumes</span>
             </h2>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {artistAlbums.map((alb) => (
+              {ownAlbums.map((alb) => (
                 <div
                   key={alb.name}
                   onClick={() => onSelectAlbum(alb)}
@@ -333,7 +491,9 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                   </div>
                   <h3 className="font-bold text-sm text-white truncate">{alb.name}</h3>
                   <p className="text-xs text-neutral-400 truncate mt-0.5">
-                    {alb.year ? `${alb.year} • ` : ''}{alb.songs.length} pistas
+                    {alb.year ? `${alb.year} • ` : ''}
+                    {alb.totalDiscs && alb.totalDiscs > 1 ? `${alb.totalDiscs} discos • ` : ''}
+                    {alb.songs.length} pistas
                   </p>
                 </div>
               ))}
@@ -409,8 +569,8 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
-                            const alb = artistAlbums.find(
-                              (a) => a.name.trim().toLowerCase() === song.album.trim().toLowerCase()
+                            const alb = allArtistAlbums.find(
+                              (a: Album) => a.name.trim().toLowerCase() === song.album.trim().toLowerCase()
                             );
                             if (alb) onSelectAlbum(alb);
                           }}
@@ -462,6 +622,55 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
             </div>
           )}
         </div>
+
+        {/* Section 3: También aparece en (Álbumes de otros artistas donde colabora) */}
+        {featuredAlbums.length > 0 && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                <Sparkles className="w-6 h-6 text-amber-400" />
+                <span>También aparece en</span>
+              </h2>
+              <p className="text-xs text-neutral-400 mt-1">
+                Álbumes de otros artistas donde {artistName} participa como colaborador o artista invitado.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {featuredAlbums.map((alb) => (
+                <div
+                  key={`feat-${alb.name}`}
+                  onClick={() => onSelectAlbum(alb)}
+                  className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group"
+                >
+                  <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center">
+                    {alb.coverUrl ? (
+                      <img
+                        src={alb.coverUrl}
+                        alt={alb.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    ) : (
+                      <Disc className="w-12 h-12 text-neutral-600" />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Play className="w-8 h-8 text-emerald-400 fill-emerald-400 drop-shadow-lg" />
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-sm text-white truncate">{alb.name}</h3>
+                  <p className="text-xs text-emerald-400/90 font-semibold truncate mt-0.5">
+                    De {alb.artist}
+                  </p>
+                  <p className="text-[11px] text-neutral-400 truncate mt-0.5">
+                    {alb.year ? `${alb.year} • ` : ''}
+                    {alb.totalDiscs && alb.totalDiscs > 1 ? `${alb.totalDiscs} discos • ` : ''}
+                    {alb.songs.length} pistas
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Admin Edit Artist Modal */}
@@ -559,6 +768,104 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                   placeholder="Biografía breve, trayectoria, país de origen o descripción del artista..."
                   className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 resize-none"
                 />
+              </div>
+
+              {/* Aliases & Alternate Names */}
+              <div className="pt-2 border-t border-neutral-800 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-emerald-400" />
+                  <label className="block text-xs font-bold text-neutral-200">
+                    Nombres Alternativos / Variaciones (Alias)
+                  </label>
+                </div>
+                <p className="text-[11px] text-neutral-400 leading-relaxed">
+                  Permite que nombres con puntuación diferente (ej. <strong>J. Balvin</strong> y <strong>J Balvin</strong>) se reconozcan como el mismo artista.
+                </p>
+
+                {/* Badges of current aliases */}
+                {localAliases.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {localAliases.map((alias) => (
+                      <span
+                        key={alias}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800 text-xs font-semibold text-white border border-neutral-700"
+                      >
+                        <span>{alias}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAlias(alias)}
+                          className="text-neutral-400 hover:text-red-400 transition-colors"
+                          title="Eliminar este alias"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new alias input */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={newAliasInput}
+                    onChange={(e) => setNewAliasInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddAlias();
+                      }
+                    }}
+                    placeholder="Escribe otro nombre o alias (ej. J. Balvin)..."
+                    className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddAlias}
+                    disabled={!newAliasInput.trim()}
+                    className="px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold border border-neutral-700 disabled:opacity-50"
+                  >
+                    Añadir alias
+                  </button>
+                </div>
+              </div>
+
+              {/* Merge with existing artist */}
+              <div className="pt-3 border-t border-neutral-800 space-y-2">
+                <div className="flex items-center gap-2">
+                  <GitMerge className="w-4 h-4 text-purple-400" />
+                  <label className="block text-xs font-bold text-neutral-200">
+                    Mezclar con otro artista de tu biblioteca
+                  </label>
+                </div>
+                <p className="text-[11px] text-neutral-400 leading-relaxed">
+                  Unifica a otro artista existente con <strong>{artistName}</strong>. Sus canciones y álbumes se integrarán de forma permanente.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                  <select
+                    value={selectedMergeArtist}
+                    onChange={(e) => setSelectedMergeArtist(e.target.value)}
+                    className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="">Selecciona un artista de tu catálogo...</option>
+                    {allOtherArtists.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={handleMergeArtists}
+                    disabled={!selectedMergeArtist || isMerging}
+                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-extrabold shadow-md disabled:opacity-40 transition-all flex items-center justify-center gap-1.5 whitespace-nowrap"
+                  >
+                    <GitMerge className="w-3.5 h-3.5" />
+                    <span>{isMerging ? 'Mezclando...' : 'Mezclar artistas'}</span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">

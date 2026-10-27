@@ -108,4 +108,67 @@ describe('Album management & sorting', () => {
     expect(albums[0].songs).toHaveLength(3);
     expect(albums[0].songs.map((s) => s.title)).toEqual(['Song 1', 'EX EX EX', 'Song 3']);
   });
+
+  it('correctly organizes multi-disc albums (Disc 1, Disc 2, Disc 3)', () => {
+    const multiDiscSongs: Song[] = [
+      {
+        id: 'd2-s1',
+        title: 'Where Them Girls At',
+        artist: 'David Guetta',
+        album: 'Nothing but the Beat',
+        coverUrl: '',
+        audioUrl: '',
+        duration: 190,
+        discNumber: 2,
+        trackNumber: 1,
+        createdAt: '',
+      },
+      {
+        id: 'd1-s2',
+        title: 'Turn Me On',
+        artist: 'David Guetta',
+        album: 'Nothing but the Beat',
+        coverUrl: '',
+        audioUrl: '',
+        duration: 200,
+        discNumber: 1,
+        trackNumber: 2,
+        createdAt: '',
+      },
+      {
+        id: 'd1-s1',
+        title: 'Titanium',
+        artist: 'David Guetta',
+        album: 'Nothing but the Beat',
+        coverUrl: '',
+        audioUrl: '',
+        duration: 240,
+        discNumber: 1,
+        trackNumber: 1,
+        createdAt: '',
+      },
+      {
+        id: 'd2-s2',
+        title: 'Without You',
+        artist: 'David Guetta',
+        album: 'Nothing but the Beat',
+        coverUrl: '',
+        audioUrl: '',
+        duration: 210,
+        discNumber: 2,
+        trackNumber: 2,
+        createdAt: '',
+      },
+    ];
+
+    const albums = getAlbumsFromCatalog(multiDiscSongs);
+    expect(albums).toHaveLength(1);
+    expect(albums[0].totalDiscs).toBe(2);
+    expect(albums[0].songs.map((s) => `${s.discNumber}-${s.trackNumber}: ${s.title}`)).toEqual([
+      '1-1: Titanium',
+      '1-2: Turn Me On',
+      '2-1: Where Them Girls At',
+      '2-2: Without You',
+    ]);
+  });
 });

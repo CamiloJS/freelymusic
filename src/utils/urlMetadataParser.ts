@@ -7,6 +7,7 @@ export interface ParsedUrlMetadata {
   title: string;
   artists: string[];
   trackNumber?: number;
+  discNumber?: number;
   year?: string;
   isExplicit?: boolean;
 }
@@ -82,12 +83,21 @@ export function parseAudioUrlMetadata(urlOrPath: string): ParsedUrlMetadata {
   // Replace "_-_" with " - ", then replace remaining single underscores with space
   raw = raw.replace(/_-_/g, ' - ').replace(/_/g, ' ');
 
-  // Extract and remove leading track number (e.g. "01.", "01 -", "01 ", "Track 01 -")
+  // Extract disc number and/or leading track number (e.g. "1-01", "2.05", "CD1-02", "01 -", "Track 01 -")
+  let discNumber: number | undefined;
   let trackNumber: number | undefined;
-  const trackNumMatch = raw.match(/^(?:track\s*)?(\d{1,3})(?:[.\s-]+)\s*(.+)$/i);
-  if (trackNumMatch) {
-    trackNumber = parseInt(trackNumMatch[1], 10);
-    raw = trackNumMatch[2].trim();
+
+  const discTrackMatch = raw.match(/^(?:cd|disc|disco)?\s*([1-9])[-.](\d{1,3})(?:[.\s-]+)\s*(.+)$/i);
+  if (discTrackMatch) {
+    discNumber = parseInt(discTrackMatch[1], 10);
+    trackNumber = parseInt(discTrackMatch[2], 10);
+    raw = discTrackMatch[3].trim();
+  } else {
+    const trackNumMatch = raw.match(/^(?:track\s*)?(\d{1,3})(?:[.\s-]+)\s*(.+)$/i);
+    if (trackNumMatch) {
+      trackNumber = parseInt(trackNumMatch[1], 10);
+      raw = trackNumMatch[2].trim();
+    }
   }
 
   let title = '';
@@ -131,6 +141,7 @@ export function parseAudioUrlMetadata(urlOrPath: string): ParsedUrlMetadata {
     title: title.trim(),
     artists: artists.map((a) => cleanArtistSeparators(a).trim()).filter(Boolean),
     trackNumber,
+    discNumber,
     year,
     isExplicit,
   };
