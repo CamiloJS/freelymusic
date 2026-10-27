@@ -60,8 +60,8 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                   }}
                   className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-all border ${
                     isIn
-                      ? 'bg-emerald-950/40 border-emerald-500/40'
-                      : 'bg-neutral-950/60 border-neutral-800/80 hover:bg-neutral-800/60'
+                      ? 'bg-emerald-950/40 border-emerald-500/40 add-playlist-active'
+                      : 'bg-neutral-950/60 border-neutral-800/80 hover:bg-neutral-800/60 add-playlist-inactive'
                   }`}
                 >
                   <div className="flex items-center gap-3 truncate">

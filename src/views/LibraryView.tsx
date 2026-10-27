@@ -338,17 +338,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     return (
       <div className="flex-1 overflow-y-auto pb-36 animate-in fade-in duration-200 select-none">
         {/* Spotify Hero Banner: the ambient light comes from the cover. */}
-        <div className="relative overflow-hidden p-5 md:p-8 pt-6 md:pt-10 flex flex-col md:flex-row items-start md:items-end gap-5 md:gap-6 shadow-2xl">
+        <div className="relative overflow-hidden p-5 md:p-8 pt-6 md:pt-10 flex flex-col md:flex-row items-start md:items-end gap-5 md:gap-6 shadow-2xl playlist-hero-container">
           {heroCover ? (
             <>
               <div
-                className="absolute inset-0 bg-cover bg-center scale-125 blur-3xl opacity-60 saturate-150"
+                className="absolute inset-0 bg-cover bg-center scale-125 blur-3xl opacity-60 saturate-150 playlist-hero-art"
                 style={{ backgroundImage: `url(${heroCover})` }}
               />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-neutral-950/55 to-neutral-950" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-neutral-950/55 to-neutral-950 playlist-hero-overlay" />
             </>
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-b from-indigo-900 via-purple-950 to-neutral-950" />
+            <div className="absolute inset-0 bg-gradient-to-b from-indigo-900 via-purple-950 to-neutral-950 playlist-hero-default-bg" />
           )}
 
           {/* Cover Art Box */}
@@ -598,7 +598,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   </button>
 
                   {isSortMenuOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-56 p-2 rounded-2xl bg-neutral-900/95 border border-neutral-800 shadow-2xl backdrop-blur-xl z-40 select-none animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute right-0 top-full mt-2 w-56 p-2 rounded-2xl bg-neutral-900/95 border border-neutral-800 shadow-2xl backdrop-blur-xl z-40 select-none animate-in fade-in zoom-in-95 duration-100 playlist-sort-dropdown">
                       <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-neutral-400 border-b border-neutral-800/80 mb-1">
                         Clasificar por
                       </div>

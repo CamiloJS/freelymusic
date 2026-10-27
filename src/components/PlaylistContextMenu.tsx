@@ -58,7 +58,7 @@ export const PlaylistContextMenu: React.FC<PlaylistContextMenuProps> = ({
       }}
     >
       <div
-        className="absolute rounded-xl border border-white/10 bg-[#282828] p-1.5 shadow-2xl shadow-black/60 animate-in fade-in zoom-in-95 duration-100"
+        className="absolute rounded-xl border border-white/10 bg-[#282828] p-1.5 shadow-2xl shadow-black/60 animate-in fade-in zoom-in-95 duration-100 playlist-context-menu"
         style={{ left, top, width }}
         onClick={(event) => event.stopPropagation()}
       >

@@ -345,8 +345,8 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                           onClick={() => handleSelectUser(user)}
                           className={`flex items-center justify-between p-3.5 rounded-2xl cursor-pointer transition-all border ${
                             isActive
-                              ? 'bg-emerald-950/40 border-emerald-500/40 shadow-sm'
-                              : 'bg-neutral-950/60 border-neutral-800/80 hover:bg-neutral-800/60 hover:border-neutral-700'
+                              ? 'bg-emerald-950/40 border-emerald-500/40 shadow-sm profile-card-active'
+                              : 'bg-neutral-950/60 border-neutral-800/80 hover:bg-neutral-800/60 hover:border-neutral-700 profile-card-inactive'
                           }`}
                         >
                           <div className="flex items-center gap-3">
@@ -357,24 +357,24 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                             />
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-bold text-sm text-white">{user.displayName}</span>
+                                <span className="font-bold text-sm text-white profile-name">{user.displayName}</span>
                                 {user.role === 'admin' ? (
-                                  <span className="text-[9px] uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-black border border-emerald-500/30 flex items-center gap-1">
+                                  <span className="text-[9px] uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-black border border-emerald-500/30 flex items-center gap-1 badge-admin">
                                     <Shield className="w-2.5 h-2.5" />
                                     ADMIN
                                   </span>
                                 ) : (
-                                  <span className="text-[9px] uppercase tracking-wider bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded font-semibold">
+                                  <span className="text-[9px] uppercase tracking-wider bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded font-semibold badge-member">
                                     MIEMBRO
                                   </span>
                                 )}
                               </div>
-                              <span className="text-xs text-neutral-500">@{user.username}</span>
+                              <span className="text-xs text-neutral-500 username-tag">@{user.username}</span>
                             </div>
                           </div>
 
                           {isActive && (
-                            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full flex items-center gap-1">
+                            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full flex items-center gap-1 active-badge">
                               <UserCheck className="w-3.5 h-3.5" />
                               Activo
                             </span>
@@ -391,7 +391,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                           onClose();
                           onOpenProfileView();
                         }}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs tracking-wide transition-all"
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs tracking-wide transition-all profile-menu-stats-btn"
                       >
                         <Sparkles className="w-4 h-4 text-emerald-400" />
                         Mi perfil y estadísticas
@@ -404,7 +404,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                           onClose();
                           onOpenAdminPanel();
                         }}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-500/25 text-emerald-300 font-bold text-xs tracking-wide transition-all"
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-500/25 text-emerald-300 font-bold text-xs tracking-wide transition-all profile-menu-admin-btn"
                       >
                         <Shield className="w-4 h-4" />
                         Panel de Administración
@@ -417,7 +417,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                           onClose();
                           onOpenCreateProfile();
                         }}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-emerald-400 font-bold text-xs tracking-wide transition-all"
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-emerald-400 font-bold text-xs tracking-wide transition-all profile-menu-create-btn"
                       >
                         <Plus className="w-4 h-4" />
                         Crear Nuevo Perfil (Solo Admin)
@@ -429,7 +429,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                         onClose();
                         logout();
                       }}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/50 border border-red-500/20 text-red-400 font-bold text-xs tracking-wide transition-all"
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/50 border border-red-500/20 text-red-400 font-bold text-xs tracking-wide transition-all profile-menu-logout-btn"
                     >
                       <LogOut className="w-4 h-4" />
                       Cerrar sesión en este dispositivo

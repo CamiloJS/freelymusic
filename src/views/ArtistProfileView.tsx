@@ -172,11 +172,11 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
   return (
     <div className="pb-36 select-none animate-in fade-in duration-200">
       {/* Hero Header with Background Banner / Overlay */}
-      <div className="relative min-h-[320px] md:min-h-[380px] bg-gradient-to-b from-neutral-800 via-neutral-900 to-black p-6 md:p-10 flex flex-col justify-end overflow-hidden">
+      <div className="relative min-h-[320px] md:min-h-[380px] bg-gradient-to-b from-neutral-800 via-neutral-900 to-black p-6 md:p-10 flex flex-col justify-end overflow-hidden artist-hero-container">
         {onBack && (
           <button
             onClick={onBack}
-            className="absolute top-5 left-5 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 hover:bg-black/70 border border-white/10 text-white text-xs font-bold backdrop-blur-md transition-colors"
+            className="absolute top-5 left-5 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 hover:bg-black/70 border border-white/10 text-white text-xs font-bold backdrop-blur-md transition-colors artist-back-btn"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Volver</span>
@@ -186,22 +186,22 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
         {/* Background Image Banner if exists */}
         {profile?.headerUrl ? (
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-40 blur-sm scale-105"
+            className="absolute inset-0 bg-cover bg-center opacity-40 blur-sm scale-105 artist-header-bg"
             style={{ backgroundImage: `url(${profile.headerUrl})` }}
           />
         ) : displayAvatar ? (
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-25 blur-md scale-110"
+            className="absolute inset-0 bg-cover bg-center opacity-25 blur-md scale-110 artist-header-bg"
             style={{ backgroundImage: `url(${displayAvatar})` }}
           />
         ) : null}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent artist-hero-overlay" />
 
         {/* Content */}
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-end gap-6 max-w-7xl mx-auto w-full">
           {/* Avatar Picture */}
-          <div className="w-36 h-36 md:w-52 md:h-52 rounded-full overflow-hidden shadow-2xl ring-4 ring-white/10 flex-shrink-0 bg-neutral-900 relative group">
+          <div className="w-36 h-36 md:w-52 md:h-52 rounded-full overflow-hidden shadow-2xl ring-4 ring-white/10 flex-shrink-0 bg-neutral-900 relative group artist-avatar-ring">
             {displayAvatar ? (
               <img
                 src={displayAvatar}
@@ -230,14 +230,14 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
           {/* Artist Info */}
           <div className="flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2.5">
-              <span className="h-8 inline-flex items-center gap-1.5 px-3.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold select-none">
+              <span className="h-8 inline-flex items-center gap-1.5 px-3.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold select-none artist-verified-badge">
                 <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 fill-blue-400 text-black" />
                 <span>Artista Verificado</span>
               </span>
 
               <button
                 onClick={() => toggleFollowArtist(artistName)}
-                className={`h-8 inline-flex items-center gap-1.5 px-3.5 rounded-full text-xs font-bold border transition-all active:scale-95 ${
+                className={`h-8 inline-flex items-center gap-1.5 px-3.5 rounded-full text-xs font-bold border transition-all active:scale-95 artist-follow-btn ${
                   following
                     ? 'bg-white/10 border-white/25 text-white hover:bg-white/15'
                     : 'bg-emerald-500 border-emerald-500 text-black hover:bg-emerald-400'
@@ -256,7 +256,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
               {isAdmin && (
                 <button
                   onClick={handleOpenEdit}
-                  className="h-8 inline-flex items-center gap-1.5 px-3.5 rounded-full bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs font-semibold border border-neutral-700 transition-colors"
+                  className="h-8 inline-flex items-center gap-1.5 px-3.5 rounded-full bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs font-semibold border border-neutral-700 transition-colors artist-edit-btn"
                   title="Configurar foto, portada y biografía del artista (Visible para todos)"
                 >
                   <Pencil className="w-3.5 h-3.5 text-emerald-400" />
@@ -265,17 +265,17 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
               )}
             </div>
 
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white tracking-tight leading-none py-1 drop-shadow-md">
+            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white tracking-tight leading-none py-1 drop-shadow-md artist-title">
               {artistName}
             </h1>
 
             {profile?.bio && (
-              <p className="text-xs md:text-sm text-neutral-300 max-w-2xl line-clamp-3 leading-relaxed">
+              <p className="text-xs md:text-sm text-neutral-300 max-w-2xl line-clamp-3 leading-relaxed artist-bio">
                 {profile.bio}
               </p>
             )}
 
-            <div className="flex items-center gap-2 text-xs text-neutral-400 font-semibold pt-1">
+            <div className="flex items-center gap-2 text-xs text-neutral-400 font-semibold pt-1 artist-stats">
               <span>{artistSongs.length} canciones en catálogo</span>
               <span>•</span>
               <span>{artistAlbums.length} álbumes</span>

@@ -202,6 +202,249 @@ input[type="range"] {
   background: rgba(0, 0, 0, 0.35);
 }
 
+/* Artist Profile Hero in Light Mode */
+[data-theme="light"] .artist-hero-container {
+  background: linear-gradient(to bottom, #cbd5e1, #f1f5f9, #f8fafc) !important;
+}
+
+[data-theme="light"] .artist-hero-overlay {
+  background: linear-gradient(to top, #f8fafc 10%, rgba(248, 250, 252, 0.85) 60%, rgba(248, 250, 252, 0.2) 100%) !important;
+}
+
+[data-theme="light"] .artist-header-bg {
+  opacity: 0.15 !important;
+}
+
+[data-theme="light"] .artist-title {
+  color: #0f172a !important;
+  text-shadow: none !important;
+}
+
+[data-theme="light"] .artist-bio {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .artist-stats {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .artist-back-btn {
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="light"] .artist-back-btn:hover {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .artist-verified-badge {
+  background-color: #dbeafe !important;
+  border-color: #bfdbfe !important;
+  color: #1d4ed8 !important;
+}
+
+[data-theme="light"] .artist-follow-btn {
+  background-color: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+[data-theme="light"] .artist-follow-btn:hover {
+  background-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .artist-edit-btn {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+[data-theme="light"] .artist-avatar-ring {
+  --tw-ring-color: rgba(203, 213, 225, 0.8) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Playlist / Album Hero in Light Mode */
+[data-theme="light"] .playlist-hero-container {
+  background: #f8fafc !important;
+}
+
+[data-theme="light"] .playlist-hero-art {
+  opacity: 0.25 !important;
+}
+
+[data-theme="light"] .playlist-hero-overlay {
+  background: linear-gradient(to bottom, rgba(248, 250, 252, 0.3), rgba(248, 250, 252, 0.85), #f8fafc) !important;
+}
+
+[data-theme="light"] .playlist-hero-default-bg {
+  background: linear-gradient(to bottom, #e0e7ff, #f1f5f9, #f8fafc) !important;
+}
+
+[data-theme="light"] .playlist-hero-container h1 {
+  color: #0f172a !important;
+  text-shadow: none !important;
+}
+
+[data-theme="light"] .playlist-hero-container p,
+[data-theme="light"] .playlist-hero-container span {
+  color: #475569 !important;
+}
+
+/* Context Menus & Dropdowns */
+[data-theme="light"] .playlist-context-menu {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .playlist-context-menu .border-b {
+  border-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .playlist-context-menu p,
+[data-theme="light"] .playlist-context-menu span,
+[data-theme="light"] .playlist-context-menu button {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .playlist-context-menu button:hover {
+  background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .playlist-sort-dropdown {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.12) !important;
+}
+
+[data-theme="light"] .playlist-sort-dropdown .border-b {
+  border-color: #f1f5f9 !important;
+  color: #64748b !important;
+}
+
+[data-theme="light"] .playlist-sort-dropdown button {
+  color: #334155 !important;
+}
+
+[data-theme="light"] .playlist-sort-dropdown button:hover {
+  background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .playlist-sort-dropdown button.text-emerald-400 {
+  background-color: #ecfdf5 !important;
+  color: #047857 !important;
+  font-weight: 800 !important;
+}
+
+/* Profile Switcher Modal */
+[data-theme="light"] .profile-card-active {
+  background-color: #f0fdf4 !important;
+  border-color: #86efac !important;
+}
+
+[data-theme="light"] .profile-card-active .profile-name {
+  color: #064e3b !important;
+}
+
+[data-theme="light"] .profile-card-active .username-tag {
+  color: #047857 !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] .profile-card-active .active-badge {
+  background-color: #dcfce7 !important;
+  color: #15803d !important;
+}
+
+[data-theme="light"] .profile-card-inactive {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .profile-card-inactive:hover {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .profile-card-inactive .profile-name {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .profile-card-inactive .username-tag {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .badge-admin {
+  background-color: #dcfce7 !important;
+  color: #166534 !important;
+  border-color: #86efac !important;
+}
+
+[data-theme="light"] .badge-member {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .profile-menu-stats-btn {
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .profile-menu-stats-btn:hover {
+  background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .profile-menu-admin-btn {
+  background-color: #ecfdf5 !important;
+  border: 1px solid #a7f3d0 !important;
+  color: #047857 !important;
+}
+
+[data-theme="light"] .profile-menu-admin-btn:hover {
+  background-color: #d1fae5 !important;
+}
+
+[data-theme="light"] .profile-menu-create-btn {
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #059669 !important;
+}
+
+[data-theme="light"] .profile-menu-create-btn:hover {
+  background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .profile-menu-logout-btn {
+  background-color: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
+  color: #dc2626 !important;
+}
+
+[data-theme="light"] .profile-menu-logout-btn:hover {
+  background-color: #fee2e2 !important;
+}
+
+/* Add to playlist modal items */
+[data-theme="light"] .add-playlist-active {
+  background-color: #f0fdf4 !important;
+  border-color: #86efac !important;
+}
+
+[data-theme="light"] .add-playlist-inactive {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .add-playlist-inactive:hover {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 8px;
