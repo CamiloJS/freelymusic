@@ -12,9 +12,13 @@ import { SavedCheckIcon } from '../components/SavedCheckIcon';
 import Music from 'lucide-react/dist/esm/icons/music.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
+import UserCheck from 'lucide-react/dist/esm/icons/user-check.mjs';
+import UserPlus from 'lucide-react/dist/esm/icons/user-plus.mjs';
+import Users from 'lucide-react/dist/esm/icons/users.mjs';
+import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
-import { Song, Album } from '../types';
+import { Song, Album, UserProfile } from '../types';
 import { formatTime } from '../utils/lyrics';
 import { getAlbumsFromCatalog } from '../utils/albums';
 import { ArtistLinks } from '../components/ArtistLinks';
@@ -31,6 +35,7 @@ interface CloudSearchViewProps {
   onOpenAddToPlaylist: (song: Song) => void;
   onSelectArtist?: (artistName: string) => void;
   onSelectAlbum?: (album: Album) => void;
+  onSelectUserProfile?: (user: UserProfile) => void;
 }
 
 function normalizeSearchText(text: string): string {
@@ -125,7 +130,9 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
   onOpenAddToPlaylist,
   onSelectArtist,
   onSelectAlbum,
+  onSelectUserProfile,
 }) => {
+  const { currentUser, allUsers, updateProfile } = useAuth();
   const {
     catalog,
     isFavorite,
@@ -138,9 +145,42 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
 
   const [recentSearches, setRecentSearches] = useState<string[]>(() => getRecentSearches());
 
+  const matchedUsers = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return [];
+    const hasAt = q.includes('@');
+    const cleanQ = q.replace(/^@+/, '').toLowerCase().trim();
+
+    return allUsers.filter((u) => {
+      if (u.isProfilePublic === false && u.id !== currentUser.id) return false;
+      if (hasAt && !cleanQ) return true;
+      if (!cleanQ) return false;
+      return (
+        u.username.toLowerCase().includes(cleanQ) ||
+        u.displayName.toLowerCase().includes(cleanQ)
+      );
+    });
+  }, [allUsers, searchQuery, currentUser.id]);
+
+  const handleToggleFollowUser = (targetUserId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    const currentFollowing = currentUser.followingUserIds || [];
+    const isFollowing = currentFollowing.includes(targetUserId);
+    const nextFollowing = isFollowing
+      ? currentFollowing.filter((id) => id !== targetUserId)
+      : [...currentFollowing, targetUserId];
+
+    updateProfile({
+      ...currentUser,
+      followingUserIds: nextFollowing,
+    });
+  };
+
   const filteredSongs = useMemo(() => {
     const q = searchQuery.trim();
     if (!q) return [];
+    // If the query is strictly an '@' user query (e.g. '@laura'), do not match random songs unless there are no user matches
+    if (q.startsWith('@')) return [];
 
     const scored = catalog
       .map((song) => {
@@ -245,21 +285,122 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
               <p className="text-xs text-neutral-500 mt-1">
                 El catálogo completo está disponible aquí, pero no se muestra hasta que busques.
               </p>
+              <button
+                type="button"
+                onClick={() => onSearchQueryChange('@')}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors shadow-sm"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Buscar perfiles y amigos con @</span>
+              </button>
             </div>
           )}
         </div>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-black text-white">Resultados</h1>
             <p className="text-sm text-neutral-400 mt-1">
-              {filteredSongs.length === 1
-                ? `1 coincidencia para “${searchQuery.trim()}”`
-                : `${filteredSongs.length} coincidencias para “${searchQuery.trim()}”`}
+              {searchQuery.trim().startsWith('@')
+                ? `${matchedUsers.length} ${matchedUsers.length === 1 ? 'perfil encontrado' : 'perfiles encontrados'} para “${searchQuery.trim()}”`
+                : `${filteredSongs.length + matchedUsers.length} coincidencias para “${searchQuery.trim()}”`}
             </p>
           </div>
 
-          {filteredSongs.length === 0 ? (
+          {/* Perfiles y Amigos (@) Section */}
+          {matchedUsers.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-white">
+                <Users className="w-4 h-4 text-emerald-400" />
+                <span>Perfiles y amigos (@)</span>
+                <span className="text-xs text-[#b3b3b3] font-normal">({matchedUsers.length})</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {matchedUsers.map((user) => {
+                  const isFollowing = (currentUser.followingUserIds || []).includes(user.id);
+                  const isMe = user.id === currentUser.id;
+                  const activity = user.currentListeningSong;
+
+                  return (
+                    <div
+                      key={user.id}
+                      onClick={() => onSelectUserProfile?.(user)}
+                      className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#181818] hover:bg-[#242424] border border-[#282828] cursor-pointer transition-all group shadow-sm"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="relative w-12 h-12 rounded-full overflow-hidden bg-[#242424] border border-white/10 flex-shrink-0 shadow">
+                          <img
+                            src={user.avatarUrl}
+                            alt={user.displayName}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                          {user.shareListeningActivity && activity?.isPlaying && (
+                            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#181818]" />
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-sm font-bold text-white truncate group-hover:text-emerald-400 transition-colors">
+                            {user.displayName} {isMe && <span className="text-xs text-[#b3b3b3] font-normal">(Tú)</span>}
+                          </h4>
+                          <p className="text-xs text-emerald-400 truncate">
+                            @{user.username}
+                          </p>
+                          {user.shareListeningActivity && activity ? (
+                            <p className="text-[11px] text-[#b3b3b3] truncate mt-0.5">
+                              {activity.isPlaying ? `🎵 ${activity.title}` : activity.relativeTimeText || 'Reciente'}
+                            </p>
+                          ) : (
+                            <p className="text-[11px] text-[#b3b3b3] truncate mt-0.5">
+                              Perfil público
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {!isMe && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleFollowUser(user.id, e)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 flex-shrink-0 shadow ${
+                            isFollowing
+                              ? 'bg-[#282828] text-white border border-white/10 hover:bg-[#333333]'
+                              : 'bg-emerald-500 text-black hover:bg-emerald-400'
+                          }`}
+                        >
+                          {isFollowing ? (
+                            <>
+                              <UserCheck className="w-3.5 h-3.5" />
+                              <span>Siguiendo</span>
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus className="w-3.5 h-3.5" />
+                              <span>Seguir</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Songs Section */}
+          {searchQuery.trim().startsWith('@') && matchedUsers.length === 0 ? (
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-12 text-center">
+              <Users className="w-10 h-10 text-neutral-600 mx-auto mb-3" />
+              <p className="text-sm font-semibold text-neutral-300">
+                No se encontraron perfiles para “{searchQuery.trim()}”
+              </p>
+              <p className="text-xs text-neutral-500 mt-1">
+                Prueba buscando con el nombre de usuario o nombre completo.
+              </p>
+            </div>
+          ) : !searchQuery.trim().startsWith('@') && filteredSongs.length === 0 && matchedUsers.length === 0 ? (
             <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-12 text-center">
               <Music className="w-10 h-10 text-neutral-600 mx-auto mb-3" />
               <p className="text-sm font-semibold text-neutral-300">
@@ -269,7 +410,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                 Prueba con otra palabra del título, del artista o de la letra.
               </p>
             </div>
-          ) : (
+          ) : filteredSongs.length > 0 ? (
             <div className="bg-neutral-900/40 border border-neutral-800/60 rounded-3xl overflow-hidden">
               <div className="p-4 border-b border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-500 font-bold uppercase tracking-wider">
                 <span>Canción</span>
@@ -464,7 +605,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                 })}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       )}
     </div>

@@ -1,5 +1,15 @@
 export type UserRole = 'admin' | 'member';
 
+export interface UserListeningActivity {
+  title: string;
+  artist: string;
+  coverUrl?: string;
+  album?: string;
+  startedAt?: string;
+  relativeTimeText?: string;
+  isPlaying?: boolean;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -8,6 +18,36 @@ export interface UserProfile {
   role: UserRole;
   pin?: string;
   createdAt: string;
+  // Social & Privacy Settings
+  isFavoritesPublic?: boolean;
+  shareListeningActivity?: boolean;
+  isProfilePublic?: boolean;
+  currentListeningSong?: UserListeningActivity;
+  followingUserIds?: string[];
+}
+
+export interface DirectMessage {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  text: string;
+  timestamp: string;
+  songAttachment?: {
+    id: string;
+    title: string;
+    artist: string;
+    coverUrl: string;
+  };
+}
+
+export interface ChatThread {
+  id: string;
+  participantIds: string[];
+  displayName: string;
+  avatarUrl?: string;
+  subtitle: string;
+  lastMessageTime: string;
+  unread?: boolean;
 }
 
 export type SongVersionType =

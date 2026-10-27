@@ -25,7 +25,7 @@ export const DownloadedIcon: React.FC<DownloadedIconProps> = ({
     focusable="false"
   >
     <title>{title}</title>
-    <circle cx="12" cy="12" r="12" fill="#1ed760" />
+    <circle cx="12" cy="12" r="12" fill="var(--brand-color, #1ed760)" />
     <path
       d="M12 5.5v8.5M8 10.5l4 4 4-4M7.5 17.5h9"
       fill="none"

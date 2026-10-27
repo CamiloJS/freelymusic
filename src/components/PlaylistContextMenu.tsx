@@ -3,6 +3,8 @@ import Pin from 'lucide-react/dist/esm/icons/pin.mjs';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Trash2 from 'lucide-react/dist/esm/icons/trash.mjs';
 import Check from 'lucide-react/dist/esm/icons/check.mjs';
+import Globe from 'lucide-react/dist/esm/icons/globe.mjs';
+import Lock from 'lucide-react/dist/esm/icons/lock.mjs';
 import { Playlist } from '../types';
 
 export interface PlaylistMenuState {
@@ -18,6 +20,7 @@ interface PlaylistContextMenuProps {
   onTogglePin: (playlistId: string) => void;
   onPlay?: (playlist: Playlist) => void;
   onDelete?: (playlist: Playlist) => void;
+  onTogglePublic?: (playlist: Playlist) => void;
 }
 
 /**
@@ -31,6 +34,7 @@ export const PlaylistContextMenu: React.FC<PlaylistContextMenuProps> = ({
   onTogglePin,
   onPlay,
   onDelete,
+  onTogglePublic,
 }) => {
   useEffect(() => {
     if (!state) return;
@@ -44,7 +48,7 @@ export const PlaylistContextMenu: React.FC<PlaylistContextMenuProps> = ({
   if (!state) return null;
 
   const width = 232;
-  const height = onDelete ? 196 : 146;
+  const height = (onDelete ? 196 : 146) + (onTogglePublic ? 40 : 0);
   const left = Math.max(8, Math.min(state.x, window.innerWidth - width - 8));
   const top = Math.max(8, Math.min(state.y, window.innerHeight - height - 8));
 
@@ -99,6 +103,29 @@ export const PlaylistContextMenu: React.FC<PlaylistContextMenuProps> = ({
           >
             <Play className="h-4 w-4 text-neutral-400" />
             <span>Reproducir</span>
+          </button>
+        )}
+
+        {onTogglePublic && (
+          <button
+            type="button"
+            onClick={() => {
+              onTogglePublic(state.playlist);
+              onClose();
+            }}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-neutral-200 hover:bg-white/10 transition-colors"
+          >
+            {state.playlist.isPublic ? (
+              <>
+                <Lock className="h-4 w-4 text-amber-400" />
+                <span className="flex-1">Hacer privada</span>
+              </>
+            ) : (
+              <>
+                <Globe className="h-4 w-4 text-emerald-400" />
+                <span className="flex-1">Hacer pública</span>
+              </>
+            )}
           </button>
         )}
 

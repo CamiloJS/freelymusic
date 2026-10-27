@@ -9,7 +9,7 @@ import { MobilePlayerBar } from './components/MobilePlayerBar';
 import { MobileNav } from './components/MobileNav';
 import { SpotifyRightPanel } from './components/SpotifyRightPanel';
 import { InstallPrompt } from './components/InstallPrompt';
-import { Playlist, Song, Album } from './types';
+import { Playlist, Song, Album, UserProfile } from './types';
 import { getAlbumsFromCatalog } from './utils/albums';
 import { getCustomAppIcon, applyAppIcon } from './utils/appIcon';
 import { DEFAULT_AVATAR } from './services/storage';
@@ -72,6 +72,36 @@ const ProfileSwitcherModal = lazy(() =>
     default: module.ProfileSwitcherModal,
   }))
 );
+const SpotifySideDrawer = lazy(() =>
+  import('./components/SpotifySideDrawer').then((module) => ({
+    default: module.SpotifySideDrawer,
+  }))
+);
+const RecientesHistoryModal = lazy(() =>
+  import('./components/RecientesHistoryModal').then((module) => ({
+    default: module.RecientesHistoryModal,
+  }))
+);
+const CustomizeModal = lazy(() =>
+  import('./components/CustomizeModal').then((module) => ({
+    default: module.CustomizeModal,
+  }))
+);
+const PrivacySettingsModal = lazy(() =>
+  import('./components/PrivacySettingsModal').then((module) => ({
+    default: module.PrivacySettingsModal,
+  }))
+);
+const MessagesModal = lazy(() =>
+  import('./components/MessagesModal').then((module) => ({
+    default: module.MessagesModal,
+  }))
+);
+const UserProfileModal = lazy(() =>
+  import('./components/UserProfileModal').then((module) => ({
+    default: module.UserProfileModal,
+  }))
+);
 const AddToPlaylistModal = lazy(() =>
   import('./components/AddToPlaylistModal').then((module) => ({
     default: module.AddToPlaylistModal,
@@ -103,6 +133,13 @@ const MainLayout: React.FC = () => {
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [songToAddToPlaylist, setSongToAddToPlaylist] = useState<Song | null>(null);
   const [isProfileSwitcherOpen, setIsProfileSwitcherOpen] = useState(false);
+  const [isSideDrawerOpen, setIsSideDrawerOpen] = useState(false);
+  const [isRecientesOpen, setIsRecientesOpen] = useState(false);
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+  const [isPrivacySettingsOpen, setIsPrivacySettingsOpen] = useState(false);
+  const [isMessagesOpen, setIsMessagesOpen] = useState(false);
+  const [messagesInitialThreadId, setMessagesInitialThreadId] = useState<string | undefined>();
+  const [selectedUserProfile, setSelectedUserProfile] = useState<UserProfile | null>(null);
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false);
   const [isImportPlaylistOpen, setIsImportPlaylistOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -503,7 +540,13 @@ const MainLayout: React.FC = () => {
         {/* Right: User Profile & Preferences Button */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsProfileSwitcherOpen(true)}
+            onClick={() => {
+              if (window.innerWidth < 768) {
+                setIsSideDrawerOpen(true);
+              } else {
+                setIsProfileSwitcherOpen(true);
+              }
+            }}
             className="flex items-center gap-2 p-1 pl-1 pr-3 rounded-full bg-neutral-900 hover:bg-neutral-850 border border-neutral-800 transition-all text-left"
             title="Abrir preferencias, cuenta y ajustes"
           >
@@ -554,7 +597,7 @@ const MainLayout: React.FC = () => {
                     onSelectPlaylist={handleSelectPlaylist}
                     onOpenAddToPlaylist={handleOpenAddToPlaylist}
                     onSelectArtist={handleSelectArtist}
-                    onOpenProfileSwitcher={() => setIsProfileSwitcherOpen(true)}
+                    onOpenProfileSwitcher={() => setIsSideDrawerOpen(true)}
                   />
                 )}
 
@@ -565,6 +608,7 @@ const MainLayout: React.FC = () => {
                     onOpenAddToPlaylist={handleOpenAddToPlaylist}
                     onSelectArtist={handleSelectArtist}
                     onSelectAlbum={handleSelectAlbum}
+                    onSelectUserProfile={(user) => setSelectedUserProfile(user)}
                   />
                 )}
 
@@ -580,7 +624,7 @@ const MainLayout: React.FC = () => {
                     onOpenAddToPlaylist={handleOpenAddToPlaylist}
                     onOpenImportPlaylist={() => setIsImportPlaylistOpen(true)}
                     onSelectArtist={handleSelectArtist}
-                    onOpenProfileSwitcher={() => setIsProfileSwitcherOpen(true)}
+                    onOpenProfileSwitcher={() => setIsSideDrawerOpen(true)}
                   />
                 )}
 
@@ -733,6 +777,87 @@ const MainLayout: React.FC = () => {
             onCreated={(playlist) => {
               handleSelectPlaylist(playlist);
               setIsImportPlaylistOpen(false);
+            }}
+          />
+        </Suspense>
+      )}
+
+      {isSideDrawerOpen && (
+        <Suspense fallback={null}>
+          <SpotifySideDrawer
+            isOpen={isSideDrawerOpen}
+            onClose={() => setIsSideDrawerOpen(false)}
+            onOpenProfile={() => setIsProfileSwitcherOpen(true)}
+            onOpenAddAccount={() => setIsProfileSwitcherOpen(true)}
+            onOpenAdminPanel={() => handleNavigateTab('admin')}
+            onOpenStats={() => handleNavigateTab('profile')}
+            onOpenRecents={() => setIsRecientesOpen(true)}
+            onOpenCustomize={() => setIsCustomizeOpen(true)}
+            onOpenSettingsPrivacy={() => setIsPrivacySettingsOpen(true)}
+            onOpenMessages={(threadId) => {
+              setMessagesInitialThreadId(threadId);
+              setIsMessagesOpen(true);
+            }}
+            onSelectFriendProfile={(user) => setSelectedUserProfile(user)}
+          />
+        </Suspense>
+      )}
+
+      {isRecientesOpen && (
+        <Suspense fallback={null}>
+          <RecientesHistoryModal
+            isOpen={isRecientesOpen}
+            onClose={() => setIsRecientesOpen(false)}
+            onOpenAddToPlaylist={handleOpenAddToPlaylist}
+          />
+        </Suspense>
+      )}
+
+      {isCustomizeOpen && (
+        <Suspense fallback={null}>
+          <CustomizeModal
+            isOpen={isCustomizeOpen}
+            onClose={() => setIsCustomizeOpen(false)}
+          />
+        </Suspense>
+      )}
+
+      {isPrivacySettingsOpen && (
+        <Suspense fallback={null}>
+          <PrivacySettingsModal
+            isOpen={isPrivacySettingsOpen}
+            onClose={() => setIsPrivacySettingsOpen(false)}
+          />
+        </Suspense>
+      )}
+
+      {isMessagesOpen && (
+        <Suspense fallback={null}>
+          <MessagesModal
+            isOpen={isMessagesOpen}
+            onClose={() => {
+              setIsMessagesOpen(false);
+              setMessagesInitialThreadId(undefined);
+            }}
+            initialThreadId={messagesInitialThreadId}
+          />
+        </Suspense>
+      )}
+
+      {selectedUserProfile && (
+        <Suspense fallback={null}>
+          <UserProfileModal
+            user={selectedUserProfile}
+            isOpen={Boolean(selectedUserProfile)}
+            onClose={() => setSelectedUserProfile(null)}
+            onOpenMessagesWithUser={(user) => {
+              setSelectedUserProfile(null);
+              setMessagesInitialThreadId(undefined);
+              setIsMessagesOpen(true);
+            }}
+            onSelectPlaylist={(pl) => {
+              setSelectedUserProfile(null);
+              handleSelectPlaylist(pl);
             }}
           />
         </Suspense>

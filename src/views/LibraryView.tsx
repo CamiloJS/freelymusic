@@ -26,6 +26,8 @@ import Video from 'lucide-react/dist/esm/icons/video.mjs';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
 import LayoutGrid from 'lucide-react/dist/esm/icons/layout-grid.mjs';
 import ArrowUpDown from 'lucide-react/dist/esm/icons/arrow-up-down.mjs';
+import Globe from 'lucide-react/dist/esm/icons/globe.mjs';
+import Lock from 'lucide-react/dist/esm/icons/lock.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -75,6 +77,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     artistProfiles,
     getArtistProfile,
     deletePlaylist,
+    updatePlaylist,
     toggleFavorite,
     isFavorite,
     isSongInLibrary,
@@ -515,6 +518,27 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   <Pin className="w-5 h-5 fill-current" />
                 </button>
               ) : null}
+
+              {/* Toggle Public / Private Playlist */}
+              {!isFavorites && !isAlbum && playlistObj && (
+                <button
+                  onClick={() => {
+                    updatePlaylist({ ...playlistObj, isPublic: !playlistObj.isPublic });
+                  }}
+                  className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 text-[#b3b3b3] hover:text-white"
+                  title={
+                    playlistObj.isPublic
+                      ? 'Playlist pública (clic para hacer privada)'
+                      : 'Playlist privada (clic para hacer pública)'
+                  }
+                >
+                  {playlistObj.isPublic ? (
+                    <Globe className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <Lock className="w-5 h-5 text-amber-400" />
+                  )}
+                </button>
+              )}
 
               {/* Download All Button (Spotify Circle Arrow Down) */}
               <button
@@ -1077,6 +1101,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           }
           onClose={() => setPlaylistMenu(null)}
           onTogglePin={togglePlaylistPin}
+          onTogglePublic={(pl) => updatePlaylist({ ...pl, isPublic: !pl.isPublic })}
           onPlay={(playlist) => setSelectedPlaylist(playlist)}
         />
       </div>
@@ -1674,6 +1699,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         }
         onClose={() => setPlaylistMenu(null)}
         onTogglePin={togglePlaylistPin}
+        onTogglePublic={(pl) => updatePlaylist({ ...pl, isPublic: !pl.isPublic })}
         onPlay={(playlist) => setSelectedPlaylist(playlist)}
       />
     </>
