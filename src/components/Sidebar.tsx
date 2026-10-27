@@ -71,11 +71,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
   const suppressPlaylistClickRef = useRef(false);
 
-  const navItems = [
-    { id: 'home', label: 'Inicio', icon: Home },
-    { id: 'cloud', label: 'Buscar', icon: Compass },
-  ];
-
   const uniqueAlbums = React.useMemo(
     () => getAlbumsFromCatalog(librarySongs),
     [librarySongs]
@@ -203,33 +198,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       <aside className="w-68 lg:w-76 bg-black text-neutral-300 flex flex-col h-full select-none flex-shrink-0">
-      {/* Top navigation: only Inicio and Buscar, like Spotify */}
-      <div className="px-3 pt-3 pb-2 space-y-1">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = currentTab === item.id && !selectedPlaylist;
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                setIsCenterLyricsOpen(false);
-                setCurrentTab(item.id);
-              }}
-              className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-colors ${
-                isActive
-                  ? 'bg-neutral-900 text-white'
-                  : 'text-neutral-400 hover:text-white hover:bg-neutral-900/60'
-              }`}
-            >
-              <Icon className={`w-5 h-5 ${isActive ? 'text-emerald-400' : ''}`} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Library panel */}
-      <div className="mt-1 flex-1 flex flex-col min-h-0 bg-neutral-950/90 rounded-2xl mx-2 border border-neutral-900/90 overflow-hidden">
+        {/* Library panel */}
+        <div className="flex-1 flex flex-col min-h-0 bg-neutral-950/90 rounded-2xl mx-2 my-2 border border-neutral-900/90 overflow-hidden">
         <div className="px-3 pt-3 pb-2">
           <div className="flex items-center justify-between gap-2 mb-2.5">
             <button

@@ -231,25 +231,8 @@ const MainLayout: React.FC = () => {
           paddingTop: 'env(safe-area-inset-top)',
         }}
       >
-        {/* Left: Brand, navigation arrows & Home */}
+        {/* Left: Navigation arrows & Home */}
         <div className="flex items-center gap-2 min-w-0">
-          <div
-            className={`${
-              currentTab === 'home' ? 'flex' : 'hidden'
-            } md:flex items-center gap-2 min-w-0 mr-1`}
-          >
-            <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg md:rounded-xl bg-gradient-to-tr from-emerald-500 via-green-400 to-teal-300 flex items-center justify-center overflow-hidden shadow-lg shadow-emerald-500/20 flex-shrink-0">
-              {appIcon ? (
-                <img src={appIcon} alt={appName} className="w-full h-full object-cover" />
-              ) : (
-                <Disc3 className="w-4 h-4 text-black" />
-              )}
-            </div>
-            <span className="hidden md:block text-sm font-black text-white truncate max-w-[130px]">
-              {appName}
-            </span>
-          </div>
-
           <div className="flex items-center gap-1">
             <button
               onClick={() => {

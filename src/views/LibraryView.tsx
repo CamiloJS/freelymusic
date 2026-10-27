@@ -1,4 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
+import List from 'lucide-react/dist/esm/icons/list.mjs';
+import ArrowDown from 'lucide-react/dist/esm/icons/arrow-down.mjs';
+import ArrowUp from 'lucide-react/dist/esm/icons/arrow-up.mjs';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
@@ -77,6 +80,24 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const { playSong, currentSong, isPlaying, togglePlayPause, isShuffle, toggleShuffle } = useAudio();
 
   const [playlistSearch, setPlaylistSearch] = useState('');
+  const [playlistSortBy, setPlaylistSortBy] = useState<'custom' | 'title' | 'artist' | 'album'>('custom');
+  const [playlistSortDir, setPlaylistSortDir] = useState<'asc' | 'desc'>('desc');
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(e.target as Node)) {
+        setIsSortMenuOpen(false);
+      }
+    };
+    if (isSortMenuOpen) {
+      document.addEventListener('mousedown', handleOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+    };
+  }, [isSortMenuOpen]);
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; status: string } | null>(null);
   const [downloadMessage, setDownloadMessage] = useState('');
   const [playlistMenu, setPlaylistMenu] = useState<PlaylistMenuState | null>(null);
@@ -206,6 +227,51 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       );
     });
 
+    const sortedAndFilteredSongs = useMemo(() => {
+      if (isAlbum) return filteredSongs;
+
+      const items = [...filteredSongs];
+      const dirMultiplier = playlistSortDir === 'asc' ? 1 : -1;
+
+      if (playlistSortBy === 'title') {
+        items.sort(
+          (a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }) * dirMultiplier
+        );
+      } else if (playlistSortBy === 'artist') {
+        items.sort(
+          (a, b) => a.artist.localeCompare(b.artist, undefined, { sensitivity: 'base' }) * dirMultiplier
+        );
+      } else if (playlistSortBy === 'album') {
+        items.sort(
+          (a, b) =>
+            (a.album || '').localeCompare(b.album || '', undefined, { sensitivity: 'base' }) *
+            dirMultiplier
+        );
+      } else if (playlistSortBy === 'custom') {
+        if (playlistSortDir === 'desc') {
+          items.reverse();
+        }
+      }
+
+      return items;
+    }, [filteredSongs, isAlbum, playlistSortBy, playlistSortDir]);
+
+    const sortLabels: Record<'custom' | 'title' | 'artist' | 'album', string> = {
+      custom: 'Agregado recientemente',
+      title: 'Título',
+      artist: 'Artista',
+      album: 'Álbum',
+    };
+
+    const handleToggleSortOption = (option: 'custom' | 'title' | 'artist' | 'album') => {
+      if (playlistSortBy === option) {
+        setPlaylistSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+      } else {
+        setPlaylistSortBy(option);
+        setPlaylistSortDir(option === 'custom' ? 'desc' : 'asc');
+      }
+    };
+
     const isThisPlaylistPlaying =
       playlistSongs.length > 0 && playlistSongs.some((s) => s.id === currentSong?.id) && isPlaying;
 
@@ -223,11 +289,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       : (isAlbum ? albumObj?.coverUrl : playlistObj?.coverUrl) || playlistSongs[0]?.coverUrl;
 
     const handlePlayAll = () => {
-      if (playlistSongs.length === 0) return;
+      if (sortedAndFilteredSongs.length === 0) return;
       if (isThisPlaylistPlaying) {
         togglePlayPause();
       } else {
-        playSong(playlistSongs[0], playlistSongs, {
+        playSong(sortedAndFilteredSongs[0], sortedAndFilteredSongs, {
           type: sourceType,
           name: sourceName,
           id: isFavorites ? 'favorites' : isAlbum ? albumObj?.name : playlistObj?.id,
@@ -471,16 +537,77 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               )}
             </div>
 
-            {/* In-playlist Search Filter */}
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-              <input
-                type="text"
-                value={playlistSearch}
-                onChange={(e) => setPlaylistSearch(e.target.value)}
-                placeholder="Buscar en la lista..."
-                className="w-full bg-neutral-900 border border-neutral-800 rounded-full pl-10 pr-4 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-              />
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+              {/* In-playlist Search Filter */}
+              <div className="relative w-full sm:w-56">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={playlistSearch}
+                  onChange={(e) => setPlaylistSearch(e.target.value)}
+                  placeholder="Buscar en la lista..."
+                  className="w-full bg-neutral-900 border border-neutral-800 rounded-full pl-10 pr-4 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Sort Dropdown Button (ONLY in playlists, NOT in albums) */}
+              {!isAlbum && (
+                <div ref={sortMenuRef} className="relative flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsSortMenuOpen((prev) => !prev)}
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-bold text-neutral-300 hover:text-white transition-all bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-700 select-none shadow-sm"
+                    title="Ordenar canciones de la playlist"
+                  >
+                    <span className="text-xs truncate max-w-[140px]">
+                      {sortLabels[playlistSortBy]}
+                    </span>
+                    {playlistSortDir === 'desc' ? (
+                      <ArrowDown className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                    ) : (
+                      <ArrowUp className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                    )}
+                    <List className="w-4 h-4 text-neutral-400 ml-0.5 flex-shrink-0" />
+                  </button>
+
+                  {isSortMenuOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-56 p-2 rounded-2xl bg-neutral-900/95 border border-neutral-800 shadow-2xl backdrop-blur-xl z-40 select-none animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-neutral-400 border-b border-neutral-800/80 mb-1">
+                        Clasificar por
+                      </div>
+
+                      {(['title', 'custom', 'artist', 'album'] as const).map((option) => {
+                        const isSelected = playlistSortBy === option;
+                        return (
+                          <button
+                            key={option}
+                            type="button"
+                            onClick={() => {
+                              handleToggleSortOption(option);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors text-left ${
+                              isSelected
+                                ? 'text-emerald-400 font-extrabold bg-neutral-800/70'
+                                : 'text-neutral-300 hover:text-white hover:bg-neutral-800/40'
+                            }`}
+                          >
+                            <span>{sortLabels[option]}</span>
+                            {isSelected && (
+                              <span className="flex items-center gap-1 text-emerald-400 font-black">
+                                {playlistSortDir === 'desc' ? (
+                                  <ArrowDown className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ArrowUp className="w-3.5 h-3.5" />
+                                )}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -521,7 +648,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
             {/* Songs Rows */}
             <div className="divide-y divide-neutral-900/60 mt-1">
-              {filteredSongs.length === 0 ? (
+              {sortedAndFilteredSongs.length === 0 ? (
                 <div className="p-12 text-center text-neutral-500">
                   <p className="text-sm font-bold">No se encontraron canciones</p>
                   <p className="text-xs text-neutral-500 mt-1">
@@ -529,7 +656,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   </p>
                 </div>
               ) : (
-                filteredSongs.map((song, idx) => {
+                sortedAndFilteredSongs.map((song, idx) => {
                   const isCurrent = currentSong?.id === song.id;
                   const downloaded = isDownloaded(song.id);
                   const isSaved = isFavorite(song.id) || isSongInLibrary(song.id);
@@ -539,7 +666,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     <div
                       key={song.id}
                       onClick={() =>
-                        playSong(song, playlistSongs, {
+                        playSong(song, sortedAndFilteredSongs, {
                           type: sourceType,
                           name: sourceName,
                           id: isFavorites ? 'favorites' : isAlbum ? albumObj?.name : playlistObj?.id,
