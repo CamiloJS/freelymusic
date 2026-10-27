@@ -2,7 +2,7 @@ import React from 'react';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
-import Laptop2 from 'lucide-react/dist/esm/icons/laptop.mjs';
+import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
 import { DownloadedIcon } from './DownloadedIcon';
 import { SavedCheckIcon } from './SavedCheckIcon';
 import { useAudio, useAudioTime } from '../context/AudioContext';
@@ -22,6 +22,9 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
     isBuffering,
     togglePlayPause,
     setIsFullscreenNowPlaying,
+    hasInstrumental,
+    isKaraoke,
+    toggleKaraoke,
   } = useAudio();
   const { currentTime, duration } = useAudioTime();
   const { isDownloaded, isFavorite, toggleFavorite } = useMusic();
@@ -89,17 +92,27 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
             </span>
           </div>
 
-          {/* Controls: Device icon, Like button, Play/Pause button */}
+          {/* Controls: Karaoke button (if available), Like button, Play/Pause button */}
           <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-            {/* Connected device icon (Spotify Connect style) */}
-            <button
-              type="button"
-              className="p-1.5 text-[#1DB954] hover:text-white transition-colors"
-              title="Dispositivo conectado"
-              aria-label="Dispositivo conectado"
-            >
-              <Laptop2 className="w-4 h-4" />
-            </button>
+            {/* Karaoke Button for tracks with instrumental */}
+            {hasInstrumental && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleKaraoke();
+                }}
+                className={`p-1.5 transition-all active:scale-90 ${
+                  isKaraoke
+                    ? 'text-[#1DB954] hover:text-[#1ed760]'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+                title={isKaraoke ? 'Desactivar modo karaoke' : 'Activar karaoke con voz eliminada'}
+                aria-label={isKaraoke ? 'Desactivar modo karaoke' : 'Activar karaoke con voz eliminada'}
+              >
+                <Mic2 className={`w-4 h-4 ${isKaraoke ? 'stroke-[2.5]' : ''}`} />
+              </button>
+            )}
 
             {/* Like button */}
             <button

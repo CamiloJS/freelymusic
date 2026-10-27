@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
@@ -63,6 +63,31 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
   const { recordListeningTime, isFavorite, toggleFavorite, catalog } = useMusic();
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const setVideoRef = useCallback((el: HTMLVideoElement | null) => {
+    if (videoRef.current && !el) {
+      try {
+        videoRef.current.pause();
+        videoRef.current.muted = true;
+        videoRef.current.removeAttribute('src');
+        videoRef.current.load();
+      } catch {}
+    }
+    videoRef.current = el;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      const v = videoRef.current;
+      if (v) {
+        try {
+          v.pause();
+          v.muted = true;
+          v.removeAttribute('src');
+          v.load();
+        } catch {}
+      }
+    };
+  }, []);
   const lastTrackedRef = useRef(0);
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -222,7 +247,7 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
           </div>
         ) : (
           <video
-            ref={videoRef}
+            ref={setVideoRef}
             src={videoUrl}
             poster={currentSong.coverUrl}
             autoPlay={isPlaying}

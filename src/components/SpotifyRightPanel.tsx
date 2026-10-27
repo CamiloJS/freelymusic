@@ -64,6 +64,31 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
   const { catalog, isFavorite, toggleFavorite, playlists, recordListeningTime } = useMusic();
 
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const setVideoRef = React.useCallback((el: HTMLVideoElement | null) => {
+    if (videoRef.current && !el) {
+      try {
+        videoRef.current.pause();
+        videoRef.current.muted = true;
+        videoRef.current.removeAttribute('src');
+        videoRef.current.load();
+      } catch {}
+    }
+    videoRef.current = el;
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      const v = videoRef.current;
+      if (v) {
+        try {
+          v.pause();
+          v.muted = true;
+          v.removeAttribute('src');
+          v.load();
+        } catch {}
+      }
+    };
+  }, []);
   const lastTrackedRef = React.useRef(0);
 
   // Sync video time and playback when entering video mode or seeking
@@ -343,7 +368,7 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
                 <div className="relative w-full h-full bg-black flex items-center justify-center">
                   {!isFullscreenNowPlaying ? (
                     <video
-                      ref={videoRef}
+                      ref={setVideoRef}
                       src={videoUrl}
                       poster={currentSong.coverUrl}
                       autoPlay={isPlaying}

@@ -10,7 +10,6 @@ import Repeat from 'lucide-react/dist/esm/icons/repeat.mjs';
 import Repeat1 from 'lucide-react/dist/esm/icons/repeat-1.mjs';
 import Volume2 from 'lucide-react/dist/esm/icons/volume-2.mjs';
 import VolumeX from 'lucide-react/dist/esm/icons/volume-x.mjs';
-import Laptop2 from 'lucide-react/dist/esm/icons/laptop.mjs';
 import Share2 from 'lucide-react/dist/esm/icons/share-2.mjs';
 import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
 import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
@@ -77,6 +76,9 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
     sleepTimerOption,
     sleepTimerRemainingSeconds,
     setSleepTimer,
+    hasInstrumental,
+    isKaraoke,
+    toggleKaraoke,
   } = useAudio();
   const { currentTime, duration, activeLyricIndex } = useAudioTime();
 
@@ -574,15 +576,26 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
               </button>
             </div>
 
-            {/* 7. Auxiliary Row (Device icon on left, Share & Queue on right) */}
+            {/* 7. Auxiliary Row (Karaoke on left if available, Share & Queue on right) */}
             <div className="flex items-center justify-between py-1 text-neutral-400 flex-shrink-0">
-              <button
-                type="button"
-                className="p-1 hover:text-white transition-colors"
-                title="Dispositivos disponibles"
-              >
-                <Laptop2 className="w-5 h-5" />
-              </button>
+              {hasInstrumental ? (
+                <button
+                  type="button"
+                  onClick={toggleKaraoke}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all active:scale-95 ${
+                    isKaraoke
+                      ? 'bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/25'
+                      : 'bg-[#242424] text-neutral-300 hover:text-white border border-white/10'
+                  }`}
+                  title={isKaraoke ? 'Desactivar modo karaoke' : 'Activar modo karaoke'}
+                  aria-label={isKaraoke ? 'Desactivar modo karaoke' : 'Activar modo karaoke'}
+                >
+                  <Mic2 className="w-4 h-4" />
+                  <span>Karaoke</span>
+                </button>
+              ) : (
+                <div className="w-5 h-5" />
+              )}
 
               <div className="flex items-center gap-5">
                 <button

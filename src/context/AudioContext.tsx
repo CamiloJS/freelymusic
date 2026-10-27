@@ -28,6 +28,19 @@ function getInitialVolume(): number {
   return 0.85;
 }
 
+export function stopAllVideos() {
+  if (typeof document !== 'undefined') {
+    document.querySelectorAll('video').forEach((v) => {
+      try {
+        v.pause();
+        v.muted = true;
+        v.removeAttribute('src');
+        v.load();
+      } catch {}
+    });
+  }
+}
+
 // Never let an IndexedDB read block the start of a network stream forever.
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
   return new Promise((resolve) => {
@@ -468,7 +481,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const activeVersionLabel = activeVersion?.label || 'Original';
-  const hasInstrumental = Boolean(playbackTrack?.instrumentalUrl);
+  const hasInstrumental = Boolean(
+    playbackTrack?.instrumentalUrl ||
+    currentSong?.instrumentalUrl ||
+    currentSong?.versions?.some((v) => v.type === 'instrumental' || Boolean(v.instrumentalUrl))
+  );
   const [offlineVideoUrl, setOfflineVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -704,6 +721,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         if (isVideoModeRef.current) {
           if (!song.videoUrl) {
+            stopAllVideos();
             setIsVideoMode(false);
             audio.muted = isMuted;
             await audio.play();
@@ -712,6 +730,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             audio.pause();
           }
         } else {
+          stopAllVideos();
           audio.muted = isMuted;
           await audio.play();
         }
@@ -753,6 +772,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Play a specific song and optionally update queue and source
   const playSong = useCallback(
     (song: Song, newQueue?: Song[], source?: PlaybackSource) => {
+      stopAllVideos();
       setCurrentSong(song);
       setActiveVersionIdState(null);
       setIsKaraoke(false);
@@ -803,23 +823,32 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleKaraoke = useCallback(() => {
     if (!currentSong) return;
 
+    const instVersion = currentSong.versions?.find(
+      (v) => v.type === 'instrumental' || Boolean(v.instrumentalUrl)
+    );
     const instrumental =
-      activeVersion?.instrumentalUrl ?? currentSong.instrumentalUrl;
+      activeVersion?.instrumentalUrl ?? currentSong.instrumentalUrl ?? instVersion?.instrumentalUrl ?? instVersion?.audioUrl;
     if (!instrumental) return;
 
     const audio = audioRef.current;
     const current = audio?.currentTime || 0;
     const offset = Number(
-      activeVersion?.instrumentalOffset ?? currentSong.instrumentalOffset ?? 0
+      activeVersion?.instrumentalOffset ?? currentSong.instrumentalOffset ?? instVersion?.instrumentalOffset ?? 0
     );
     const nextKaraoke = !isKaraoke;
     const startAt = Math.max(0, current + (nextKaraoke ? offset : -offset));
 
+    stopAllVideos();
     setIsKaraoke(nextKaraoke);
     setIsVideoMode(false);
 
+    const targetVersionId =
+      nextKaraoke && !activeVersion?.instrumentalUrl && !currentSong.instrumentalUrl && instVersion
+        ? instVersion.id
+        : activeVersionId;
+
     void loadAndPlaySong(currentSong, {
-      versionId: activeVersionId,
+      versionId: targetVersionId,
       karaoke: nextKaraoke,
       startAt,
     });
@@ -844,6 +873,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [videoUrl]);
 
   const closeVideo = useCallback((seconds?: number) => {
+    stopAllVideos();
     setIsVideoMode(false);
     const audio = audioRef.current;
     if (!audio) return;

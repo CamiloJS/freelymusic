@@ -2,10 +2,26 @@
 <html lang="es" class="bg-black">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
     <title>Spotifree</title>
+
+    <!-- iOS Apple Touch Icon (Must be early in <head> for iOS Safari WebKit Add to Home Screen) -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=8" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=8" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png?v=8" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png?v=8" />
+    <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon-precomposed.png?v=8" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=8" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=8" />
+    <link rel="manifest" href="/manifest.webmanifest?v=8" />
+    <meta name="theme-color" content="#121212" />
+    <meta name="application-name" content="Spotifree" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Spotifree" />
 
     <!-- Warm up the connections needed for the first paint and playback. -->
     <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
@@ -127,22 +143,6 @@
       }, true);
     </script>
 
-    <!-- PWA & Mobile Web App Meta (iOS / WebKit / Android / Windows) -->
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#121212" />
-    <meta name="application-name" content="Spotifree" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Spotifree" />
-
-    <!-- iOS Apple Touch Icons -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
-    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon-precomposed.png" />
-    
     <meta name="description" content="Spotifree: reproductor móvil de música en la nube con letras sincronizadas y soporte offline nativo." />
   </head>
   <body class="bg-black text-white">

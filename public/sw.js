@@ -4,8 +4,8 @@
  * Full offline compatibility for iOS Safari (WebKit Standalone), Android Chrome, and Windows Edge.
  */
 
-const CACHE_NAME = 'spotifree-cache-v7';
-const PWA_ICON_CACHE = 'spotifree-pwa-icons';
+const CACHE_NAME = 'spotifree-cache-v8';
+const PWA_ICON_CACHE = 'spotifree-pwa-icons-v3';
 
 const PWA_ICON_PATHS = new Set([
   '/apple-touch-icon.png',
@@ -17,6 +17,7 @@ const PWA_ICON_PATHS = new Set([
   '/pwa-icon-512.png',
   '/favicon.svg',
   '/icon.svg',
+  '/spotify-icon.svg',
 ]);
 
 const PRECACHE_STATIC = [
@@ -25,6 +26,7 @@ const PRECACHE_STATIC = [
   '/manifest.webmanifest',
   '/favicon.svg',
   '/icon.svg',
+  '/spotify-icon.svg',
   '/apple-touch-icon.png',
   '/apple-touch-icon-precomposed.png',
   '/icon-192.png',
