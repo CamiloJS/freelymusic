@@ -34,6 +34,7 @@ import { loadFirebaseService } from '../services/firebaseLoader';
 import { detectAudioDuration } from '../utils/audioDuration';
 import { searchLyrics, searchArtistAvatar } from '../services/metadataEnrichment';
 import { cleanArtistSeparators } from '../utils/urlMetadataParser';
+import { preloadAllAppImages } from '../utils/offlineImagePreloader';
 
 export interface DownloadingState {
   isDownloading: boolean;
@@ -348,6 +349,23 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     refreshDownloadedIds();
   }, [refreshDownloadedIds]);
+
+  // Preload and cache all covers and images into Service Worker offline cache
+  useEffect(() => {
+    if (!catalog.length && !userData.playlists.length) return;
+    const timer = setTimeout(() => {
+      void preloadAllAppImages({
+        songs: catalog,
+        playlists: userData.playlists,
+        additionalUrls: [
+          currentUser?.avatarUrl,
+          ...artistProfiles.map((a) => a.avatarUrl),
+        ],
+      });
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [catalog, userData.playlists, artistProfiles, currentUser?.avatarUrl]);
 
   // Catalog actions
   const addTrackToCatalog = (songData: Omit<Song, 'id' | 'createdAt' | 'addedBy'>): Song => {

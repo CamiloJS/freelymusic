@@ -41,6 +41,7 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
   onOpenAdminPanel,
 }) => {
   const { currentUser, allUsers, switchUser, updateProfile, isAdmin, logout } = useAuth();
+  const isMainProfile = currentUser?.id === 'camilo-admin' || isAdmin;
   const {
     themeMode,
     setThemeMode,
@@ -58,7 +59,15 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
     resetIcon,
   } = useCustomization();
 
-  const [activeTab, setActiveTab] = useState<'perfiles' | 'mi_perfil' | 'personalizacion'>('perfiles');
+  const [activeTab, setActiveTab] = useState<'perfiles' | 'mi_perfil' | 'personalizacion'>(
+    isMainProfile ? 'perfiles' : 'mi_perfil'
+  );
+
+  React.useEffect(() => {
+    if (!isMainProfile && activeTab === 'perfiles') {
+      setActiveTab('mi_perfil');
+    }
+  }, [isMainProfile, activeTab]);
 
   // PIN switch state
   const [pinPromptUser, setPinPromptUser] = useState<UserProfile | null>(null);
@@ -229,17 +238,19 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-1.5 p-1 bg-neutral-950 rounded-2xl border border-neutral-800 mb-6 flex-shrink-0 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('perfiles')}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              activeTab === 'perfiles'
-                ? 'bg-neutral-800 text-white shadow-sm'
-                : 'text-neutral-400 hover:text-white'
-            }`}
-          >
-            <User className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Perfiles</span>
-          </button>
+          {isMainProfile && (
+            <button
+              onClick={() => setActiveTab('perfiles')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                activeTab === 'perfiles'
+                  ? 'bg-neutral-800 text-white shadow-sm'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <User className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Perfiles</span>
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab('mi_perfil')}
@@ -262,10 +273,10 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
             }`}
           >
             <Palette className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Personalización & Tema</span>
+            <span>Personalización</span>
           </button>
 
-          {onNavigateAddMusic && (
+          {isMainProfile && onNavigateAddMusic && (
             <button
               onClick={() => {
                 onClose();
@@ -281,8 +292,8 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
 
         {/* Tab Content Container */}
         <div className="flex-1 overflow-y-auto pr-1 space-y-6">
-          {/* TAB 1: PERFILES */}
-          {activeTab === 'perfiles' && (
+          {/* TAB 1: PERFILES (Solo perfil principal / Admin) */}
+          {isMainProfile && activeTab === 'perfiles' && (
             <div>
               {pinPromptUser ? (
                 <div>
@@ -529,6 +540,20 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                   </button>
                 </div>
               </form>
+
+              <div className="pt-4 border-t border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    logout();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/50 border border-red-500/20 text-red-400 font-bold text-xs tracking-wide transition-all"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Cerrar sesión en este dispositivo
+                </button>
+              </div>
             </div>
           )}
 

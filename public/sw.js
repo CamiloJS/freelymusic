@@ -4,8 +4,9 @@
  * Full offline compatibility for iOS Safari (WebKit Standalone), Android Chrome, and Windows Edge.
  */
 
-const CACHE_NAME = 'spotifree-cache-v8';
+const CACHE_NAME = 'spotifree-cache-v9';
 const PWA_ICON_CACHE = 'spotifree-pwa-icons-v3';
+const IMAGE_CACHE = 'spotifree-images-v1';
 
 const PWA_ICON_PATHS = new Set([
   '/apple-touch-icon.png',
@@ -99,7 +100,7 @@ self.addEventListener('activate', (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME && key !== PWA_ICON_CACHE) {
+          if (key !== CACHE_NAME && key !== PWA_ICON_CACHE && key !== IMAGE_CACHE) {
             console.log('[SW] Eliminando caché obsoleta:', key);
             return caches.delete(key);
           }
@@ -121,9 +122,10 @@ self.addEventListener('message', (event) => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. FETCH EVENT: Cache-First for App Shell, Assets, and Offline Fallback
+// 4. FETCH EVENT: Cache-First for App Shell, Assets, Images, and Offline Fallback
 // ---------------------------------------------------------------------------
-const AUDIO_EXTENSIONS = /\.(mp3|wav|flac|m4a|aac|ogg)$/i;
+const AUDIO_EXTENSIONS = /\.(mp3|wav|flac|m4a|aac|ogg)($|\?)/i;
+const IMAGE_EXTENSIONS = /\.(png|jpg|jpeg|webp|svg|gif|avif)($|\?)/i;
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
@@ -133,7 +135,6 @@ self.addEventListener('fetch', (event) => {
 
   // Audio files & external streams are handled by IndexedDB or streamed directly
   if (AUDIO_EXTENSIONS.test(url.pathname)) return;
-  if (url.origin !== self.location.origin) return;
 
   // A. PWA Icons (Apple touch icons, Android launcher icons)
   if (PWA_ICON_PATHS.has(url.pathname)) {
@@ -169,6 +170,71 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
+
+  // B. Images (Same-Origin AND Cross-Origin covers, album art, avatars, and icons)
+  // Ensures 100% full visual offline support on iOS, Android, and Windows.
+  const isImageRequest =
+    request.destination === 'image' ||
+    IMAGE_EXTENSIONS.test(url.pathname) ||
+    url.hostname.includes('mzstatic.com') ||
+    url.hostname.includes('dzcdn.net') ||
+    url.hostname.includes('unsplash.com') ||
+    url.hostname.includes('firebasestorage.googleapis.com') ||
+    url.hostname.includes('filegarden.com') ||
+    (request.headers.get('accept') && request.headers.get('accept').includes('image/'));
+
+  if (isImageRequest) {
+    event.respondWith(
+      (async () => {
+        const imageCache = await caches.open(IMAGE_CACHE);
+        const cached =
+          (await imageCache.match(request)) ||
+          (await imageCache.match(url.href));
+
+        if (cached) {
+          // Background revalidation if online
+          if (navigator.onLine) {
+            fetch(request)
+              .then((netRes) => {
+                if (netRes && (netRes.status === 200 || netRes.type === 'opaque')) {
+                  imageCache.put(request, netRes.clone());
+                }
+              })
+              .catch(() => {});
+          }
+          return cached;
+        }
+
+        try {
+          const networkResponse = await fetch(request);
+          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+            imageCache.put(request, networkResponse.clone());
+          }
+          return networkResponse;
+        } catch {
+          // If offline and image was not cached, return graceful Spotify fallback SVG
+          const fallback =
+            (await (await caches.open(CACHE_NAME)).match('/spotify-icon.svg')) ||
+            (await (await caches.open(CACHE_NAME)).match('/icon.svg'));
+          if (fallback) return fallback;
+
+          return new Response(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="background:#181818;"><circle cx="12" cy="12" r="10"/><path d="M8 12a4 4 0 0 1 8 0"/><path d="M6 9a7 7 0 0 1 12 0"/><path d="M10 15a2 2 0 0 1 4 0"/></svg>',
+            {
+              headers: {
+                'Content-Type': 'image/svg+xml',
+                'Cache-Control': 'public, max-age=31536000',
+              },
+            }
+          );
+        }
+      })()
+    );
+    return;
+  }
+
+  // All other cross-origin network requests are skipped by the App Shell service worker
+  if (url.origin !== self.location.origin) return;
 
   // B. Navigation requests (App Shell HTML): CACHE-FIRST for 100% offline support
   if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {

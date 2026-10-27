@@ -116,6 +116,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; status: string } | null>(null);
   const [downloadMessage, setDownloadMessage] = useState('');
   const [showDeleteDownloadsConfirm, setShowDeleteDownloadsConfirm] = useState(false);
+  const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [playlistMenu, setPlaylistMenu] = useState<PlaylistMenuState | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
@@ -576,6 +577,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   <ArrowDownCircle className={`w-7 h-7 ${isAnyDownloaded ? 'text-emerald-400' : ''}`} />
                 )}
               </button>
+
+              {/* Delete Playlist Button */}
+              {!isFavorites && !isAlbum && playlistObj && (
+                <button
+                  onClick={() => setPlaylistToDelete(playlistObj)}
+                  className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 text-[#b3b3b3] hover:text-red-400"
+                  title="Eliminar playlist"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
 
               {/* Playlist Options (Three dots) */}
               <button
@@ -1099,10 +1111,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   <button
                     onClick={() => {
                       setIsPlaylistOptionsOpen(false);
-                      if (confirm(`¿Eliminar la playlist "${playlistObj.name}"?`)) {
-                        deletePlaylist(playlistObj.id);
-                        setSelectedPlaylist(null);
-                      }
+                      setPlaylistToDelete(playlistObj);
                     }}
                     className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-950/30 transition-colors text-left"
                   >
@@ -1127,7 +1136,60 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           onTogglePin={togglePlaylistPin}
           onTogglePublic={(pl) => updatePlaylist({ ...pl, isPublic: !pl.isPublic })}
           onPlay={(playlist) => setSelectedPlaylist(playlist)}
+          onDelete={(pl) => setPlaylistToDelete(pl)}
         />
+
+        {/* Modal de confirmación para eliminar playlist */}
+        {playlistToDelete && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in select-none"
+            onClick={() => setPlaylistToDelete(null)}
+          >
+            <div
+              className="w-full max-w-sm bg-[#181818] border border-[#282828] rounded-3xl p-6 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto shadow-inner">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white leading-tight">
+                  ¿Eliminar de Tu Biblioteca?
+                </h3>
+                <p className="text-xs text-[#b3b3b3] mt-2 leading-relaxed">
+                  Esto eliminará <strong className="text-white">"{playlistToDelete.name}"</strong> de tu biblioteca de forma permanente.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    deletePlaylist(playlistToDelete.id);
+                    if (
+                      selectedPlaylist &&
+                      typeof selectedPlaylist === 'object' &&
+                      'id' in selectedPlaylist &&
+                      selectedPlaylist.id === playlistToDelete.id
+                    ) {
+                      setSelectedPlaylist(null);
+                    }
+                    setPlaylistToDelete(null);
+                  }}
+                  className="w-full py-3 px-4 rounded-full bg-red-500 hover:bg-red-400 text-black font-bold text-sm transition-all active:scale-95 shadow"
+                >
+                  Eliminar playlist
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPlaylistToDelete(null)}
+                  className="w-full py-3 px-4 rounded-full bg-[#242424] hover:bg-[#2c2c2c] text-white font-semibold text-sm transition-all active:scale-95 border border-[#333]"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal de confirmación para borrar descargas de playlist o álbum */}
         {showDeleteDownloadsConfirm && (
@@ -1766,7 +1828,52 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         onTogglePin={togglePlaylistPin}
         onTogglePublic={(pl) => updatePlaylist({ ...pl, isPublic: !pl.isPublic })}
         onPlay={(playlist) => setSelectedPlaylist(playlist)}
+        onDelete={(pl) => setPlaylistToDelete(pl)}
       />
+
+      {/* Modal de confirmación para eliminar playlist en vista de lista/grid */}
+      {playlistToDelete && !selectedPlaylist && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in select-none"
+          onClick={() => setPlaylistToDelete(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-[#181818] border border-[#282828] rounded-3xl p-6 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto shadow-inner">
+              <Trash2 className="w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white leading-tight">
+                ¿Eliminar de Tu Biblioteca?
+              </h3>
+              <p className="text-xs text-[#b3b3b3] mt-2 leading-relaxed">
+                Esto eliminará <strong className="text-white">"{playlistToDelete.name}"</strong> de tu biblioteca de forma permanente.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  deletePlaylist(playlistToDelete.id);
+                  setPlaylistToDelete(null);
+                }}
+                className="w-full py-3 px-4 rounded-full bg-red-500 hover:bg-red-400 text-black font-bold text-sm transition-all active:scale-95 shadow"
+              >
+                Eliminar playlist
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlaylistToDelete(null)}
+                className="w-full py-3 px-4 rounded-full bg-[#242424] hover:bg-[#2c2c2c] text-white font-semibold text-sm transition-all active:scale-95 border border-[#333]"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

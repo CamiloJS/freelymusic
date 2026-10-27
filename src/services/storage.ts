@@ -506,6 +506,7 @@ function normalizePlaylist(raw: Partial<Playlist> | null | undefined): Playlist 
     description: typeof raw.description === 'string' ? raw.description : undefined,
     coverUrl: typeof raw.coverUrl === 'string' ? raw.coverUrl : undefined,
     userId: typeof raw.userId === 'string' ? raw.userId : 'user',
+    isPublic: Boolean(raw.isPublic),
     songIds: Array.from(new Set(songIds)),
     createdAt:
       typeof raw.createdAt === 'string' && raw.createdAt
@@ -540,7 +541,14 @@ export function normalizeUserData(raw: Partial<UserLibraryData> | null | undefin
   const playlists = Array.isArray(source.playlists)
     ? source.playlists
         .map((playlist) => normalizePlaylist(playlist))
-        .filter((playlist): playlist is Playlist => Boolean(playlist))
+        .filter(
+          (playlist): playlist is Playlist =>
+            Boolean(
+              playlist &&
+                playlist.name !== 'Favoritos de Sonora' &&
+                playlist.name !== 'Favoritas de Sonora'
+            )
+        )
     : [];
 
   const followedArtists = Array.isArray(source.followedArtists)
@@ -836,19 +844,7 @@ export function createDefaultUserData(userId: string): UserLibraryData {
     followedArtists: [],
     pinnedPlaylistIds: [],
     savedAlbumNames: [],
-    playlists: [
-      {
-        id: `pl-${userId}-1`,
-        name: 'Favoritos de Sonora',
-        description: 'Mis canciones destacadas guardadas de la nube',
-        coverUrl:
-          'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80',
-        userId,
-        songIds: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    ],
+    playlists: [],
     playCounts: {},
     playHistory: [],
     totalListenSeconds: 0,

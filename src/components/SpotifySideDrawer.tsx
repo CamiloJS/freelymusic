@@ -10,6 +10,7 @@ import ChevronRight from 'lucide-react/dist/esm/icons/chevron-right.mjs';
 import SquarePen from 'lucide-react/dist/esm/icons/square-pen.mjs';
 import UserPlus from 'lucide-react/dist/esm/icons/user-plus.mjs';
 import Music2 from 'lucide-react/dist/esm/icons/music-2.mjs';
+import LogOut from 'lucide-react/dist/esm/icons/log-out.mjs';
 import { useAuth } from '../context/AuthContext';
 import { UserProfile, ChatThread } from '../types';
 import { getStoredChatThreads } from '../services/storage';
@@ -41,7 +42,8 @@ export const SpotifySideDrawer: React.FC<SpotifySideDrawerProps> = ({
   onOpenMessages,
   onSelectFriendProfile,
 }) => {
-  const { currentUser, allUsers, isAdmin } = useAuth();
+  const { currentUser, allUsers, isAdmin, logout } = useAuth();
+  const isMainProfile = currentUser?.id === 'camilo-admin' || isAdmin;
   const [chatThreads, setChatThreads] = React.useState<ChatThread[]>(() => getStoredChatThreads());
 
   React.useEffect(() => {
@@ -97,7 +99,7 @@ export const SpotifySideDrawer: React.FC<SpotifySideDrawerProps> = ({
                   {currentUser?.displayName || 'Camilo Jaimes'}
                 </h2>
                 <p className="text-xs text-[#b3b3b3] mt-0.5 truncate">
-                  Ver perfil
+                  {isMainProfile ? 'Ver perfil' : 'Mi cuenta'}
                 </p>
               </div>
             </div>
@@ -114,80 +116,85 @@ export const SpotifySideDrawer: React.FC<SpotifySideDrawerProps> = ({
 
           {/* 2. Main Navigation Items */}
           <nav className="space-y-1">
-            {/* Agregar cuenta */}
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenAddAccount();
-              }}
-              className="w-full flex items-start gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
-            >
-              <div className="p-1.5 rounded-lg text-neutral-300 group-hover:text-white flex-shrink-0">
-                <Plus className="w-5 h-5 stroke-[2.2]" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <span className="text-sm font-semibold text-white block">
-                  Agregar cuenta
-                </span>
-                <span className="text-xs text-[#b3b3b3] block truncate mt-0.5">
-                  Agrega a un menor o a alguien más.
-                </span>
-              </div>
-            </button>
+            {/* Solo para Perfil Principal */}
+            {isMainProfile && (
+              <>
+                {/* Agregar cuenta */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAddAccount();
+                  }}
+                  className="w-full flex items-start gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
+                >
+                  <div className="p-1.5 rounded-lg text-neutral-300 group-hover:text-white flex-shrink-0">
+                    <Plus className="w-5 h-5 stroke-[2.2]" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm font-semibold text-white block">
+                      Agregar cuenta
+                    </span>
+                    <span className="text-xs text-[#b3b3b3] block truncate mt-0.5">
+                      Agrega a un menor o a alguien más.
+                    </span>
+                  </div>
+                </button>
 
-            {/* Panel de administración */}
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenAdminPanel();
-              }}
-              className="w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
-            >
-              <div className="p-1.5 rounded-lg text-neutral-300 group-hover:text-white flex-shrink-0">
-                <LayoutGrid className="w-5 h-5" />
-              </div>
-              <span className="text-sm font-semibold text-white flex-1 truncate">
-                Panel de administración
-              </span>
-            </button>
+                {/* Panel de administración */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAdminPanel();
+                  }}
+                  className="w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
+                >
+                  <div className="p-1.5 rounded-lg text-neutral-300 group-hover:text-white flex-shrink-0">
+                    <LayoutGrid className="w-5 h-5" />
+                  </div>
+                  <span className="text-sm font-semibold text-white flex-1 truncate">
+                    Panel de administración
+                  </span>
+                </button>
 
-            {/* Estadísticas de reproducción */}
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenStats();
-              }}
-              className="w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
-            >
-              <div className="p-1.5 rounded-lg text-neutral-300 group-hover:text-white flex-shrink-0">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <span className="text-sm font-semibold text-white flex-1 truncate">
-                Estadísticas de reproducción
-              </span>
-            </button>
+                {/* Estadísticas de reproducción */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenStats();
+                  }}
+                  className="w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
+                >
+                  <div className="p-1.5 rounded-lg text-neutral-300 group-hover:text-white flex-shrink-0">
+                    <TrendingUp className="w-5 h-5" />
+                  </div>
+                  <span className="text-sm font-semibold text-white flex-1 truncate">
+                    Estadísticas de reproducción
+                  </span>
+                </button>
 
-            {/* Recientes (Historial de música por semanas) */}
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenRecents();
-              }}
-              className="w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
-            >
-              <div className="p-1.5 rounded-lg text-neutral-300 group-hover:text-white flex-shrink-0">
-                <History className="w-5 h-5" />
-              </div>
-              <span className="text-sm font-semibold text-white flex-1 truncate">
-                Recientes
-              </span>
-            </button>
+                {/* Recientes (Historial de música por semanas) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenRecents();
+                  }}
+                  className="w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
+                >
+                  <div className="p-1.5 rounded-lg text-neutral-300 group-hover:text-white flex-shrink-0">
+                    <History className="w-5 h-5" />
+                  </div>
+                  <span className="text-sm font-semibold text-white flex-1 truncate">
+                    Recientes
+                  </span>
+                </button>
+              </>
+            )}
 
-            {/* Personalizar (Modo oscuro/claro y colores de acento) */}
+            {/* Personalizar (Visible para todos) */}
             <button
               type="button"
               onClick={() => {
@@ -204,26 +211,49 @@ export const SpotifySideDrawer: React.FC<SpotifySideDrawerProps> = ({
               </span>
             </button>
 
-            {/* Configuración y privacidad */}
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenSettingsPrivacy();
-              }}
-              className="w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
-            >
-              <div className="p-1.5 rounded-lg text-neutral-300 group-hover:text-white flex-shrink-0">
-                <Settings className="w-5 h-5" />
-              </div>
-              <span className="text-sm font-semibold text-white flex-1 truncate">
-                Configuración y privacidad
-              </span>
-            </button>
+            {/* Configuración y privacidad (Solo perfil principal) */}
+            {isMainProfile && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenSettingsPrivacy();
+                }}
+                className="w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
+              >
+                <div className="p-1.5 rounded-lg text-neutral-300 group-hover:text-white flex-shrink-0">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <span className="text-sm font-semibold text-white flex-1 truncate">
+                  Configuración y privacidad
+                </span>
+              </button>
+            )}
+
+            {/* Cerrar sesión para perfiles no principales */}
+            {!isMainProfile && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  logout();
+                }}
+                className="w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-xl text-left text-red-400 hover:bg-red-500/10 transition-colors group mt-2"
+              >
+                <div className="p-1.5 rounded-lg text-red-400 flex-shrink-0">
+                  <LogOut className="w-5 h-5" />
+                </div>
+                <span className="text-sm font-semibold flex-1 truncate">
+                  Cerrar sesión
+                </span>
+              </button>
+            )}
           </nav>
 
-          {/* 3. Friend Activity Carousel */}
-          <div className="pt-2">
+          {/* 3. Friend Activity Carousel (Solo perfil principal) */}
+          {isMainProfile && (
+            <>
+              <div className="pt-2">
             <div className="flex items-center gap-3 overflow-x-auto scrollbar-none pb-2 -mx-1 px-1">
               {/* Current User Activity Pill */}
               <div
@@ -405,6 +435,8 @@ export const SpotifySideDrawer: React.FC<SpotifySideDrawerProps> = ({
               </button>
             </div>
           </div>
+          </>
+          )}
         </div>
 
         {/* Footer info */}
