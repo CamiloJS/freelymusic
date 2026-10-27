@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Song, LyricLine, SongVersion } from '../types';
 import { parseLrc, getActiveLyricIndex } from '../utils/lyrics';
-import { getSongBlob } from '../services/storage';
+import { getSongBlob, getInstrumentalBlob, getVideoBlob } from '../services/storage';
 import { translateLyricsWithCache } from '../services/translation';
 import { useMusic } from './MusicContext';
 import { useAuth } from './AuthContext';
@@ -72,6 +72,7 @@ interface AudioContextType {
   videoUrl: string | null;
   openVideo: () => void;
   closeVideo: (seconds?: number) => void;
+  syncMediaTime: (seconds: number) => void;
 
   // Lyrics translation
   translatedLyrics: LyricLine[];
@@ -361,7 +362,35 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const activeVersionLabel = activeVersion?.label || 'Original';
   const hasInstrumental = Boolean(playbackTrack?.instrumentalUrl);
-  const videoUrl = playbackTrack?.videoUrl || null;
+  const [offlineVideoUrl, setOfflineVideoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let createdUrl: string | null = null;
+
+    if (currentSong && isDownloaded(currentSong.id)) {
+      getVideoBlob(currentSong.id, activeVersionId).then((blob) => {
+        if (!active) return;
+        if (blob) {
+          createdUrl = URL.createObjectURL(blob);
+          setOfflineVideoUrl(createdUrl);
+        } else {
+          setOfflineVideoUrl(null);
+        }
+      });
+    } else {
+      setOfflineVideoUrl(null);
+    }
+
+    return () => {
+      active = false;
+      if (createdUrl) {
+        URL.revokeObjectURL(createdUrl);
+      }
+    };
+  }, [currentSong?.id, activeVersionId, isDownloaded]);
+
+  const videoUrl = offlineVideoUrl || playbackTrack?.videoUrl || null;
 
   // Karaoke can have its own LRC with different timings. Prefer it when present.
   const effectiveLyricsLrc =
@@ -497,10 +526,20 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       let audioSource = karaoke && instrumentalUrl ? instrumentalUrl : baseUrl;
       let usedBlob = false;
 
-      // Only touch IndexedDB when the song is actually downloaded and we are
-      // playing its original audio. Alternates/karaoke are streamed.
+      // Touch IndexedDB when the song is downloaded (supports main audio, karaoke and versions)
       if (canUseOffline && isDownloaded(song.id)) {
-        const cachedBlob = await withTimeout(getSongBlob(song.id), 1200);
+        let cachedBlob: Blob | null = null;
+        if (karaoke) {
+          cachedBlob = await withTimeout(getInstrumentalBlob(song.id, options?.versionId), 1200);
+        } else if (options?.versionId) {
+          cachedBlob = await withTimeout(getSongBlob(`${song.id}-version-${options.versionId}`), 1200);
+          if (!cachedBlob) {
+            cachedBlob = await withTimeout(getSongBlob(song.id), 1200);
+          }
+        } else {
+          cachedBlob = await withTimeout(getSongBlob(song.id), 1200);
+        }
+
         if (requestId !== playRequestRef.current) return;
 
         if (cachedBlob) {
@@ -654,10 +693,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   ]);
 
   const openVideo = useCallback(() => {
-    if (!playbackTrack?.videoUrl) return;
+    if (!videoUrl) return;
     audioRef.current?.pause();
+    setIsPlaying(true);
     setIsVideoMode(true);
-  }, [playbackTrack]);
+    setIsRightPanelOpen(true);
+    setRightPanelTab('now-playing');
+  }, [videoUrl]);
 
   const closeVideo = useCallback((seconds?: number) => {
     setIsVideoMode(false);
@@ -672,9 +714,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setCurrentTime(audio.currentTime);
     }
 
+    setIsPlaying(true);
     audio.play().catch((err) => {
       console.warn('No se pudo reanudar el audio al cerrar el video:', err);
     });
+  }, []);
+
+  const syncMediaTime = useCallback((seconds: number) => {
+    if (!Number.isFinite(seconds)) return;
+    setCurrentTime(seconds);
   }, []);
 
   const clearTranslation = useCallback(() => {
@@ -771,8 +819,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const togglePlayPause = useCallback(() => {
+    if (!currentSong) return;
+    if (isVideoMode) {
+      setIsPlaying((prev) => !prev);
+      return;
+    }
+
     const audio = audioRef.current;
-    if (!audio || !currentSong || isVideoMode) return;
+    if (!audio) return;
 
     if (isPlaying) {
       audio.pause();
@@ -787,9 +841,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
-    if (!audio) return;
-    audio.currentTime = seconds;
-    setCurrentTime(seconds);
+    const clamped = Math.max(0, seconds);
+    if (audio) {
+      const maxDur = audio.duration || seconds;
+      audio.currentTime = Math.min(clamped, maxDur);
+    }
+    setCurrentTime(clamped);
   }, []);
 
   const nextTrack = useCallback(() => {
@@ -959,6 +1016,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       videoUrl,
       openVideo,
       closeVideo,
+      syncMediaTime,
       translatedLyrics,
       lyricsDisplayMode,
       setLyricsDisplayMode,
@@ -1016,6 +1074,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       videoUrl,
       openVideo,
       closeVideo,
+      syncMediaTime,
       translatedLyrics,
       lyricsDisplayMode,
       setLyricsDisplayMode,

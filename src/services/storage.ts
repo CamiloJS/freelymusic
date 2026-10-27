@@ -71,12 +71,24 @@ export async function getSongBlob(songId: string): Promise<Blob | null> {
 
 export async function deleteSongBlob(songId: string): Promise<void> {
   const db = await openDB();
+  const allKeys = await new Promise<string[]>((res, rej) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const st = tx.objectStore(STORE_NAME);
+    const req = st.getAllKeys();
+    req.onsuccess = () => res((req.result as string[]) || []);
+    req.onerror = () => rej(req.error);
+  });
+
+  const matchingKeys = allKeys.filter((k) => k === songId || k.startsWith(`${songId}-`));
+
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
-    const request = store.delete(songId);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    for (const key of matchingKeys) {
+      store.delete(key);
+    }
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
   });
 }
 
@@ -86,7 +98,13 @@ export async function getAllDownloadedSongIds(): Promise<string[]> {
     const transaction = db.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.getAllKeys();
-    request.onsuccess = () => resolve((request.result as string[]) || []);
+    request.onsuccess = () => {
+      const keys = (request.result as string[]) || [];
+      const songIds = keys.filter(
+        (k) => !k.includes('-instrumental') && !k.includes('-video') && !k.includes('-version-')
+      );
+      resolve(songIds);
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -96,24 +114,89 @@ export async function isSongDownloaded(songId: string): Promise<boolean> {
   return blob !== null;
 }
 
+export async function getInstrumentalBlob(songId: string, versionId?: string | null): Promise<Blob | null> {
+  if (versionId) {
+    const vBlob = await getSongBlob(`${songId}-version-${versionId}-instrumental`);
+    if (vBlob) return vBlob;
+  }
+  return getSongBlob(`${songId}-instrumental`);
+}
+
+export async function getVideoBlob(songId: string, versionId?: string | null): Promise<Blob | null> {
+  if (versionId) {
+    const vBlob = await getSongBlob(`${songId}-version-${versionId}-video`);
+    if (vBlob) return vBlob;
+  }
+  return getSongBlob(`${songId}-video`);
+}
+
+async function fetchMediaBlob(url: string, timeoutMs = 120000): Promise<Blob | null> {
+  if (!url) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return null;
+    return await res.blob();
+  } catch (err) {
+    console.warn('No se pudo descargar archivo multimedia para caché offline:', url, err);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
- * Downloads audio file and caches it inside IndexedDB for 100% offline playback
+ * Downloads audio file, karaoke instrumental, and music video into IndexedDB for 100% offline playback
  */
 export async function cacheSongOffline(song: Song): Promise<boolean> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000);
-
   try {
-    const res = await fetch(song.audioUrl, { signal: controller.signal });
-    if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-    const blob = await res.blob();
-    await storeSongBlob(song.id, blob);
+    // 1. Audio principal
+    const mainBlob = await fetchMediaBlob(song.audioUrl);
+    if (!mainBlob) {
+      console.error(`Fallo al descargar audio principal de ${song.title}`);
+      return false;
+    }
+    await storeSongBlob(song.id, mainBlob);
+
+    // 2. Pista karaoke / instrumental si existe
+    if (song.instrumentalUrl) {
+      const instBlob = await fetchMediaBlob(song.instrumentalUrl);
+      if (instBlob) {
+        await storeSongBlob(`${song.id}-instrumental`, instBlob);
+      }
+    }
+
+    // 3. Videoclip si existe
+    if (song.videoUrl) {
+      const vidBlob = await fetchMediaBlob(song.videoUrl, 180000);
+      if (vidBlob) {
+        await storeSongBlob(`${song.id}-video`, vidBlob);
+      }
+    }
+
+    // 4. Versiones alternativas y sus instrumentales/videos
+    if (Array.isArray(song.versions)) {
+      for (const v of song.versions) {
+        if (v.audioUrl) {
+          const vBlob = await fetchMediaBlob(v.audioUrl);
+          if (vBlob) await storeSongBlob(`${song.id}-version-${v.id}`, vBlob);
+        }
+        if (v.instrumentalUrl) {
+          const vInstBlob = await fetchMediaBlob(v.instrumentalUrl);
+          if (vInstBlob) await storeSongBlob(`${song.id}-version-${v.id}-instrumental`, vInstBlob);
+        }
+        if (v.videoUrl) {
+          const vVidBlob = await fetchMediaBlob(v.videoUrl, 180000);
+          if (vVidBlob) await storeSongBlob(`${song.id}-version-${v.id}-video`, vVidBlob);
+        }
+      }
+    }
+
     return true;
   } catch (err) {
-    console.error(`Failed to cache song ${song.title} offline:`, err);
+    console.error(`Error al guardar sin conexión ${song.title}:`, err);
     return false;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 

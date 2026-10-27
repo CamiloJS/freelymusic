@@ -23,7 +23,6 @@ import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
 import { ArtistLinks } from './ArtistLinks';
-import { SongVersionSelector } from './SongVersionSelector';
 
 interface PlayerBarProps {
   onSelectArtist?: (artistName: string) => void;
@@ -171,7 +170,6 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
           <span className="text-xs text-neutral-400 truncate block">
             <ArtistLinks artists={currentSong.artist} onSelectArtist={onSelectArtist} />
           </span>
-          <SongVersionSelector compact className="mt-1" />
         </div>
 
         {/* Favorite button (Spotify Style: green SavedCheckIcon when saved, subtle plus circle when not) */}

@@ -44,12 +44,13 @@ export const CenterLyricsView: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-neutral-950 relative overflow-hidden select-none animate-in fade-in duration-300">
-      {/* Ambient Artwork Background (Takes song/album cover colors) */}
+      {/* Ambient Artwork Background (Diffused color wash from song/album cover) */}
       <div
-        className="absolute inset-0 bg-cover bg-center filter blur-3xl scale-125 opacity-40 saturate-150 pointer-events-none transition-all duration-1000"
+        className="absolute inset-0 bg-cover bg-center blur-[120px] scale-150 opacity-35 saturate-150 pointer-events-none transition-all duration-1000"
         style={{ backgroundImage: `url(${currentSong.coverUrl})` }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/80 to-black/95 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-neutral-950/70 to-neutral-950 pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-neutral-950 via-neutral-950/80 to-transparent pointer-events-none z-10" />
 
       {/* Top Action Bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 z-10 bg-black/30 backdrop-blur-md flex-shrink-0">
@@ -96,7 +97,7 @@ export const CenterLyricsView: React.FC = () => {
       {/* Scrolling Lyrics Area */}
       <div
         ref={scrollContainerRef}
-        className="relative z-10 flex-1 overflow-y-auto px-6 md:px-12 py-12 space-y-7 text-center md:text-left scroll-smooth"
+        className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-6 md:px-12 py-12 pb-32 space-y-7 text-center md:text-left scroll-smooth"
       >
         {parsedLyrics.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3">

@@ -3,6 +3,7 @@ import Languages from 'lucide-react/dist/esm/icons/languages.mjs';
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 import Check from 'lucide-react/dist/esm/icons/check.mjs';
+import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down.mjs';
 import { useAudio } from '../context/AudioContext';
 
 const TARGET_LANGUAGES = [
@@ -115,18 +116,23 @@ export const LyricsTranslationButton: React.FC<LyricsTranslationButtonProps> = (
           </span>
         </button>
 
-        {/* Small settings arrow / options button to change language or display mode */}
+        {/* Dropdown chevron button to change language or display mode */}
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className={`p-1.5 rounded-full transition-colors border backdrop-blur-md ${
+          className={`h-8 w-8 flex items-center justify-center rounded-full transition-colors border backdrop-blur-md ${
             isOpen
               ? 'bg-white/30 text-white border-white/30'
               : 'bg-white/10 hover:bg-white/20 text-white/80 border-white/10'
           }`}
           title="Opciones de idioma y traducción"
+          aria-label="Opciones de idioma y traducción"
         >
-          <span className="text-[9px] font-mono leading-none select-none">▾</span>
+          <ChevronDown
+            className={`w-3.5 h-3.5 transition-transform duration-200 ${
+              isOpen ? 'rotate-180 text-white' : 'text-neutral-300'
+            }`}
+          />
         </button>
       </div>
 

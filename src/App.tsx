@@ -479,7 +479,7 @@ const MainLayout: React.FC = () => {
         </div>
       )}
 
-      {isFullscreenNowPlaying && (
+      {isFullscreenNowPlaying && !isVideoMode && (
         <Suspense fallback={null}>
           <FullscreenNowPlayingModal
             onSelectArtist={handleSelectArtist}
@@ -489,9 +489,13 @@ const MainLayout: React.FC = () => {
         </Suspense>
       )}
 
-      {isVideoMode && (
+      {isFullscreenNowPlaying && isVideoMode && (
         <Suspense fallback={null}>
-          <MusicVideoModal />
+          <MusicVideoModal
+            onSelectArtist={handleSelectArtist}
+            onSelectAlbum={handleSelectAlbum}
+            onSelectPlaylist={handleSelectPlaylist}
+          />
         </Suspense>
       )}
 
