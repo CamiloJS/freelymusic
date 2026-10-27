@@ -450,6 +450,7 @@ const MainLayout: React.FC = () => {
           <SpotifyRightPanel
             onSelectArtist={handleSelectArtist}
             onSelectAlbum={handleSelectAlbum}
+            onSelectPlaylist={handleSelectPlaylist}
           />
         </div>
       </div>
@@ -497,7 +498,11 @@ const MainLayout: React.FC = () => {
 
       {isFullscreenNowPlaying && (
         <Suspense fallback={null}>
-          <FullscreenNowPlayingModal onSelectArtist={handleSelectArtist} />
+          <FullscreenNowPlayingModal
+            onSelectArtist={handleSelectArtist}
+            onSelectAlbum={handleSelectAlbum}
+            onSelectPlaylist={handleSelectPlaylist}
+          />
         </Suspense>
       )}
 

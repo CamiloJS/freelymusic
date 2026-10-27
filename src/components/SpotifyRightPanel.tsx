@@ -14,7 +14,7 @@ import Video from 'lucide-react/dist/esm/icons/video.mjs';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
-import { Song, Album } from '../types';
+import { Song, Album, Playlist } from '../types';
 import { getAlbumsFromCatalog } from '../utils/albums';
 import { ArtistLinks } from './ArtistLinks';
 import { SavedCheckIcon } from './SavedCheckIcon';
@@ -24,11 +24,13 @@ import { GlobalStatsCard } from './GlobalStatsCard';
 interface SpotifyRightPanelProps {
   onSelectArtist?: (artistName: string) => void;
   onSelectAlbum?: (album: Album) => void;
+  onSelectPlaylist?: (playlist: Playlist | 'favorites' | Album) => void;
 }
 
 export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
   onSelectArtist,
   onSelectAlbum,
+  onSelectPlaylist,
 }) => {
   const {
     currentSong,
@@ -48,7 +50,7 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
   } = useAudio();
   const { activeLyricIndex } = useAudioTime();
 
-  const { catalog, isFavorite, toggleFavorite } = useMusic();
+  const { catalog, isFavorite, toggleFavorite, playlists } = useMusic();
 
   if (!isRightPanelOpen || !currentSong) return null;
 
@@ -77,9 +79,101 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
         : null;
     }
     return playbackSource.name;
-  }, [playbackSource?.name, currentSong.album]);
+  }, [playbackSource, currentSong.album]);
 
   const sourceName = displayOrigin || playbackSource?.name || 'Tus me gusta';
+
+  const handleNavigateToOrigin = () => {
+    if (!displayOrigin && !playbackSource) return;
+
+    // 1. Favorites check
+    if (
+      playbackSource?.type === 'favorites' ||
+      displayOrigin?.toLowerCase() === 'tus me gusta' ||
+      displayOrigin?.toLowerCase() === 'canciones que te gustan'
+    ) {
+      if (onSelectPlaylist) {
+        onSelectPlaylist('favorites');
+        return;
+      }
+    }
+
+    // 2. Playlist check (by ID or matching name)
+    const matchingPlaylist = playlists.find(
+      (p) =>
+        (playbackSource?.type === 'playlist' && playbackSource.id && p.id === playbackSource.id) ||
+        (playbackSource?.name && p.name.trim().toLowerCase() === playbackSource.name.trim().toLowerCase()) ||
+        (displayOrigin && p.name.trim().toLowerCase() === displayOrigin.trim().toLowerCase())
+    );
+    if (matchingPlaylist && onSelectPlaylist) {
+      onSelectPlaylist(matchingPlaylist);
+      return;
+    }
+
+    // 3. Album check (by target album name from playbackSource, displayOrigin, or currentSong.album)
+    const targetAlbumName =
+      (playbackSource?.type === 'album' && playbackSource.name ? playbackSource.name : displayOrigin) ||
+      currentSong?.album;
+
+    if (targetAlbumName && targetAlbumName.trim().toLowerCase() !== 'sencillo') {
+      const albums = getAlbumsFromCatalog(catalog);
+      const foundAlbum = albums.find(
+        (a) => a.name.trim().toLowerCase() === targetAlbumName.trim().toLowerCase()
+      );
+      if (foundAlbum) {
+        if (onSelectAlbum) {
+          onSelectAlbum(foundAlbum);
+          return;
+        } else if (onSelectPlaylist) {
+          onSelectPlaylist(foundAlbum);
+          return;
+        }
+      } else {
+        // Dynamic fallback Album object from catalog songs matching album name
+        const matchingSongs = catalog.filter(
+          (s) => s.album && s.album.trim().toLowerCase() === targetAlbumName.trim().toLowerCase()
+        );
+        const albumObj: Album = {
+          name: targetAlbumName,
+          artist: currentSong?.albumArtist || currentSong?.artist || '',
+          coverUrl: currentSong?.coverUrl || '',
+          year: currentSong?.year,
+          genre: currentSong?.genre,
+          songs: matchingSongs.length > 0 ? matchingSongs : currentSong ? [currentSong] : [],
+        };
+        if (onSelectAlbum) {
+          onSelectAlbum(albumObj);
+          return;
+        } else if (onSelectPlaylist) {
+          onSelectPlaylist(albumObj);
+          return;
+        }
+      }
+    }
+
+    // 4. Artist check
+    if (
+      playbackSource?.type === 'artist' ||
+      (playbackSource?.name && /^artista:/i.test(playbackSource.name))
+    ) {
+      const artistName =
+        playbackSource.id ||
+        playbackSource.name.replace(/^artista:\s*/i, '').trim() ||
+        currentSong?.artist;
+      if (artistName && onSelectArtist) {
+        onSelectArtist(artistName);
+        return;
+      }
+    }
+
+    // 5. Fallback: if displayOrigin matches an artist
+    if (displayOrigin && onSelectArtist) {
+      if (displayOrigin.trim().toLowerCase() === currentSong?.artist.trim().toLowerCase()) {
+        onSelectArtist(currentSong.artist);
+        return;
+      }
+    }
+  };
 
   return (
     <aside className="w-80 lg:w-88 bg-neutral-950 border-l border-neutral-900/90 flex flex-col h-full flex-shrink-0 select-none overflow-hidden animate-in slide-in-from-right-4 duration-200">
@@ -122,12 +216,17 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
         {rightPanelTab === 'now-playing' ? (
           /* TAB: VISTA ACTUAL (Spotify Image 5) */
           <div className="space-y-5">
-            {/* Source Origin Title */}
+            {/* Source Origin Title (clickable like Spotify) */}
             {displayOrigin && (
-              <div>
-                <span className="text-[11px] font-black uppercase tracking-wider text-neutral-400 block truncate">
-                  {displayOrigin}
-                </span>
+              <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={handleNavigateToOrigin}
+                  className="text-[11px] font-black uppercase tracking-wider text-neutral-400 hover:text-white hover:underline block truncate text-left transition-colors cursor-pointer w-full group"
+                  title={`Ir a ${displayOrigin}`}
+                >
+                  <span className="truncate">{displayOrigin}</span>
+                </button>
               </div>
             )}
 
@@ -314,10 +413,18 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
             {/* Upcoming Songs */}
             <div>
               <div className="flex items-center justify-between mb-2.5">
-                <span className="text-xs font-black uppercase tracking-wider text-neutral-300">
-                  Próximas canciones de: {sourceName}
+                <span className="text-xs font-black uppercase tracking-wider text-neutral-300 truncate pr-2">
+                  Próximas canciones de:{' '}
+                  <button
+                    type="button"
+                    onClick={handleNavigateToOrigin}
+                    className="hover:text-emerald-400 hover:underline cursor-pointer inline transition-colors text-white font-black"
+                    title={`Ir a ${sourceName}`}
+                  >
+                    {sourceName}
+                  </button>
                 </span>
-                <span className="text-[10px] text-neutral-500 font-bold">
+                <span className="text-[10px] text-neutral-500 font-bold flex-shrink-0">
                   {upcomingSongs.length} en cola
                 </span>
               </div>

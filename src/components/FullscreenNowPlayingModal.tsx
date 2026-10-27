@@ -15,6 +15,8 @@ import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down.mjs';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { buildDisplayLyrics, formatTime } from '../utils/lyrics';
+import { Album, Playlist } from '../types';
+import { getAlbumsFromCatalog } from '../utils/albums';
 import { ArtistLinks } from './ArtistLinks';
 import { LyricsTranslationControls } from './LyricsTranslationControls';
 import { SongVersionSelector } from './SongVersionSelector';
@@ -22,10 +24,14 @@ import { GlobalStatsCard } from './GlobalStatsCard';
 
 interface FullscreenNowPlayingModalProps {
   onSelectArtist?: (artistName: string) => void;
+  onSelectAlbum?: (album: Album) => void;
+  onSelectPlaylist?: (playlist: Playlist | 'favorites' | Album) => void;
 }
 
 export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps> = ({
   onSelectArtist,
+  onSelectAlbum,
+  onSelectPlaylist,
 }) => {
   const {
     currentSong,
@@ -52,9 +58,82 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
   const { currentTime, duration, activeLyricIndex } = useAudioTime();
   const displayLyrics = buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode);
 
-  const { isFavorite, toggleFavorite } = useMusic();
+  const { isFavorite, toggleFavorite, catalog, playlists } = useMusic();
 
   if (!isFullscreenNowPlaying || !currentSong) return null;
+
+  const handleOriginClick = () => {
+    setIsFullscreenNowPlaying(false);
+    const sourceName = playbackSource?.name;
+
+    if (
+      playbackSource?.type === 'favorites' ||
+      sourceName?.toLowerCase() === 'tus me gusta'
+    ) {
+      if (onSelectPlaylist) {
+        onSelectPlaylist('favorites');
+        return;
+      }
+    }
+
+    const matchingPlaylist = playlists.find(
+      (p) =>
+        (playbackSource?.id && p.id === playbackSource.id) ||
+        (sourceName && p.name.trim().toLowerCase() === sourceName.trim().toLowerCase())
+    );
+    if (matchingPlaylist && onSelectPlaylist) {
+      onSelectPlaylist(matchingPlaylist);
+      return;
+    }
+
+    const targetAlbumName =
+      (playbackSource?.type === 'album' && sourceName ? sourceName : null) ||
+      currentSong?.album;
+
+    if (targetAlbumName && targetAlbumName.trim().toLowerCase() !== 'sencillo') {
+      const albums = getAlbumsFromCatalog(catalog);
+      const foundAlbum = albums.find(
+        (a) => a.name.trim().toLowerCase() === targetAlbumName.trim().toLowerCase()
+      );
+      if (foundAlbum) {
+        if (onSelectAlbum) {
+          onSelectAlbum(foundAlbum);
+          return;
+        } else if (onSelectPlaylist) {
+          onSelectPlaylist(foundAlbum);
+          return;
+        }
+      } else {
+        const matchingSongs = catalog.filter(
+          (s) => s.album && s.album.trim().toLowerCase() === targetAlbumName.trim().toLowerCase()
+        );
+        const albumObj: Album = {
+          name: targetAlbumName,
+          artist: currentSong?.albumArtist || currentSong?.artist || '',
+          coverUrl: currentSong?.coverUrl || '',
+          year: currentSong?.year,
+          genre: currentSong?.genre,
+          songs: matchingSongs.length > 0 ? matchingSongs : currentSong ? [currentSong] : [],
+        };
+        if (onSelectAlbum) {
+          onSelectAlbum(albumObj);
+          return;
+        } else if (onSelectPlaylist) {
+          onSelectPlaylist(albumObj);
+          return;
+        }
+      }
+    }
+
+    if (playbackSource?.type === 'artist' || (sourceName && /^artista:/i.test(sourceName))) {
+      const artistName =
+        playbackSource?.id || sourceName?.replace(/^artista:\s*/i, '').trim() || currentSong?.artist;
+      if (artistName && onSelectArtist) {
+        onSelectArtist(artistName);
+        return;
+      }
+    }
+  };
 
   const liked = isFavorite(currentSong.id);
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -80,9 +159,14 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
           >
             <ChevronDown className="w-5 h-5" />
           </button>
-          <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-emerald-400 truncate">
+          <button
+            type="button"
+            onClick={handleOriginClick}
+            className="text-[10px] md:text-xs font-black uppercase tracking-widest text-emerald-400 hover:text-white hover:underline truncate text-left transition-colors cursor-pointer"
+            title={`Ir a ${playbackSource?.name || 'Tus me gusta'}`}
+          >
             {playbackSource?.name || 'Tus me gusta'}
-          </span>
+          </button>
         </div>
 
         <button

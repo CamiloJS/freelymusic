@@ -162,8 +162,9 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
       togglePlayPause();
     } else {
       playSong(artistSongs[0], artistSongs, {
-        type: 'album',
-        name: `Artista: ${artistName}`,
+        type: 'artist',
+        name: artistName,
+        id: artistName,
       });
     }
   };
@@ -323,7 +324,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                 return (
                   <div
                     key={song.id}
-                    onClick={() => playSong(song, artistSongs, { type: 'album', name: `Artista: ${artistName}` })}
+                    onClick={() => playSong(song, artistSongs, { type: 'artist', name: artistName, id: artistName })}
                     className={`grid grid-cols-12 gap-3 px-4 py-3 rounded-xl items-center cursor-pointer transition-colors group select-none ${
                       isCurrent ? 'bg-neutral-900 text-emerald-400 font-bold' : 'hover:bg-neutral-900/60 text-neutral-300'
                     }`}

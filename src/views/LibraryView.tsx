@@ -230,6 +230,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         playSong(playlistSongs[0], playlistSongs, {
           type: sourceType,
           name: sourceName,
+          id: isFavorites ? 'favorites' : isAlbum ? albumObj?.name : playlistObj?.id,
         });
       }
     };
@@ -541,6 +542,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         playSong(song, playlistSongs, {
                           type: sourceType,
                           name: sourceName,
+                          id: isFavorites ? 'favorites' : isAlbum ? albumObj?.name : playlistObj?.id,
                         })
                       }
                       className="grid grid-cols-12 gap-4 px-4 py-2.5 rounded-xl hover:bg-neutral-900/70 items-center cursor-pointer group transition-colors"

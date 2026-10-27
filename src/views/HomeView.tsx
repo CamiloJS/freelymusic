@@ -184,7 +184,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div className="flex flex-wrap items-center gap-2.5 md:gap-3">
           {aiRecommendations.length > 0 && (
             <button
-              onClick={() => playSong(aiRecommendations[0], aiRecommendations)}
+              onClick={() =>
+                playSong(aiRecommendations[0], aiRecommendations, {
+                  type: 'playlist',
+                  name: 'Recomendaciones',
+                })
+              }
               className="inline-flex items-center justify-center gap-2 px-4 md:px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs tracking-wide whitespace-nowrap shadow-lg shadow-emerald-500/25 transition-transform active:scale-95"
             >
               <Play className="w-4 h-4 fill-black" />
@@ -213,7 +218,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
             return (
               <div
                 key={song.id}
-                onClick={() => playSong(song, recentSongs)}
+                onClick={() =>
+                  playSong(song, recentSongs, {
+                    type: song.album && song.album.toLowerCase() !== 'sencillo' ? 'album' : 'playlist',
+                    name: song.album && song.album.toLowerCase() !== 'sencillo' ? song.album : 'Acceso Rápido',
+                  })
+                }
                 className="flex items-center gap-4 bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800/60 rounded-xl overflow-hidden cursor-pointer group transition-all duration-200 pr-4 shadow-sm"
               >
                 <div className="w-16 h-16 bg-neutral-800 flex-shrink-0 relative overflow-hidden">
@@ -294,7 +304,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               return (
                 <div
                   key={song.id}
-                  onClick={() => playSong(song, mix.songs)}
+                  onClick={() => playSong(song, mix.songs, { type: 'playlist', name: mix.genre })}
                   className="bg-neutral-900/40 hover:bg-neutral-800/60 p-3.5 rounded-2xl border border-neutral-800/60 cursor-pointer group transition-all"
                 >
                   <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow-md relative">
@@ -425,7 +435,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
               return (
                 <div
                   key={song.id}
-                  onClick={() => playSong(song, userFavoriteSongs)}
+                  onClick={() =>
+                    playSong(song, userFavoriteSongs, {
+                      type: 'favorites',
+                      name: 'Tus me gusta',
+                      id: 'favorites',
+                    })
+                  }
                   className="flex items-center justify-between p-3 rounded-xl bg-neutral-900/40 hover:bg-neutral-800/60 border border-neutral-800/40 group cursor-pointer transition-all"
                 >
                   <div className="flex items-center gap-3 truncate">

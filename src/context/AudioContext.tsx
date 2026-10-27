@@ -37,8 +37,9 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | nul
 export type RepeatMode = 'off' | 'all' | 'one';
 
 export interface PlaybackSource {
-  type: 'playlist' | 'favorites' | 'catalog' | 'album';
+  type: 'playlist' | 'favorites' | 'catalog' | 'album' | 'artist';
   name: string;
+  id?: string;
 }
 
 interface AudioContextType {
