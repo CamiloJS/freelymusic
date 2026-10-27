@@ -31,6 +31,7 @@ import {
   normalizeUserData,
 } from '../services/storage';
 import { loadFirebaseService } from '../services/firebaseLoader';
+import { detectAudioDuration } from '../utils/audioDuration';
 
 export interface DownloadingState {
   isDownloading: boolean;
@@ -412,7 +413,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return newSongs;
   };
 
-  const updateCatalogTrack = (song: Song) => {
+  const updateCatalogTrack = useCallback((song: Song) => {
     const cleanSong = normalizeSong(song);
     if (!cleanSong) return;
 
@@ -429,7 +430,51 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (ok) removeStoredPendingSong(cleanSong.id);
       })
       .catch((err) => console.warn('La edición quedó pendiente de sincronizar:', err));
-  };
+  }, []);
+
+  // Background auto-repair for songs whose duration is defaulted to 180 (3:00) or 0
+  const repairedSongIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!catalog.length) return;
+
+    // Identify songs needing real duration resolution
+    const candidates = catalog.filter(
+      (s) =>
+        (s.duration === 180 || !s.duration || s.duration <= 0) &&
+        Boolean(s.audioUrl) &&
+        !repairedSongIdsRef.current.has(s.id)
+    );
+
+    if (candidates.length === 0) return;
+
+    let isCancelled = false;
+
+    const repairBatch = async () => {
+      for (const song of candidates) {
+        if (isCancelled) break;
+        repairedSongIdsRef.current.add(song.id);
+
+        try {
+          const detected = await detectAudioDuration(song.audioUrl);
+          if (detected > 0 && detected !== song.duration) {
+            updateCatalogTrack({ ...song, duration: detected });
+          }
+        } catch (err) {
+          console.warn('Error detectando duración de catálogo:', song.title, err);
+        }
+      }
+    };
+
+    const timer = setTimeout(() => {
+      void repairBatch();
+    }, 1500);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [catalog, updateCatalogTrack]);
 
   const deleteCatalogTrack = (songId: string) => {
     addStoredDeletedSongId(songId);

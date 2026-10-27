@@ -27,6 +27,7 @@ import { parseLrc, formatTime } from '../utils/lyrics';
 import { compressImage } from '../utils/imageCompressor';
 import { SongMediaEditor, SongMediaValue, EMPTY_SONG_MEDIA } from '../components/SongMediaEditor';
 import { enrichSongMetadata } from '../services/metadataEnrichment';
+import { detectAudioDuration } from '../utils/audioDuration';
 import { Song, LyricLine } from '../types';
 
 interface AddMusicViewProps {
@@ -85,7 +86,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80'
   );
   const [lyricsLrc, setLyricsLrc] = useState('');
-  const [detectedDuration, setDetectedDuration] = useState<number>(180);
+  const [detectedDuration, setDetectedDuration] = useState<number>(0);
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectStatus, setDetectStatus] = useState<string | null>(null);
   const [songMedia, setSongMedia] = useState<SongMediaValue>({ ...EMPTY_SONG_MEDIA });
@@ -100,8 +101,8 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80'
   );
   const [albumTracks, setAlbumTracks] = useState<AlbumTrackDraft[]>([
-    { id: '1', title: '', audioUrl: '', duration: 180, isExplicit: false, lyricsLrc: '', isConfigOpen: false },
-    { id: '2', title: '', audioUrl: '', duration: 180, isExplicit: false, lyricsLrc: '', isConfigOpen: false },
+    { id: '1', title: '', audioUrl: '', duration: 0, isExplicit: false, lyricsLrc: '', isConfigOpen: false },
+    { id: '2', title: '', audioUrl: '', duration: 0, isExplicit: false, lyricsLrc: '', isConfigOpen: false },
   ]);
   const [bulkTrackCountInput, setBulkTrackCountInput] = useState('5');
   const [isSavingAlbum, setIsSavingAlbum] = useState(false);
@@ -151,7 +152,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         id: Math.random().toString(36).substring(2, 9),
         title: '',
         audioUrl: '',
-        duration: 180,
+        duration: 0,
         isExplicit: false,
         lyricsLrc: '',
         isConfigOpen: false,
@@ -180,6 +181,22 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
       updated[index] = { ...updated[index], ...updates };
       return updated;
     });
+
+    // Auto-detect audio duration whenever audioUrl changes
+    if (updates.audioUrl && updates.audioUrl.trim()) {
+      const targetUrl = updates.audioUrl.trim();
+      void detectAudioDuration(targetUrl).then((dur) => {
+        if (dur > 0) {
+          setAlbumTracks((prev) => {
+            const next = [...prev];
+            if (next[index] && next[index].audioUrl.trim() === targetUrl) {
+              next[index] = { ...next[index], duration: dur };
+            }
+            return next;
+          });
+        }
+      });
+    }
   };
 
   const handleSetBulkTrackCount = (count: number) => {
@@ -194,7 +211,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
           id: Math.random().toString(36).substring(2, 9),
           title: '',
           audioUrl: '',
-          duration: 180,
+          duration: 0,
           isExplicit: false,
           lyricsLrc: '',
           isConfigOpen: false,
@@ -260,37 +277,25 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     detectAudioMetadata(audioUrl.trim());
   };
 
-  // Detect audio duration and verify audio stream
-  const detectAudioMetadata = (urlToTest: string) => {
+  // Detect audio duration and verify audio stream automatically
+  const detectAudioMetadata = async (urlToTest: string) => {
     if (!urlToTest) return;
     setIsDetecting(true);
-    setDetectStatus('Verificando enlace...');
+    setDetectStatus('Detectando duración...');
 
-    const audio = new Audio();
-    audio.preload = 'metadata';
-    audio.src = urlToTest;
-
-    const timeout = setTimeout(() => {
-      setIsDetecting(false);
-      setDetectStatus('Enlace listo (duración estimada)');
-    }, 6000);
-
-    audio.onloadedmetadata = () => {
-      clearTimeout(timeout);
-      if (!isNaN(audio.duration) && audio.duration > 0) {
-        setDetectedDuration(Math.round(audio.duration));
-        setDetectStatus(`Duración detectada: ${formatTime(audio.duration)}`);
+    try {
+      const dur = await detectAudioDuration(urlToTest);
+      if (dur > 0) {
+        setDetectedDuration(dur);
+        setDetectStatus(`Duración detectada: ${formatTime(dur)}`);
       } else {
-        setDetectStatus('Enlace verificado');
+        setDetectStatus('Enlace listo');
       }
+    } catch {
+      setDetectStatus('Enlace listo');
+    } finally {
       setIsDetecting(false);
-    };
-
-    audio.onerror = () => {
-      clearTimeout(timeout);
-      setIsDetecting(false);
-      setDetectStatus('Audio no detectable automáticamente, puedes asignarlo manual.');
-    };
+    }
   };
 
   // Toggle in-page preview playback
@@ -376,7 +381,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         year: year.trim() || '2026',
         coverUrl: coverUrl.trim(),
         audioUrl: audioUrl.trim(),
-        duration: detectedDuration || 180,
+        duration: detectedDuration || 0,
         lyricsLrc: lyricsLrc.trim() || undefined,
         isExplicit: isExplicit,
         videoUrl: songMedia.videoUrl.trim() || undefined,
@@ -497,7 +502,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         year: albumYear.trim() || '2026',
         coverUrl: albumCoverUrl.trim(),
         audioUrl: t.audioUrl.trim(),
-        duration: t.duration || 180,
+        duration: t.duration || 0,
         lyricsLrc: t.lyricsLrc?.trim() || undefined,
         isExplicit: t.isExplicit,
         trackNumber: idx + 1,
@@ -532,8 +537,8 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
       setAlbumArtistList(['']);
       setAlbumGenre('');
       setAlbumTracks([
-        { id: '1', title: '', audioUrl: '', duration: 180, isExplicit: false, lyricsLrc: '', isConfigOpen: false },
-        { id: '2', title: '', audioUrl: '', duration: 180, isExplicit: false, lyricsLrc: '', isConfigOpen: false },
+        { id: '1', title: '', audioUrl: '', duration: 0, isExplicit: false, lyricsLrc: '', isConfigOpen: false },
+        { id: '2', title: '', audioUrl: '', duration: 0, isExplicit: false, lyricsLrc: '', isConfigOpen: false },
       ]);
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err: unknown) {
@@ -791,7 +796,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-neutral-300 mb-1.5">
                       Álbum
@@ -814,19 +819,6 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                       value={year}
                       onChange={(e) => setYear(e.target.value)}
                       placeholder="2026"
-                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-neutral-300 mb-1.5">
-                      Duración (segundos)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={detectedDuration}
-                      onChange={(e) => setDetectedDuration(parseInt(e.target.value, 10) || 180)}
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -1176,6 +1168,16 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                             />
                           </div>
 
+                          {/* Auto-detected Duration Badge */}
+                          {t.duration > 0 && (
+                            <span
+                              className="inline-flex items-center text-[11px] font-mono text-emerald-400 font-semibold px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex-shrink-0"
+                              title="Duración detectada automáticamente"
+                            >
+                              {formatTime(t.duration)}
+                            </span>
+                          )}
+
                           {/* Explicit Badge if active */}
                           {t.isExplicit && (
                             <span
@@ -1195,7 +1197,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                                 : 'bg-neutral-900 text-neutral-400 hover:text-white border-neutral-800'
                             }`}
-                            title="Configurar colaboradores, letra sincronizada y duración"
+                            title="Configurar colaboradores y letra sincronizada"
                           >
                             <Sliders className="w-3.5 h-3.5" />
                             <span className="hidden sm:inline">Configurar</span>
@@ -1217,7 +1219,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                         {/* Expandable Track Configuration Accordion */}
                         {t.isConfigOpen && (
                           <div className="p-3.5 bg-neutral-900/90 rounded-xl border border-neutral-800 space-y-3 animate-in fade-in duration-150">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               {/* Collaborator / Custom Artist */}
                               <div>
                                 <label className="block text-[11px] font-bold text-neutral-300 mb-1">
@@ -1232,22 +1234,6 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                                 />
                               </div>
 
-                              {/* Duration (seconds) */}
-                              <div>
-                                <label className="block text-[11px] font-bold text-neutral-300 mb-1">
-                                  Duración (segundos)
-                                </label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={t.duration}
-                                  onChange={(e) =>
-                                    handleUpdateAlbumTrack(index, { duration: parseInt(e.target.value, 10) || 180 })
-                                  }
-                                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                                />
-                              </div>
-
                               {/* Explicit Toggle */}
                               <div className="flex items-end">
                                 <label
@@ -1258,7 +1244,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                                     E
                                   </span>
                                   <span className="text-xs text-neutral-300 font-bold select-none">
-                                    Canción explícita
+                                    Contenido explícito (E)
                                   </span>
                                   <input
                                     type="checkbox"

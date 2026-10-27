@@ -228,15 +228,15 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
 
           {/* Artist Info */}
           <div className="flex-1 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[11px] font-bold">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="h-8 inline-flex items-center gap-1.5 px-3.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold select-none">
                 <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 fill-blue-400 text-black" />
                 <span>Artista Verificado</span>
               </span>
 
               <button
                 onClick={() => toggleFollowArtist(artistName)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold border transition-colors active:scale-95 ${
+                className={`h-8 inline-flex items-center gap-1.5 px-3.5 rounded-full text-xs font-bold border transition-all active:scale-95 ${
                   following
                     ? 'bg-white/10 border-white/25 text-white hover:bg-white/15'
                     : 'bg-emerald-500 border-emerald-500 text-black hover:bg-emerald-400'
@@ -255,10 +255,10 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
               {isAdmin && (
                 <button
                   onClick={handleOpenEdit}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white text-[11px] font-semibold border border-neutral-700 transition-colors"
+                  className="h-8 inline-flex items-center gap-1.5 px-3.5 rounded-full bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs font-semibold border border-neutral-700 transition-colors"
                   title="Configurar foto, portada y biografía del artista (Visible para todos)"
                 >
-                  <Pencil className="w-3 h-3 text-emerald-400" />
+                  <Pencil className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Configurar artista</span>
                 </button>
               )}

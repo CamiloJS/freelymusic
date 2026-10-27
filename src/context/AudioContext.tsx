@@ -118,7 +118,7 @@ const AudioContext = createContext<AudioContextType | undefined>(undefined);
 const AudioTimeContext = createContext<AudioTimeState | undefined>(undefined);
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { recordSongPlay, recordListeningTime, isDownloaded } = useMusic();
+  const { recordSongPlay, recordListeningTime, isDownloaded, updateCatalogTrack } = useMusic();
   const { isAuthenticated, currentUser } = useAuth();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -127,6 +127,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const previousUserIdRef = useRef<string | null>(currentUser?.id || null);
 
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
+  const currentSongRef = useRef<Song | null>(null);
+  currentSongRef.current = currentSong;
   const [queue, setQueue] = useState<Song[]>([]);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isBuffering, setIsBuffering] = useState<boolean>(false);
@@ -176,8 +178,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const onDurationChange = () => {
-      if (!isNaN(audio.duration)) {
-        setDuration(audio.duration);
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        const rounded = Math.round(audio.duration);
+        setDuration(rounded);
+
+        const active = currentSongRef.current;
+        if (active && (active.duration === 180 || active.duration <= 0 || Math.abs(active.duration - rounded) > 2)) {
+          active.duration = rounded;
+          updateCatalogTrack({ ...active, duration: rounded });
+        }
       }
     };
 
@@ -189,7 +198,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const onPause = () => setIsPlaying(false);
     const onWaiting = () => setIsBuffering(true);
     const onStalled = () => setIsBuffering(true);
-    const onCanPlay = () => setIsBuffering(false);
+    const onCanPlay = () => {
+      setIsBuffering(false);
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        const rounded = Math.round(audio.duration);
+        setDuration(rounded);
+
+        const active = currentSongRef.current;
+        if (active && (active.duration === 180 || active.duration <= 0 || Math.abs(active.duration - rounded) > 2)) {
+          active.duration = rounded;
+          updateCatalogTrack({ ...active, duration: rounded });
+        }
+      }
+    };
     const onLoadStart = () => setIsBuffering(true);
     const onEmptied = () => {
       setCurrentTime(0);

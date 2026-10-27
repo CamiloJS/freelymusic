@@ -23,6 +23,7 @@ import { Song, UserRole, FirebaseConfigOptions } from '../types';
 import { saveStoredFirebaseConfig, getStoredFirebaseConfig } from '../services/storage';
 import { isFirebaseConnected } from '../services/firebase';
 import { compressImage } from '../utils/imageCompressor';
+import { detectAudioDuration } from '../utils/audioDuration';
 import { SongMediaEditor, SongMediaValue, EMPTY_SONG_MEDIA } from '../components/SongMediaEditor';
 import { MetadataEnrichmentModal } from '../components/MetadataEnrichmentModal';
 
@@ -44,7 +45,7 @@ export const AdminView: React.FC = () => {
     'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80'
   );
   const [lyricsLrc, setLyricsLrc] = useState('');
-  const [detectedDuration, setDetectedDuration] = useState<number>(180);
+  const [detectedDuration, setDetectedDuration] = useState<number>(0);
   const [isDetecting, setIsDetecting] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [previewAudio, setPreviewAudio] = useState<HTMLAudioElement | null>(null);
@@ -98,7 +99,13 @@ export const AdminView: React.FC = () => {
     setEditAudioUrl(song.audioUrl);
     setEditLyricsLrc(song.lyricsLrc || song.plainLyrics || '');
     setEditIsExplicit(Boolean(song.isExplicit));
-    setEditDuration(song.duration || 180);
+    const currentDur = song.duration && song.duration !== 180 ? song.duration : 0;
+    setEditDuration(currentDur);
+    if (!currentDur && song.audioUrl) {
+      void detectAudioDuration(song.audioUrl).then((d) => {
+        if (d > 0) setEditDuration(d);
+      });
+    }
     setEditMedia({
       videoUrl: song.videoUrl || '',
       instrumentalUrl: song.instrumentalUrl || '',
@@ -203,20 +210,17 @@ export const AdminView: React.FC = () => {
   };
 
   // Detect audio duration automatically
-  const handleDetectDuration = () => {
+  const handleDetectDuration = async () => {
     if (!audioUrl) return;
     setIsDetecting(true);
-    const audio = new Audio();
-    audio.src = audioUrl;
-    audio.onloadedmetadata = () => {
-      if (!isNaN(audio.duration) && audio.duration > 0) {
-        setDetectedDuration(Math.round(audio.duration));
+    try {
+      const dur = await detectAudioDuration(audioUrl.trim());
+      if (dur > 0) {
+        setDetectedDuration(dur);
       }
+    } finally {
       setIsDetecting(false);
-    };
-    audio.onerror = () => {
-      setIsDetecting(false);
-    };
+    }
   };
 
   // Toggle preview playback of link
@@ -270,7 +274,7 @@ export const AdminView: React.FC = () => {
       year: year.trim() || '2026',
       coverUrl: coverUrl.trim(),
       audioUrl: audioUrl.trim(),
-      duration: detectedDuration || 180,
+      duration: detectedDuration || 0,
       lyricsLrc: lyricsLrc.trim() || undefined,
       isExplicit: adminIsExplicit,
     });
@@ -563,8 +567,8 @@ export const AdminView: React.FC = () => {
               </div>
             </div>
 
-            {/* Album, Genre, Year & Duration */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Album, Genre & Year */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
                   Álbum
@@ -600,19 +604,6 @@ export const AdminView: React.FC = () => {
                   value={year}
                   onChange={(e) => setYear(e.target.value)}
                   placeholder="2026"
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
-                  Duración (segundos)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={detectedDuration}
-                  onChange={(e) => setDetectedDuration(parseInt(e.target.value, 10) || 180)}
                   className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>

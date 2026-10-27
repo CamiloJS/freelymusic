@@ -375,19 +375,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               {/* Shuffle Button */}
               <button
                 onClick={toggleShuffle}
-                className={`p-2 rounded-full transition-colors ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-90 ${
                   isShuffle ? 'text-emerald-400' : 'text-neutral-400 hover:text-white'
                 }`}
                 title="Aleatorio"
               >
-                <Shuffle className="w-6 h-6" />
+                <Shuffle className="w-5 h-5" />
               </button>
 
               {/* Add Album to Library Button (Exact Spotify Style) */}
               {isAlbum && albumObj && (
                 <button
                   onClick={() => toggleSaveAlbum(albumObj)}
-                  className="transition-transform active:scale-90"
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-90"
                   title={
                     isAlbumSaved(albumObj.name)
                       ? 'Guardado en tu biblioteca (clic para quitar)'
@@ -402,7 +402,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       height="32"
                       viewBox="0 0 32 32"
                       fill="none"
-                      className="text-neutral-400 hover:text-white hover:scale-105 transition-all"
+                      className="text-neutral-400 hover:text-white"
                     >
                       <circle cx="16" cy="16" r="14.5" stroke="currentColor" strokeWidth="1.8" />
                       <path
@@ -419,7 +419,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               {/* Download All Button (Spotify Style 32px circle) */}
               <button
                 onClick={handleDownloadAll}
-                className="transition-transform active:scale-90"
+                className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-90"
                 title={areAllDownloaded ? 'Descargado en tu dispositivo' : 'Descargar para escuchar sin conexión'}
               >
                 {areAllDownloaded ? (
@@ -430,7 +430,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     height="32"
                     viewBox="0 0 32 32"
                     fill="none"
-                    className="text-neutral-400 hover:text-white hover:scale-105 transition-all"
+                    className="text-neutral-400 hover:text-white"
                   >
                     <circle cx="16" cy="16" r="14.5" stroke="currentColor" strokeWidth="1.8" />
                     <path
@@ -447,10 +447,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               {/* Download ZIP bundle button */}
               <button
                 onClick={handleDownloadZip}
-                className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white border border-neutral-700/80 hover:border-neutral-400 bg-neutral-900/60 hover:bg-neutral-800 transition-all hover:scale-105 active:scale-90"
                 title="Descargar paquete completo (.ZIP) para tu computador"
               >
-                <FolderDown className="w-5 h-5" />
+                <FolderDown className="w-4 h-4" />
               </button>
 
               {/* Delete Playlist (only if custom playlist) */}
@@ -462,10 +462,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       setSelectedPlaylist(null);
                     }
                   }}
-                  className="p-2 rounded-xl text-neutral-400 hover:text-red-400 hover:bg-neutral-900 transition-colors"
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-red-400 border border-neutral-800 hover:border-red-500/40 bg-neutral-900/60 hover:bg-red-950/20 transition-all hover:scale-105 active:scale-90"
                   title="Eliminar playlist"
                 >
-                  <Trash2 className="w-5 h-5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               )}
             </div>
