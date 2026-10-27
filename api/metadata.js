@@ -272,6 +272,56 @@ async function lyrics(title, artist, album, duration) {
   return result;
 }
 
+async function cover(title, artist, album, isAlbum) {
+  const query = [artist, album || title].filter(Boolean).join(' ');
+  const key = `cover:${query}:${Boolean(isAlbum)}`;
+  const cached = cacheGet(key);
+  if (cached) return cached;
+
+  // 1. iTunes Search
+  try {
+    const itunesEntity = isAlbum ? 'album' : 'song';
+    const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=${itunesEntity}&limit=5`;
+    const payload = await fetchJson(itunesUrl, 2);
+    const results = Array.isArray(payload.results) ? payload.results : [];
+    if (results.length > 0) {
+      const best = results[0];
+      const artwork = best.artworkUrl100 || best.artworkUrl60;
+      if (typeof artwork === 'string') {
+        const coverUrl = artwork.replace(/\/\d+x\d+bb\./, '/600x600bb.');
+        const result = { source: 'iTunes', coverUrl };
+        cacheSet(key, result);
+        return result;
+      }
+    }
+  } catch (err) {
+    // Continue to Deezer
+  }
+
+  // 2. Deezer Search
+  try {
+    const deezerEndpoint = isAlbum ? 'album' : 'track';
+    const deezerUrl = `https://api.deezer.com/search/${deezerEndpoint}?q=${encodeURIComponent(query)}&limit=5`;
+    const payload = await fetchJson(deezerUrl, 2);
+    const items = Array.isArray(payload.data) ? payload.data : [];
+    if (items.length > 0) {
+      const best = items[0];
+      const artwork = isAlbum
+        ? (best.cover_xl || best.cover_big || best.cover_medium)
+        : (best.album?.cover_xl || best.album?.cover_big || best.album?.cover_medium);
+      if (artwork) {
+        const result = { source: 'Deezer', coverUrl: artwork };
+        cacheSet(key, result);
+        return result;
+      }
+    }
+  } catch (err) {
+    // Continue
+  }
+
+  return { source: 'none', coverUrl: null };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return send(res, 405, { error: 'method_not_allowed', message: 'Usa GET.' });
@@ -282,7 +332,11 @@ export default async function handler(req, res) {
   const artist = String(req.query.artist || '');
   const name = String(req.query.name || req.query.title || '');
 
-  if (source === 'deezer-artist') {
+  if (source === 'cover') {
+    if (!title && !artist && !req.query.album) {
+      return send(res, 400, { error: 'missing_params', message: 'Se requiere title, artist o album.' });
+    }
+  } else if (source === 'deezer-artist') {
     if (!name) {
       return send(res, 400, { error: 'missing_params', message: 'Se requiere name.' });
     }
@@ -301,6 +355,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (source === 'cover') {
+      return send(
+        res,
+        200,
+        await cover(title, artist, req.query.album ? String(req.query.album) : undefined, req.query.isAlbum === 'true')
+      );
+    }
     if (source === 'musicbrainz') {
       return send(res, 200, await musicbrainz(title, artist));
     }
@@ -324,7 +385,7 @@ export default async function handler(req, res) {
     }
     return send(res, 400, {
       error: 'unsupported_source',
-      message: 'Usa source=musicbrainz, source=lyrics, source=deezer-artist o source=deezer-track.',
+      message: 'Usa source=cover, source=musicbrainz, source=lyrics, source=deezer-artist o source=deezer-track.',
     });
   } catch (error) {
     console.error('Metadata proxy failed:', error);

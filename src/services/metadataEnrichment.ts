@@ -271,34 +271,14 @@ export async function searchLyrics(
   }
 }
 
+import { autoDetectCover } from '../utils/audioCoverExtractor';
+
 export async function searchCover(
   title: string,
   artist: string,
   album?: string
 ): Promise<string | null> {
-  const query = [artist, album || title].filter(Boolean).join(' ');
-  const url = `${ITUNES_ENDPOINT}?term=${encodeURIComponent(query)}&entity=album&limit=8`;
-
-  try {
-    const payload = await fetchJsonWithRetry(url, { headers: { Accept: 'application/json' } }, 2);
-    const results = (payload.results as Array<Record<string, unknown>>) || [];
-    const best = results
-      .filter(
-        (item) =>
-          textMatch(String(item.artistName || ''), artist) ||
-          textMatch(String(item.collectionName || ''), album || title)
-      )
-      .sort((a, b) => Number(b.collectionId || 0) - Number(a.collectionId || 0))[0];
-
-    const artwork = best?.artworkUrl100;
-    if (typeof artwork === 'string') {
-      return artwork.replace(/\/\d+x\d+bb\./, '/600x600bb.');
-    }
-  } catch {
-    // no cover
-  }
-
-  return null;
+  return autoDetectCover(title, artist, album);
 }
 
 function hasMissingMetadata(song: Song): boolean {

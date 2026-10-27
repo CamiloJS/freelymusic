@@ -29,6 +29,11 @@ import { SongMediaEditor, SongMediaValue, EMPTY_SONG_MEDIA } from '../components
 import { enrichSongMetadata, searchLyrics, searchCover } from '../services/metadataEnrichment';
 import { detectAudioDuration } from '../utils/audioDuration';
 import { parseAudioUrlMetadata } from '../utils/urlMetadataParser';
+import {
+  extractMetadataFromAudioSource,
+  autoDetectCover,
+  autoDetectAlbumCover,
+} from '../utils/audioCoverExtractor';
 import { Song, LyricLine } from '../types';
 
 interface AddMusicViewProps {
@@ -92,6 +97,9 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   const [detectStatus, setDetectStatus] = useState<string | null>(null);
   const [songMedia, setSongMedia] = useState<SongMediaValue>({ ...EMPTY_SONG_MEDIA });
   const [autoEnrich, setAutoEnrich] = useState(true);
+  const [isSearchingCover, setIsSearchingCover] = useState(false);
+  const [isSearchingAlbumCover, setIsSearchingAlbumCover] = useState(false);
+  const audioFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Album Form State
   const [albumTitle, setAlbumTitle] = useState('');
@@ -238,6 +246,45 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
           }
         });
       }
+
+      // 4. Extract embedded cover art & ID3 tags from audio file
+      void (async () => {
+        try {
+          const extracted = await extractMetadataFromAudioSource(targetUrl);
+          if (extracted) {
+            if (index === 0 && extracted.coverUrl && albumCoverUrl.includes('images.unsplash.com')) {
+              setAlbumCoverUrl(extracted.coverUrl);
+            }
+            if (!albumTitle.trim() && extracted.album) {
+              setAlbumTitle(extracted.album);
+            }
+            if (albumArtistList.filter(Boolean).length === 0 && extracted.artist) {
+              setAlbumArtistList([extracted.artist]);
+            }
+            setAlbumTracks((prev) => {
+              const next = [...prev];
+              if (next[index] && next[index].audioUrl.trim() === targetUrl) {
+                next[index] = {
+                  ...next[index],
+                  title: next[index].title || extracted.title || '',
+                  artist: next[index].artist || extracted.artist || '',
+                  lyricsLrc: next[index].lyricsLrc || extracted.lyrics || '',
+                };
+              }
+              return next;
+            });
+          } else if (albumCoverUrl.includes('images.unsplash.com')) {
+            const art = albumArtistList.filter(Boolean)[0] || '';
+            const alb = albumTitle.trim();
+            if (art || alb) {
+              const onlineCover = await autoDetectAlbumCover(alb, art);
+              if (onlineCover) setAlbumCoverUrl(onlineCover);
+            }
+          }
+        } catch {
+          // non-blocking
+        }
+      })();
     }
   };
 
@@ -286,17 +333,18 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     };
   }, [previewAudio]);
 
-  // Auto-detect metadata (Title, Artists, LRCLIB lyrics, cover) from URL
-  const handleAudioUrlChange = (newUrl: string) => {
+  // Auto-detect metadata (Title, Artists, LRCLIB lyrics, cover) from URL or File
+  const handleAudioUrlChange = async (newUrl: string) => {
     setAudioUrl(newUrl);
     if (!newUrl.trim()) return;
 
-    const parsed = parseAudioUrlMetadata(newUrl);
+    const trimmedUrl = newUrl.trim();
+    const parsed = parseAudioUrlMetadata(trimmedUrl);
 
-    let currentTitle = title;
+    let currentTitle = title.trim();
     let currentArtists = artistList.filter(Boolean);
 
-    if (!title.trim() && parsed.title) {
+    if (!currentTitle && parsed.title) {
       setTitle(parsed.title);
       currentTitle = parsed.title;
     }
@@ -307,9 +355,43 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     }
 
     // Automatically trigger duration detection
-    detectAudioMetadata(newUrl.trim());
+    detectAudioMetadata(trimmedUrl);
 
-    // If title and artist are available, immediately fetch lyrics from LRCLIB & cover
+    // 1. First, attempt to extract embedded cover art & ID3 tags from audio stream
+    setDetectStatus('Analizando archivo y extrayendo carátula...');
+    try {
+      const extracted = await extractMetadataFromAudioSource(trimmedUrl);
+      if (extracted) {
+        if (extracted.coverUrl && (coverUrl.includes('images.unsplash.com') || !coverUrl)) {
+          setCoverUrl(extracted.coverUrl);
+          setDetectStatus('✓ Carátula extraída del archivo de audio');
+        }
+        if (!currentTitle && extracted.title) {
+          setTitle(extracted.title);
+          currentTitle = extracted.title;
+        }
+        if (currentArtists.length === 0 && extracted.artist) {
+          setArtistList([extracted.artist]);
+          currentArtists = [extracted.artist];
+        }
+        if (!album.trim() && extracted.album) {
+          setAlbum(extracted.album);
+        }
+        if (!genre.trim() && extracted.genre) {
+          setGenre(extracted.genre);
+        }
+        if (!year.trim() && extracted.year) {
+          setYear(extracted.year);
+        }
+        if (!lyricsLrc.trim() && extracted.lyrics) {
+          setLyricsLrc(extracted.lyrics);
+        }
+      }
+    } catch {
+      // non-blocking
+    }
+
+    // 2. If title and artist are available, immediately fetch lyrics from LRCLIB & cover from iTunes/Deezer
     const primaryArt = currentArtists[0] || (parsed.artists[0] ?? '');
     if (currentTitle && primaryArt) {
       void (async () => {
@@ -322,9 +404,12 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
               setDetectStatus('✓ Letra sincronizada obtenida de LRCLIB');
             }
           }
-          if (coverUrl.includes('images.unsplash.com')) {
-            const foundCover = await searchCover(currentTitle, primaryArt, album.trim() || undefined);
-            if (foundCover) setCoverUrl(foundCover);
+          if (coverUrl.includes('images.unsplash.com') || !coverUrl) {
+            const foundCover = await autoDetectCover(currentTitle, primaryArt, album.trim() || undefined);
+            if (foundCover) {
+              setCoverUrl(foundCover);
+              setDetectStatus('✓ Carátula detectada automáticamente (iTunes/Deezer)');
+            }
           }
         } catch {
           // non-blocking
@@ -335,6 +420,162 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
 
   const handleUrlBlur = () => {
     handleAudioUrlChange(audioUrl);
+  };
+
+  // Blur handler on title/artist to auto-search cover if still default
+  const handleSingleMetadataBlur = async () => {
+    const art = artistList.filter(Boolean)[0] || '';
+    if (title.trim() && art && (coverUrl.includes('images.unsplash.com') || !coverUrl)) {
+      try {
+        const found = await autoDetectCover(title.trim(), art, album.trim() || undefined);
+        if (found) {
+          setCoverUrl(found);
+          setDetectStatus('✓ Carátula detectada automáticamente');
+          setTimeout(() => setDetectStatus(null), 3500);
+        }
+      } catch {
+        // non-blocking
+      }
+    }
+  };
+
+  // Blur handler on album fields to auto-search album cover if still default
+  const handleAlbumMetadataBlur = async () => {
+    const art = albumArtistList.filter(Boolean)[0] || '';
+    if ((albumTitle.trim() || art) && (albumCoverUrl.includes('images.unsplash.com') || !albumCoverUrl)) {
+      try {
+        const found = await autoDetectAlbumCover(albumTitle.trim(), art);
+        if (found) {
+          setAlbumCoverUrl(found);
+        }
+      } catch {
+        // non-blocking
+      }
+    }
+  };
+
+  // Manual button: auto-detect single song cover
+  const handleAutoDetectCover = async () => {
+    const primaryArt = artistList.filter(Boolean)[0] || '';
+    if (!title.trim() && !primaryArt) {
+      setErrorMessage('Ingresa al menos el título o artista para detectar la carátula.');
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+    setIsSearchingCover(true);
+    setDetectStatus('Buscando carátula en alta definición (iTunes/Deezer)...');
+    try {
+      const detected = await autoDetectCover(title.trim(), primaryArt, album.trim() || undefined);
+      if (detected) {
+        setCoverUrl(detected);
+        setDetectStatus('✓ Carátula encontrada y aplicada con éxito');
+      } else {
+        setDetectStatus('No se encontró carátula en línea para este título.');
+      }
+    } catch {
+      setDetectStatus('Error al buscar carátula.');
+    } finally {
+      setIsSearchingCover(false);
+      setTimeout(() => setDetectStatus(null), 4000);
+    }
+  };
+
+  // Manual button: extract cover from audio file/URL
+  const handleExtractFromFileOrUrl = async (source?: string | File) => {
+    const target = source || audioUrl;
+    if (!target) {
+      setErrorMessage('Ingresa un enlace de audio o selecciona un archivo para extraer su carátula.');
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+    setIsSearchingCover(true);
+    setDetectStatus('Extrayendo carátula y metadatos del archivo de audio...');
+    try {
+      const extracted = await extractMetadataFromAudioSource(target);
+      if (extracted?.coverUrl) {
+        setCoverUrl(extracted.coverUrl);
+        if (!title.trim() && extracted.title) setTitle(extracted.title);
+        if (artistList.filter(Boolean).length === 0 && extracted.artist) setArtistList([extracted.artist]);
+        if (!album.trim() && extracted.album) setAlbum(extracted.album);
+        if (!genre.trim() && extracted.genre) setGenre(extracted.genre);
+        if (!year.trim() && extracted.year) setYear(extracted.year);
+        if (!lyricsLrc.trim() && extracted.lyrics) setLyricsLrc(extracted.lyrics);
+        setDetectStatus('✓ Carátula y metadatos extraídos del archivo de audio');
+      } else {
+        const effectiveTitle = title.trim() || extracted?.title || '';
+        const effectiveArtist = artistList.filter(Boolean)[0] || extracted?.artist || '';
+        if (effectiveTitle && effectiveArtist) {
+          const onlineCover = await autoDetectCover(effectiveTitle, effectiveArtist, album.trim() || extracted?.album);
+          if (onlineCover) {
+            setCoverUrl(onlineCover);
+            setDetectStatus('✓ Carátula detectada en línea automáticamente');
+          } else {
+            setDetectStatus('El archivo no contiene carátula incrustada.');
+          }
+        } else {
+          setDetectStatus('El archivo no contiene carátula incrustada.');
+        }
+      }
+    } catch {
+      setDetectStatus('No se pudo extraer carátula del archivo.');
+    } finally {
+      setIsSearchingCover(false);
+      setTimeout(() => setDetectStatus(null), 4000);
+    }
+  };
+
+  // Manual button: auto-detect album cover
+  const handleAutoDetectAlbumCover = async () => {
+    const primaryAlbumArt = albumArtistList.filter(Boolean)[0] || '';
+    if (!albumTitle.trim() && !primaryAlbumArt) {
+      setErrorMessage('Ingresa al menos el título del álbum o artista.');
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+    setIsSearchingAlbumCover(true);
+    try {
+      const detected = await autoDetectAlbumCover(albumTitle.trim(), primaryAlbumArt);
+      if (detected) {
+        setAlbumCoverUrl(detected);
+        setSuccessMessage('✓ Carátula del álbum detectada automáticamente');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setErrorMessage('No se encontró carátula para este álbum.');
+        setTimeout(() => setErrorMessage(''), 3000);
+      }
+    } catch {
+      setErrorMessage('Error al buscar carátula del álbum.');
+      setTimeout(() => setErrorMessage(''), 3000);
+    } finally {
+      setIsSearchingAlbumCover(false);
+    }
+  };
+
+  // Manual button: extract album cover from track 1
+  const handleExtractAlbumCoverFromTrack1 = async () => {
+    const track1 = albumTracks[0];
+    if (!track1?.audioUrl?.trim()) {
+      setErrorMessage('Ingresa el enlace de la Pista #1 para extraer su carátula.');
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+    setIsSearchingAlbumCover(true);
+    try {
+      const extracted = await extractMetadataFromAudioSource(track1.audioUrl.trim());
+      if (extracted?.coverUrl) {
+        setAlbumCoverUrl(extracted.coverUrl);
+        if (!albumTitle.trim() && extracted.album) setAlbumTitle(extracted.album);
+        if (albumArtistList.filter(Boolean).length === 0 && extracted.artist) setAlbumArtistList([extracted.artist]);
+        setSuccessMessage('✓ Carátula extraída de la Pista #1 del álbum');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        await handleAutoDetectAlbumCover();
+      }
+    } catch {
+      await handleAutoDetectAlbumCover();
+    } finally {
+      setIsSearchingAlbumCover(false);
+    }
   };
 
   // Detect audio duration and verify audio stream automatically
@@ -704,26 +945,70 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                     <FileAudio className="w-4 h-4" />
                     1. Enlace de Audio Directo (URL) *
                   </label>
-                  {audioUrl && (
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={handleTogglePreview}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-all"
+                      onClick={() => audioFileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white text-xs font-bold border border-white/10 transition-all"
+                      title="Seleccionar archivo de tu dispositivo para auto-rellenar tags y carátula"
                     >
-                      {isPlayingPreview ? (
-                        <>
-                          <Pause className="w-3.5 h-3.5 fill-emerald-400" />
-                          <span>Pausar Vista Previa</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-3.5 h-3.5 fill-emerald-400" />
-                          <span>Probar Enlace</span>
-                        </>
-                      )}
+                      <UploadCloud className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Cargar archivo local</span>
                     </button>
-                  )}
+                    {audioUrl && (
+                      <button
+                        type="button"
+                        onClick={handleTogglePreview}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/30 transition-all"
+                      >
+                        {isPlayingPreview ? (
+                          <>
+                            <Pause className="w-3.5 h-3.5 fill-emerald-400" />
+                            <span>Pausar</span>
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-3.5 h-3.5 fill-emerald-400" />
+                            <span>Probar</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
+
+                <input
+                  type="file"
+                  ref={audioFileInputRef}
+                  accept="audio/*,.mp3,.flac,.m4a,.wav"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setDetectStatus('Extrayendo carátula y etiquetas del archivo local...');
+                    setIsDetecting(true);
+                    try {
+                      const extracted = await extractMetadataFromAudioSource(file);
+                      if (extracted) {
+                        if (extracted.coverUrl) setCoverUrl(extracted.coverUrl);
+                        if (extracted.title) setTitle(extracted.title);
+                        if (extracted.artist) setArtistList([extracted.artist]);
+                        if (extracted.album) setAlbum(extracted.album);
+                        if (extracted.genre) setGenre(extracted.genre);
+                        if (extracted.year) setYear(extracted.year);
+                        if (extracted.lyrics) setLyricsLrc(extracted.lyrics);
+                        setDetectStatus('✓ Carátula y metadatos extraídos del archivo local');
+                      } else {
+                        setDetectStatus('Archivo analizado (sin carátula incrustada)');
+                      }
+                    } catch {
+                      setDetectStatus('Error al leer archivo local.');
+                    } finally {
+                      setIsDetecting(false);
+                      setTimeout(() => setDetectStatus(null), 4000);
+                    }
+                  }}
+                  className="hidden"
+                />
 
                 <input
                   type="url"
@@ -776,6 +1061,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                       required
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
+                      onBlur={handleSingleMetadataBlur}
                       placeholder="Ej. Blinding Lights"
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
                     />
@@ -805,6 +1091,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                             required={idx === 0}
                             value={art}
                             onChange={(e) => handleArtistChange(idx, e.target.value)}
+                            onBlur={handleSingleMetadataBlur}
                             placeholder={idx === 0 ? "Artista principal (Ej. Aitana)" : "Artista colaborador (Ej. Kenia OS)"}
                             className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
                           />
@@ -865,6 +1152,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                       type="text"
                       value={album}
                       onChange={(e) => setAlbum(e.target.value)}
+                      onBlur={handleSingleMetadataBlur}
                       placeholder="Sencillo / After Hours"
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
                     />
@@ -1021,6 +1309,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                     required
                     value={albumTitle}
                     onChange={(e) => setAlbumTitle(e.target.value)}
+                    onBlur={handleAlbumMetadataBlur}
                     placeholder="Ej. Un Verano Sin Ti / After Hours"
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-bold"
                   />
@@ -1050,6 +1339,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                           required={idx === 0}
                           value={art}
                           onChange={(e) => handleAlbumArtistChange(idx, e.target.value)}
+                          onBlur={handleAlbumMetadataBlur}
                           placeholder={idx === 0 ? "Artista principal del álbum (Ej. Bad Bunny)" : "Artista colaborador"}
                           className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
                         />
@@ -1421,6 +1711,31 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                   <span>Subir carátula desde tu PC</span>
                 </button>
 
+                {/* Auto Detection & Extraction Buttons */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleAutoDetectCover}
+                    disabled={isSearchingCover}
+                    className="py-2.5 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    title="Buscar carátula automáticamente en línea (iTunes y Deezer)"
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 ${isSearchingCover ? 'animate-spin' : ''}`} />
+                    <span>Detectar en línea</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleExtractFromFileOrUrl()}
+                    disabled={isSearchingCover || !audioUrl}
+                    className="py-2.5 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    title="Extraer carátula incrustada en el archivo de audio o enlace"
+                  >
+                    <Music className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Extraer de archivo</span>
+                  </button>
+                </div>
+
                 <div className="pt-1">
                   <label className="block text-[10px] uppercase font-bold text-neutral-400 mb-1">
                     O pegar URL de imagen:
@@ -1477,6 +1792,31 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                     <UploadCloud className="w-4 h-4" />
                     <span>Subir carátula de álbum desde tu PC</span>
                   </button>
+
+                  {/* Auto Detection & Extraction for Album */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleAutoDetectAlbumCover}
+                      disabled={isSearchingAlbumCover}
+                      className="py-2.5 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      title="Buscar carátula del álbum automáticamente en línea"
+                    >
+                      <Sparkles className={`w-3.5 h-3.5 ${isSearchingAlbumCover ? 'animate-spin' : ''}`} />
+                      <span>Detectar álbum</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleExtractAlbumCoverFromTrack1}
+                      disabled={isSearchingAlbumCover || !albumTracks[0]?.audioUrl}
+                      className="py-2.5 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 font-bold text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      title="Extraer carátula incrustada en la pista #1 del álbum"
+                    >
+                      <Disc className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>De pista #1</span>
+                    </button>
+                  </div>
 
                   <div className="pt-1">
                     <label className="block text-[10px] uppercase font-bold text-neutral-400 mb-1">
