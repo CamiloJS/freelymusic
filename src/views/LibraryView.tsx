@@ -24,6 +24,8 @@ import MoreVertical from 'lucide-react/dist/esm/icons/ellipsis-vertical.mjs';
 import MoreHorizontal from 'lucide-react/dist/esm/icons/ellipsis.mjs';
 import Video from 'lucide-react/dist/esm/icons/video.mjs';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
+import LayoutGrid from 'lucide-react/dist/esm/icons/layout-grid.mjs';
+import ArrowUpDown from 'lucide-react/dist/esm/icons/arrow-up-down.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -49,6 +51,7 @@ interface LibraryViewProps {
   onOpenAddToPlaylist: (song: Song) => void;
   onOpenImportPlaylist?: () => void;
   onSelectArtist?: (artistName: string) => void;
+  onOpenProfileSwitcher?: () => void;
 }
 
 export const LibraryView: React.FC<LibraryViewProps> = ({
@@ -58,6 +61,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onOpenAddToPlaylist,
   onOpenImportPlaylist,
   onSelectArtist,
+  onOpenProfileSwitcher,
 }) => {
   const { currentUser } = useAuth();
   const {
@@ -114,6 +118,46 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const suppressPlaylistClickRef = useRef(false);
 
   const albums = React.useMemo(() => getAlbumsFromCatalog(librarySongs), [librarySongs]);
+
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    try {
+      const saved = localStorage.getItem('sonora_library_view_mode');
+      return saved === 'grid' ? 'grid' : 'list';
+    } catch {
+      return 'list';
+    }
+  });
+
+  const [libraryFilterChip, setLibraryFilterChip] = useState<
+    'all' | 'Playlists' | 'Álbumes' | 'Artistas' | 'Eventos' | 'Descargado'
+  >('all');
+  const [isLibrarySearchOpen, setIsLibrarySearchOpen] = useState(false);
+  const [librarySearchQuery, setLibrarySearchQuery] = useState('');
+  const [librarySortBy, setLibrarySortBy] = useState<'recent' | 'az' | 'creator'>('recent');
+
+  const toggleViewMode = () => {
+    setViewMode((prev) => {
+      const next = prev === 'list' ? 'grid' : 'list';
+      try {
+        localStorage.setItem('sonora_library_view_mode', next);
+      } catch {}
+      return next;
+    });
+  };
+
+  const cycleLibrarySort = () => {
+    setLibrarySortBy((prev) => {
+      if (prev === 'recent') return 'az';
+      if (prev === 'az') return 'creator';
+      return 'recent';
+    });
+  };
+
+  const librarySortLabel = {
+    recent: 'Recientes',
+    az: 'Alfabético',
+    creator: 'Creador',
+  }[librarySortBy];
 
   const orderedPlaylists = React.useMemo(
     () =>
@@ -1039,203 +1083,599 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     );
   }
 
-  // Fallback if no playlist is selected: Grid of user playlists
+  // Fallback if no playlist is selected: Spotify Tu Biblioteca (Mobile-First 1:1 List View & Grid View)
+  const q = librarySearchQuery.trim().toLowerCase();
+
+  const showFavorites =
+    (libraryFilterChip === 'all' ||
+      libraryFilterChip === 'Playlists' ||
+      (libraryFilterChip === 'Descargado' &&
+        userFavoriteSongs.some((s) => isDownloaded(s.id)))) &&
+    (!q ||
+      'tus me gusta'.includes(q) ||
+      'favoritos'.includes(q) ||
+      'me gusta'.includes(q));
+
+  const favoritesIsPlaying =
+    isPlaying && userFavoriteSongs.some((s) => s.id === currentSong?.id);
+  const favoritesDownloaded =
+    userFavoriteSongs.length > 0 &&
+    userFavoriteSongs.some((s) => isDownloaded(s.id));
+
+  const filteredPlaylists = (
+    libraryFilterChip === 'Álbumes' ||
+    libraryFilterChip === 'Artistas' ||
+    libraryFilterChip === 'Eventos'
+      ? []
+      : orderedPlaylists.filter((pl) => {
+          if (q && !pl.name.toLowerCase().includes(q)) return false;
+          if (libraryFilterChip === 'Descargado') {
+            return (
+              pl.songIds.length > 0 &&
+              pl.songIds.some((id) => isDownloaded(id))
+            );
+          }
+          return true;
+        })
+  ).sort((a, b) => {
+    const aPinned = pinnedPlaylistIds.includes(a.id) ? 0 : 1;
+    const bPinned = pinnedPlaylistIds.includes(b.id) ? 0 : 1;
+    if (aPinned !== bPinned) return aPinned - bPinned;
+    if (librarySortBy === 'az') return a.name.localeCompare(b.name);
+    return 0;
+  });
+
+  const filteredAlbums = (
+    libraryFilterChip === 'Playlists' ||
+    libraryFilterChip === 'Artistas' ||
+    libraryFilterChip === 'Eventos'
+      ? []
+      : albums.filter((alb) => {
+          if (
+            q &&
+            !alb.name.toLowerCase().includes(q) &&
+            !alb.artist.toLowerCase().includes(q)
+          ) {
+            return false;
+          }
+          if (libraryFilterChip === 'Descargado') {
+            return (
+              alb.songs.length > 0 &&
+              alb.songs.some((s) => isDownloaded(s.id))
+            );
+          }
+          return true;
+        })
+  ).sort((a, b) => {
+    if (librarySortBy === 'az') return a.name.localeCompare(b.name);
+    if (librarySortBy === 'creator') return a.artist.localeCompare(b.artist);
+    return 0;
+  });
+
+  const filteredArtists = (
+    libraryFilterChip === 'Playlists' ||
+    libraryFilterChip === 'Álbumes' ||
+    libraryFilterChip === 'Eventos' ||
+    libraryFilterChip === 'Descargado'
+      ? []
+      : followedArtistCards.filter((art) => {
+          if (q && !art.name.toLowerCase().includes(q)) return false;
+          return true;
+        })
+  ).sort((a, b) => a.name.localeCompare(b.name));
+
+  const isFilterEmpty =
+    !showFavorites &&
+    filteredPlaylists.length === 0 &&
+    filteredAlbums.length === 0 &&
+    filteredArtists.length === 0;
+
   return (
     <>
-    <div className="p-4 sm:p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-36 animate-in fade-in select-none">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-black text-white">Tu Biblioteca</h1>
-          <p className="text-xs text-neutral-400 mt-1">
-            Explora tus canciones favoritas y playlists creadas.
-          </p>
+      <div className="px-4 py-3 sm:px-6 md:px-8 space-y-3 max-w-7xl mx-auto pb-36 animate-in fade-in select-none">
+        {/* Header Superior: Avatar + Título + Búsqueda + Añadir (+) */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* User Profile Avatar */}
+            <button
+              type="button"
+              onClick={onOpenProfileSwitcher}
+              className="w-9 h-9 rounded-full overflow-hidden bg-[#242424] border border-white/10 flex items-center justify-center text-white text-xs font-bold active:scale-95 transition-transform flex-shrink-0"
+              title="Cambiar perfil"
+            >
+              {currentUser?.avatarUrl ? (
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.displayName || 'Perfil'}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                (currentUser?.displayName || 'C').charAt(0).toUpperCase()
+              )}
+            </button>
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight truncate">
+              Tu biblioteca
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            {/* Search Button */}
+            <button
+              type="button"
+              onClick={() => setIsLibrarySearchOpen((prev) => !prev)}
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-colors active:scale-95 ${
+                isLibrarySearchOpen
+                  ? 'text-[#1DB954] bg-white/10'
+                  : 'text-neutral-300 hover:text-white hover:bg-white/5'
+              }`}
+              title="Buscar en la biblioteca"
+              aria-label="Buscar en la biblioteca"
+            >
+              <Search className="w-5 h-5 sm:w-5 sm:h-5" />
+            </button>
+
+            {/* Import Button (Desktop / larger screens) */}
+            {onOpenImportPlaylist && (
+              <button
+                type="button"
+                onClick={onOpenImportPlaylist}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#242424] hover:bg-[#2c2c2c] text-emerald-400 font-bold text-xs transition-colors"
+                title="Importar playlist"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Importar</span>
+              </button>
+            )}
+
+            {/* Add / Create Playlist Button (+) */}
+            <button
+              type="button"
+              onClick={onOpenCreatePlaylist}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-neutral-300 hover:text-white hover:bg-white/5 transition-colors active:scale-95"
+              title="Crear playlist"
+              aria-label="Crear playlist"
+            >
+              <Plus className="w-6 h-6 stroke-[2.2]" />
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {onOpenImportPlaylist && (
-            <button
-              onClick={onOpenImportPlaylist}
-              className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-neutral-800 hover:bg-neutral-700 text-emerald-300 font-extrabold text-[11px] sm:text-xs transition-colors"
-            >
-              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span>Importar</span>
-            </button>
-          )}
+        {/* Expandable Search Input */}
+        {isLibrarySearchOpen && (
+          <div className="relative animate-in fade-in duration-150 pt-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+            <input
+              type="text"
+              autoFocus
+              value={librarySearchQuery}
+              onChange={(e) => setLibrarySearchQuery(e.target.value)}
+              placeholder="Buscar en tu biblioteca..."
+              className="w-full bg-[#242424] border border-[#333333] rounded-full pl-9 pr-9 py-2 text-xs sm:text-sm text-white placeholder-neutral-400 focus:outline-none focus:border-[#1DB954]"
+            />
+            {librarySearchQuery && (
+              <button
+                type="button"
+                onClick={() => setLibrarySearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Chips de filtro horizontales (Playlists, Álbumes, Artistas, Eventos, Descargado) */}
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 -mx-4 px-4 sm:mx-0 sm:px-0">
+          {(
+            ['Playlists', 'Álbumes', 'Artistas', 'Eventos', 'Descargado'] as const
+          ).map((chip) => {
+            const isActive = libraryFilterChip === chip;
+            return (
+              <button
+                key={chip}
+                type="button"
+                onClick={() =>
+                  setLibraryFilterChip(isActive ? 'all' : chip)
+                }
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 active:scale-95 ${
+                  isActive
+                    ? 'bg-[#1DB954] text-black shadow-md'
+                    : 'bg-[#242424] text-white hover:bg-[#2c2c2c]'
+                }`}
+              >
+                {chip}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Fila de ordenamiento: Recientes (con icono) + Alternar vista cuadrícula/lista */}
+        <div className="flex items-center justify-between py-1 text-xs text-neutral-300">
           <button
-            onClick={onOpenCreatePlaylist}
-            className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-[11px] sm:text-xs shadow-lg transition-transform active:scale-95"
+            type="button"
+            onClick={cycleLibrarySort}
+            className="flex items-center gap-1.5 font-bold hover:text-white transition-colors active:scale-95"
+            title="Cambiar ordenación"
           >
-            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />
-            <span>Crear</span>
+            <ArrowUpDown className="w-3.5 h-3.5 text-neutral-300" />
+            <span className="text-[13px]">{librarySortLabel}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleViewMode}
+            className="p-1.5 rounded-full hover:text-white hover:bg-white/5 transition-colors active:scale-95 text-neutral-300"
+            title={
+              viewMode === 'list'
+                ? 'Cambiar a vista de cuadrícula'
+                : 'Cambiar a vista de lista'
+            }
+            aria-label="Alternar vista cuadrícula o lista"
+          >
+            {viewMode === 'list' ? (
+              <LayoutGrid className="w-4 h-4" />
+            ) : (
+              <List className="w-4 h-4" />
+            )}
           </button>
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {/* Tus me gusta card */}
-        <div
-          onClick={() => setSelectedPlaylist('favorites')}
-          className="p-4 rounded-2xl bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-600 cursor-pointer shadow-xl hover:scale-102 transition-transform group flex flex-col justify-between aspect-square"
-        >
-          <Heart className="w-10 h-10 text-white fill-white" />
-          <div>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <h3 className="font-black text-base sm:text-xl leading-tight text-white truncate min-w-0">
-                Tus me gusta
-              </h3>
-              <span title="Fijada siempre" className="flex-shrink-0">
-                <Pin className="w-4 h-4 text-white fill-white rotate-45" />
-              </span>
-            </div>
-            <p className="text-xs text-indigo-200 mt-1 font-semibold">
-              {userFavoriteSongs.length} canciones favoritas
+        {/* Empty States */}
+        {libraryFilterChip === 'Eventos' ? (
+          <div className="py-16 text-center space-y-2">
+            <h3 className="text-base font-bold text-white">No tienes eventos guardados</h3>
+            <p className="text-xs text-neutral-400 max-w-xs mx-auto">
+              Los eventos y conciertos guardados de tus artistas favoritos aparecerán aquí.
             </p>
           </div>
-        </div>
-
-        {/* User Playlists */}
-        {orderedPlaylists.map((pl) => {
-          const isPinned = pinnedPlaylistIds.includes(pl.id);
-          return (
-            <div
-              key={pl.id}
-              onClick={() => handlePlaylistClick(pl)}
-              onContextMenu={(event) => openPlaylistMenu(event, pl)}
-              onPointerDown={(event) => handlePlaylistPointerDown(event, pl)}
-              onPointerMove={handlePlaylistPointerMove}
-              onPointerUp={clearLongPress}
-              onPointerLeave={clearLongPress}
-              onPointerCancel={clearLongPress}
-              title="Clic derecho o mantener presionado para fijar"
-              className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group"
-            >
-              <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center">
-                {pl.coverUrl ? (
-                  <img src={pl.coverUrl} alt={pl.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                ) : (
-                  <Music className="w-12 h-12 text-neutral-600" />
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 min-w-0">
-                <h3 className="font-bold text-sm text-white truncate">{pl.name}</h3>
-                {isPinned && (
-                  <span title="Fijada" className="flex-shrink-0">
-                    <Pin className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400 rotate-45" />
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-neutral-500 truncate mt-0.5">
-                Playlist • {pl.songIds.length} temas
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Álbumes Section */}
-      {albums.length > 0 && (
-        <div className="pt-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-black text-white flex items-center gap-2">
-                <Disc className="w-6 h-6 text-emerald-400" />
-                <span>Tus Álbumes</span>
-              </h2>
-              <p className="text-xs text-neutral-400 mt-0.5">
-                Álbumes completos con todas sus pistas unificadas (incluyendo colaboraciones).
-              </p>
-            </div>
+        ) : isFilterEmpty ? (
+          <div className="py-16 text-center space-y-2">
+            <h3 className="text-base font-bold text-white">No se encontraron resultados</h3>
+            <p className="text-xs text-neutral-400 max-w-xs mx-auto">
+              Prueba buscando otro término o desmarca los filtros aplicados.
+            </p>
           </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {albums.map((alb) => (
+        ) : viewMode === 'list' ? (
+          /* =======================================================
+             VISTA DE LISTA EXACTA (Spotify Mobile 1:1)
+             - Portada cuadrada 64x64 px (rounded-[4px])
+             - Pinned item 1: Tus me gusta con degradado azul-violeta
+             - Título en negrita y subtítulo en gris con pin / descargado
+             ======================================================= */
+          <div className="space-y-0.5 divide-y divide-transparent">
+            {/* Elemento anclado 1: Tus me gusta */}
+            {showFavorites && (
               <div
-                key={alb.name}
-                onClick={() => setSelectedPlaylist(alb)}
-                className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group"
+                onClick={() => setSelectedPlaylist('favorites')}
+                className="flex items-center gap-3.5 py-2 px-1 hover:bg-[#282828]/50 active:bg-[#282828] rounded-xl cursor-pointer select-none transition-colors group"
               >
-                <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center">
-                  {alb.coverUrl ? (
-                    <img
-                      src={alb.coverUrl}
-                      alt={alb.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                  ) : (
-                    <Disc className="w-12 h-12 text-neutral-600" />
-                  )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Play className="w-8 h-8 text-emerald-400 fill-emerald-400 drop-shadow-lg" />
+                <div className="w-16 h-16 rounded-[4px] bg-gradient-to-br from-[#4f46e5] via-[#6366f1] to-[#a855f7] flex items-center justify-center flex-shrink-0 shadow-md">
+                  <Heart className="w-7 h-7 text-white fill-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3
+                    className={`text-[15px] sm:text-base font-semibold truncate ${
+                      favoritesIsPlaying ? 'text-[#1DB954]' : 'text-white'
+                    }`}
+                  >
+                    Tus me gusta
+                  </h3>
+                  <div className="flex items-center gap-1.5 text-xs text-[#B3B3B3] mt-0.5 truncate">
+                    <span title="Fijada" className="text-[#1DB954] flex-shrink-0">
+                      <Pin className="w-3.5 h-3.5 fill-current rotate-45" />
+                    </span>
+                    {favoritesDownloaded && (
+                      <span title="Descargado" className="flex-shrink-0">
+                        <DownloadedIcon size={14} />
+                      </span>
+                    )}
+                    <span className="truncate">
+                      Playlist • {currentUser?.displayName || 'Camilo Jaimes'}
+                    </span>
                   </div>
                 </div>
-                <h3 className="font-bold text-sm text-white truncate">{alb.name}</h3>
-                <p className="text-xs text-emerald-400 font-semibold truncate mt-0.5">
-                  {alb.artist}
-                </p>
-                <p className="text-[11px] text-neutral-500 truncate mt-0.5">
-                  {alb.year ? `${alb.year} • ` : ''}{alb.songs.length} pistas
-                </p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            )}
 
-      {/* Followed artists */}
-      {followedArtistCards.length > 0 && (
-        <div className="pt-6 space-y-4">
-          <div>
-            <h2 className="text-2xl font-black text-white flex items-center gap-2">
-              <UserRound className="w-6 h-6 text-emerald-400" />
-              <span>Artistas que sigues</span>
-            </h2>
-            <p className="text-xs text-neutral-400 mt-0.5">
-              Solo aparecen los artistas que sigues.
-            </p>
-          </div>
+            {/* Playlists de usuario */}
+            {filteredPlaylists.map((pl) => {
+              const isPinned = pinnedPlaylistIds.includes(pl.id);
+              const isThisPlaying =
+                isPlaying && pl.songIds.includes(currentSong?.id || '');
+              const allDownloaded =
+                pl.songIds.length > 0 &&
+                pl.songIds.every((id) => isDownloaded(id));
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {followedArtistCards.map((artist) => (
+              return (
+                <div
+                  key={pl.id}
+                  onClick={() => handlePlaylistClick(pl)}
+                  onContextMenu={(event) => openPlaylistMenu(event, pl)}
+                  onPointerDown={(event) => handlePlaylistPointerDown(event, pl)}
+                  onPointerMove={handlePlaylistPointerMove}
+                  onPointerUp={clearLongPress}
+                  onPointerLeave={clearLongPress}
+                  onPointerCancel={clearLongPress}
+                  className="flex items-center gap-3.5 py-2 px-1 hover:bg-[#282828]/50 active:bg-[#282828] rounded-xl cursor-pointer select-none transition-colors group"
+                >
+                  <div className="w-16 h-16 rounded-[4px] overflow-hidden bg-[#242424] flex items-center justify-center flex-shrink-0 shadow-md">
+                    {pl.coverUrl ? (
+                      <img
+                        src={pl.coverUrl}
+                        alt={pl.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Music className="w-7 h-7 text-neutral-500" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3
+                      className={`text-[15px] sm:text-base font-semibold truncate ${
+                        isThisPlaying ? 'text-[#1DB954]' : 'text-white'
+                      }`}
+                    >
+                      {pl.name}
+                    </h3>
+                    <div className="flex items-center gap-1.5 text-xs text-[#B3B3B3] mt-0.5 truncate">
+                      {isPinned && (
+                        <span title="Fijada" className="text-[#1DB954] flex-shrink-0">
+                          <Pin className="w-3.5 h-3.5 fill-current rotate-45" />
+                        </span>
+                      )}
+                      {allDownloaded && (
+                        <span title="Descargado" className="flex-shrink-0">
+                          <DownloadedIcon size={14} />
+                        </span>
+                      )}
+                      <span className="truncate">
+                        Playlist • {currentUser?.displayName || 'Sonora'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Álbumes */}
+            {filteredAlbums.map((alb) => {
+              const isThisPlaying =
+                isPlaying && alb.songs.some((s) => s.id === currentSong?.id);
+              const allDownloaded =
+                alb.songs.length > 0 &&
+                alb.songs.every((s) => isDownloaded(s.id));
+
+              return (
+                <div
+                  key={alb.name}
+                  onClick={() => setSelectedPlaylist(alb)}
+                  className="flex items-center gap-3.5 py-2 px-1 hover:bg-[#282828]/50 active:bg-[#282828] rounded-xl cursor-pointer select-none transition-colors group"
+                >
+                  <div className="w-16 h-16 rounded-[4px] overflow-hidden bg-[#242424] flex items-center justify-center flex-shrink-0 shadow-md">
+                    {alb.coverUrl ? (
+                      <img
+                        src={alb.coverUrl}
+                        alt={alb.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Disc className="w-7 h-7 text-neutral-500" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3
+                      className={`text-[15px] sm:text-base font-semibold truncate ${
+                        isThisPlaying ? 'text-[#1DB954]' : 'text-white'
+                      }`}
+                    >
+                      {alb.name}
+                    </h3>
+                    <div className="flex items-center gap-1.5 text-xs text-[#B3B3B3] mt-0.5 truncate">
+                      {allDownloaded && (
+                        <span title="Descargado" className="flex-shrink-0">
+                          <DownloadedIcon size={14} />
+                        </span>
+                      )}
+                      <span className="truncate">Álbum • {alb.artist}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Artistas que sigues */}
+            {filteredArtists.map((art) => (
               <div
-                key={artist.key}
-                onClick={() => onSelectArtist?.(artist.name)}
-                className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group text-center"
+                key={art.key}
+                onClick={() => onSelectArtist?.(art.name)}
+                className="flex items-center gap-3.5 py-2 px-1 hover:bg-[#282828]/50 active:bg-[#282828] rounded-xl cursor-pointer select-none transition-colors group"
               >
-                <div className="w-full aspect-square rounded-full overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center mx-auto">
-                  {artist.coverUrl ? (
+                <div className="w-16 h-16 rounded-full overflow-hidden bg-[#242424] flex items-center justify-center flex-shrink-0 shadow-md">
+                  {art.coverUrl ? (
                     <img
-                      src={artist.coverUrl}
-                      alt={artist.name}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      src={art.coverUrl}
+                      alt={art.name}
+                      className="w-full h-full object-cover"
                     />
                   ) : (
-                    <UserRound className="w-12 h-12 text-neutral-600" />
+                    <UserRound className="w-7 h-7 text-neutral-500" />
                   )}
                 </div>
-                <h3 className="font-bold text-sm text-white truncate">{artist.name}</h3>
-                <p className="text-xs text-neutral-500 truncate mt-0.5">
-                  {artist.songs === 1 ? '1 canción' : `${artist.songs} canciones`}
-                </p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-[15px] sm:text-base font-semibold text-white truncate">
+                    {art.name}
+                  </h3>
+                  <div className="text-xs text-[#B3B3B3] mt-0.5 truncate">
+                    Artista
+                  </div>
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
-    </div>
+        ) : (
+          /* =======================================================
+             VISTA DE CUADRÍCULA (Grid View Toggle)
+             ======================================================= */
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {/* Tus me gusta card */}
+              {showFavorites && (
+                <div
+                  onClick={() => setSelectedPlaylist('favorites')}
+                  className="p-4 rounded-2xl bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-600 cursor-pointer shadow-xl hover:scale-102 transition-transform group flex flex-col justify-between aspect-square"
+                >
+                  <Heart className="w-10 h-10 text-white fill-white" />
+                  <div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <h3 className="font-black text-base sm:text-xl leading-tight text-white truncate min-w-0">
+                        Tus me gusta
+                      </h3>
+                      <span title="Fijada siempre" className="flex-shrink-0">
+                        <Pin className="w-4 h-4 text-white fill-white rotate-45" />
+                      </span>
+                    </div>
+                    <p className="text-xs text-indigo-200 mt-1 font-semibold truncate">
+                      Playlist • {currentUser?.displayName || 'Camilo Jaimes'}
+                    </p>
+                  </div>
+                </div>
+              )}
 
-    <PlaylistContextMenu
-      state={playlistMenu}
-      pinned={
-        playlistMenu
-          ? pinnedPlaylistIds.includes(playlistMenu.playlist.id)
-          : false
-      }
-      onClose={() => setPlaylistMenu(null)}
-      onTogglePin={togglePlaylistPin}
-      onPlay={(playlist) => setSelectedPlaylist(playlist)}
-    />
+              {/* User Playlists */}
+              {filteredPlaylists.map((pl) => {
+                const isPinned = pinnedPlaylistIds.includes(pl.id);
+                return (
+                  <div
+                    key={pl.id}
+                    onClick={() => handlePlaylistClick(pl)}
+                    onContextMenu={(event) => openPlaylistMenu(event, pl)}
+                    onPointerDown={(event) => handlePlaylistPointerDown(event, pl)}
+                    onPointerMove={handlePlaylistPointerMove}
+                    onPointerUp={clearLongPress}
+                    onPointerLeave={clearLongPress}
+                    onPointerCancel={clearLongPress}
+                    title="Clic derecho o mantener presionado para fijar"
+                    className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group"
+                  >
+                    <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center">
+                      {pl.coverUrl ? (
+                        <img
+                          src={pl.coverUrl}
+                          alt={pl.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      ) : (
+                        <Music className="w-12 h-12 text-neutral-600" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <h3 className="font-bold text-sm text-white truncate">{pl.name}</h3>
+                      {isPinned && (
+                        <span title="Fijada" className="flex-shrink-0">
+                          <Pin className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400 rotate-45" />
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-neutral-500 truncate mt-0.5">
+                      Playlist • {pl.songIds.length} temas
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Álbumes en Cuadrícula */}
+            {filteredAlbums.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Disc className="w-5 h-5 text-emerald-400" />
+                  <span>Álbumes</span>
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {filteredAlbums.map((alb) => (
+                    <div
+                      key={alb.name}
+                      onClick={() => setSelectedPlaylist(alb)}
+                      className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group"
+                    >
+                      <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center">
+                        {alb.coverUrl ? (
+                          <img
+                            src={alb.coverUrl}
+                            alt={alb.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        ) : (
+                          <Disc className="w-12 h-12 text-neutral-600" />
+                        )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Play className="w-8 h-8 text-emerald-400 fill-emerald-400 drop-shadow-lg" />
+                        </div>
+                      </div>
+                      <h3 className="font-bold text-sm text-white truncate">{alb.name}</h3>
+                      <p className="text-xs text-emerald-400 font-semibold truncate mt-0.5">
+                        {alb.artist}
+                      </p>
+                      <p className="text-[11px] text-neutral-500 truncate mt-0.5">
+                        {alb.year ? `${alb.year} • ` : ''}{alb.songs.length} pistas
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Artistas en Cuadrícula */}
+            {filteredArtists.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <UserRound className="w-5 h-5 text-emerald-400" />
+                  <span>Artistas que sigues</span>
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {filteredArtists.map((artist) => (
+                    <div
+                      key={artist.key}
+                      onClick={() => onSelectArtist?.(artist.name)}
+                      className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group text-center"
+                    >
+                      <div className="w-full aspect-square rounded-full overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center mx-auto">
+                        {artist.coverUrl ? (
+                          <img
+                            src={artist.coverUrl}
+                            alt={artist.name}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        ) : (
+                          <UserRound className="w-12 h-12 text-neutral-600" />
+                        )}
+                      </div>
+                      <h3 className="font-bold text-sm text-white truncate">{artist.name}</h3>
+                      <p className="text-xs text-neutral-500 truncate mt-0.5">
+                        {artist.songs === 1 ? '1 canción' : `${artist.songs} canciones`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <PlaylistContextMenu
+        state={playlistMenu}
+        pinned={
+          playlistMenu
+            ? pinnedPlaylistIds.includes(playlistMenu.playlist.id)
+            : false
+        }
+        onClose={() => setPlaylistMenu(null)}
+        onTogglePin={togglePlaylistPin}
+        onPlay={(playlist) => setSelectedPlaylist(playlist)}
+      />
     </>
   );
 };

@@ -115,6 +115,11 @@ interface AudioContextType {
   setRightPanelTab: (tab: 'now-playing' | 'queue') => void;
   setIsCenterLyricsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setIsFullscreenNowPlaying: React.Dispatch<React.SetStateAction<boolean>>;
+
+  // Sleep Timer / Temporizador de sueño
+  sleepTimerOption: string | null;
+  sleepTimerRemainingSeconds: number | null;
+  setSleepTimer: (option: string | null) => void;
 }
 
 interface AudioTimeState {
@@ -1028,12 +1033,74 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [currentSong, queue, playSong]);
 
+  // Sleep timer state & controls
+  const [sleepTimerOption, setSleepTimerOption] = useState<string | null>(null);
+  const [sleepTimerRemainingSeconds, setSleepTimerRemainingSeconds] = useState<number | null>(null);
+  const sleepTimerOptionRef = useRef<string | null>(null);
+  const sleepTimerEndRef = useRef<number | null>(null);
+
+  const setSleepTimer = useCallback((option: string | null) => {
+    sleepTimerOptionRef.current = option;
+    setSleepTimerOption(option);
+
+    if (!option) {
+      sleepTimerEndRef.current = null;
+      setSleepTimerRemainingSeconds(null);
+      return;
+    }
+
+    if (option === 'end_of_track') {
+      sleepTimerEndRef.current = null;
+      setSleepTimerRemainingSeconds(null);
+      return;
+    }
+
+    const minutes = Number(option);
+    if (Number.isFinite(minutes) && minutes > 0) {
+      const endTime = Date.now() + minutes * 60 * 1000;
+      sleepTimerEndRef.current = endTime;
+      setSleepTimerRemainingSeconds(minutes * 60);
+    } else {
+      sleepTimerEndRef.current = null;
+      setSleepTimerRemainingSeconds(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!sleepTimerOption || sleepTimerOption === 'end_of_track' || !sleepTimerEndRef.current) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      if (!sleepTimerEndRef.current) return;
+      const remaining = Math.max(0, Math.round((sleepTimerEndRef.current - Date.now()) / 1000));
+      setSleepTimerRemainingSeconds(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        setIsPlaying(false);
+        setSleepTimer(null);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [sleepTimerOption, setSleepTimer]);
+
   // Handle song ended event with repeat logic
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
     const onEnded = () => {
+      if (sleepTimerOptionRef.current === 'end_of_track') {
+        audio.pause();
+        setIsPlaying(false);
+        setSleepTimer(null);
+        return;
+      }
       if (repeatMode === 'one') {
         audio.currentTime = 0;
         audio.play().catch(console.error);
@@ -1044,7 +1111,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     audio.addEventListener('ended', onEnded);
     return () => audio.removeEventListener('ended', onEnded);
-  }, [repeatMode, nextTrack]);
+  }, [repeatMode, nextTrack, setSleepTimer]);
 
   // Volume controls
   const setVolume = useCallback(
@@ -1184,6 +1251,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setRightPanelTab,
       setIsCenterLyricsOpen,
       setIsFullscreenNowPlaying,
+      sleepTimerOption,
+      sleepTimerRemainingSeconds,
+      setSleepTimer,
     }),
     [
       currentSong,
@@ -1236,6 +1306,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       toggleMute,
       toggleRepeat,
       toggleShuffle,
+      sleepTimerOption,
+      sleepTimerRemainingSeconds,
+      setSleepTimer,
     ]
   );
 

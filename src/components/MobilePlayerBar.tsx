@@ -7,6 +7,7 @@ import { DownloadedIcon } from './DownloadedIcon';
 import { SavedCheckIcon } from './SavedCheckIcon';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
+import { useAuth } from '../context/AuthContext';
 import { ArtistLinks } from './ArtistLinks';
 
 interface MobilePlayerBarProps {
@@ -14,6 +15,7 @@ interface MobilePlayerBarProps {
 }
 
 export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist }) => {
+  const { currentUser } = useAuth();
   const {
     currentSong,
     isPlaying,

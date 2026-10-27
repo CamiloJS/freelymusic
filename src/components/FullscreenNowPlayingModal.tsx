@@ -16,26 +16,38 @@ import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
 import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Moon from 'lucide-react/dist/esm/icons/moon.mjs';
+import QrCode from 'lucide-react/dist/esm/icons/qr-code.mjs';
+import PlusCircle from 'lucide-react/dist/esm/icons/circle-plus.mjs';
+import Check from 'lucide-react/dist/esm/icons/check.mjs';
+import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
+import UserRound from 'lucide-react/dist/esm/icons/user-round.mjs';
+import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { buildDisplayLyrics, formatTime } from '../utils/lyrics';
-import { Album, Playlist } from '../types';
+import { Album, Playlist, Song } from '../types';
 import { getAlbumsFromCatalog } from '../utils/albums';
 import { ArtistLinks } from './ArtistLinks';
 import { SongVersionSelector } from './SongVersionSelector';
 import { LyricsTranslationButton } from './LyricsTranslationButton';
 import { SavedCheckIcon } from './SavedCheckIcon';
+import { SpotifyCode } from './SpotifyCode';
+import { SpotifyCodeModal } from './SpotifyCodeModal';
+import { useArtworkColor } from '../utils/dominantColor';
 
 interface FullscreenNowPlayingModalProps {
   onSelectArtist?: (artistName: string) => void;
   onSelectAlbum?: (album: Album) => void;
   onSelectPlaylist?: (playlist: Playlist | 'favorites' | Album) => void;
+  onOpenAddToPlaylist?: (song: Song) => void;
 }
 
 export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps> = ({
   onSelectArtist,
   onSelectAlbum,
   onSelectPlaylist,
+  onOpenAddToPlaylist,
 }) => {
   const {
     currentSong,
@@ -62,13 +74,25 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
     openVideo,
     setIsRightPanelOpen,
     setRightPanelTab,
+    sleepTimerOption,
+    sleepTimerRemainingSeconds,
+    setSleepTimer,
   } = useAudio();
   const { currentTime, duration, activeLyricIndex } = useAudioTime();
 
-  // Mobile state for full-screen lyrics expansion
+  // Mobile state for full-screen lyrics expansion & Spotify menus
   const [isLyricsExpanded, setIsLyricsExpanded] = useState(false);
   const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const [showSleepTimerSheet, setShowSleepTimerSheet] = useState(false);
+  const [showSpotifyCodeModal, setShowSpotifyCodeModal] = useState(false);
   const [copiedNotification, setCopiedNotification] = useState(false);
+  const [sleepTimerFeedback, setSleepTimerFeedback] = useState<string | null>(null);
+
+  // Dynamic dominant color extraction from current song artwork
+  const { lyricsCardGradient, gradient } = useArtworkColor(
+    currentSong?.coverUrl,
+    currentSong?.title
+  );
 
   const displayLyrics = useMemo(
     () => buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode),
@@ -209,11 +233,23 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
 
   const liked = isFavorite(currentSong.id);
   const progressPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
-  const sourceLabel = playbackSource?.name
-    ? `"${playbackSource.name.toLowerCase()}" en Buscar`
-    : currentSong.album
-    ? currentSong.album.toUpperCase()
-    : 'TUS ME GUSTA';
+  const albums = useMemo(() => getAlbumsFromCatalog(catalog), [catalog]);
+
+  const sourceSubtitle = useMemo(() => {
+    if (playbackSource?.type === 'playlist') return 'DE LA PLAYLIST';
+    if (playbackSource?.type === 'album') return 'DEL ÁLBUM';
+    if (playbackSource?.type === 'artist') return 'DEL ARTISTA';
+    if (playbackSource?.type === 'favorites') return 'DE TUS ME GUSTA';
+    return 'REPRODUCIENDO';
+  }, [playbackSource]);
+
+  const sourceTitle = useMemo(() => {
+    if (playbackSource?.name) return playbackSource.name;
+    if (currentSong?.album && currentSong.album.toLowerCase() !== 'sencillo') {
+      return currentSong.album;
+    }
+    return 'Tus me gusta';
+  }, [playbackSource, currentSong]);
 
   return (
     <div className="fullscreen-now-playing-container fixed inset-0 z-50 bg-[#121212] flex flex-col justify-between select-none overflow-y-auto overflow-x-hidden text-white font-sans antialiased animate-in fade-in duration-300">
@@ -237,7 +273,10 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
       <div className="md:hidden relative z-20 flex flex-col min-h-screen px-6 pt-[calc(env(safe-area-inset-top,1rem)+0.5rem)] pb-[calc(env(safe-area-inset-bottom,1.5rem)+1rem)] max-w-md mx-auto w-full">
         {/* If Mobile Lyrics are Expanded full screen */}
         {isLyricsExpanded ? (
-          <div className="flex flex-col h-full flex-1 animate-in fade-in duration-200">
+          <div
+            className="flex flex-col h-full flex-1 rounded-3xl p-4 animate-in fade-in duration-200"
+            style={{ background: gradient }}
+          >
             {/* Header for Expanded Lyrics */}
             <div className="flex items-center justify-between py-2 mb-2 flex-shrink-0">
               <button
@@ -341,10 +380,15 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
               <button
                 type="button"
                 onClick={handleOriginClick}
-                className="text-xs font-bold text-white/90 truncate max-w-[220px] hover:underline cursor-pointer"
-                title={sourceLabel}
+                className="flex flex-col items-center min-w-0 px-2 hover:underline cursor-pointer text-center max-w-[220px]"
+                title={`${sourceSubtitle} • ${sourceTitle}`}
               >
-                {sourceLabel}
+                <span className="text-[9px] font-black uppercase tracking-wider text-[#b3b3b3] truncate block">
+                  {sourceSubtitle}
+                </span>
+                <span className="text-xs font-bold text-white truncate block">
+                  {sourceTitle}
+                </span>
               </button>
 
               <button
@@ -566,7 +610,8 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
               <div className="pt-3 flex-shrink-0">
                 <div
                   onClick={() => setIsLyricsExpanded(true)}
-                  className="rounded-2xl sm:rounded-3xl p-4 bg-gradient-to-br from-[#c2410c] to-[#9a3412] text-white shadow-2xl transition-all duration-300 active:scale-99 cursor-pointer border border-white/10"
+                  className="rounded-2xl sm:rounded-3xl p-4 text-white shadow-2xl transition-all duration-300 active:scale-99 cursor-pointer border border-white/10"
+                  style={{ background: lyricsCardGradient }}
                 >
                   {/* Card Header: "Letra" + Translate + Share + Expand */}
                   <div className="flex items-center justify-between mb-2">
@@ -911,60 +956,275 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
         </div>
       </div>
 
-      {/* Options Modal for Mobile (...) */}
+      {/* Toast Notifications */}
+      {sleepTimerFeedback && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[110] px-4 py-2 rounded-full bg-[#1DB954] text-black text-xs font-black shadow-2xl animate-in fade-in slide-in-from-top-2">
+          {sleepTimerFeedback}
+        </div>
+      )}
+
+      {/* Spotify Options Bottom Sheet (...) */}
       {showOptionsModal && (
         <div
-          className="fixed inset-0 z-[90] bg-black/70 backdrop-blur-md flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[90] bg-black/70 backdrop-blur-md flex flex-col justify-end animate-in fade-in duration-200 select-none"
           onClick={() => setShowOptionsModal(false)}
         >
           <div
-            className="w-full max-w-sm rounded-3xl bg-neutral-900 border border-white/10 p-5 space-y-4 shadow-2xl animate-in slide-in-from-bottom-4 duration-200"
+            className="w-full max-w-lg mx-auto bg-[#181818] border-t border-[#282828] rounded-t-[16px] p-5 pb-8 shadow-2xl relative animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto scrollbar-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <div className="truncate">
-                <p className="text-sm font-bold text-white truncate">{currentSong.title}</p>
-                <p className="text-xs text-neutral-400 truncate">{currentSong.artist}</p>
+            {/* Drag Handle */}
+            <div className="w-10 h-1 rounded-full bg-neutral-600 mx-auto mb-4" />
+
+            {/* Song Cover & Spotify Code Header */}
+            <div className="flex flex-col items-center text-center pb-4 border-b border-[#282828]">
+              <div className="w-28 h-28 rounded-lg overflow-hidden shadow-2xl shadow-black mb-2.5">
+                <img
+                  src={currentSong.coverUrl}
+                  alt={currentSong.title}
+                  className="w-full h-full object-cover"
+                />
               </div>
-              <button
-                type="button"
-                onClick={() => setShowOptionsModal(false)}
-                className="p-1 text-neutral-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <h2 className="font-extrabold text-white text-base tracking-tight truncate max-w-[280px]">
+                {currentSong.title}
+              </h2>
+              <p className="text-xs text-[#b3b3b3] truncate max-w-[260px] mt-0.5">
+                {currentSong.artist}
+              </p>
+
+              {/* Spotify Code Bar */}
+              <div className="mt-2.5 px-3 py-1 rounded-full bg-[#121212] border border-[#282828]">
+                <SpotifyCode song={currentSong} barColor="#1DB954" className="scale-90" />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <SongVersionSelector compact />
+            {/* Actions List */}
+            <div className="py-2 space-y-1">
+              {/* Me gusta */}
+              <button
+                type="button"
+                onClick={() => {
+                  toggleFavorite(currentSong.id);
+                  setShowOptionsModal(false);
+                }}
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+              >
+                {liked ? (
+                  <>
+                    <SavedCheckIcon size={20} />
+                    <span>Quitar de Tus me gusta</span>
+                  </>
+                ) : (
+                  <>
+                    <Heart className="w-5 h-5 text-[#b3b3b3]" />
+                    <span>Añadir a Tus me gusta</span>
+                  </>
+                )}
+              </button>
 
+              {/* Añadir a playlist */}
               <button
                 type="button"
                 onClick={() => {
                   setShowOptionsModal(false);
-                  handleShare();
+                  if (onOpenAddToPlaylist) {
+                    onOpenAddToPlaylist(currentSong);
+                  }
                 }}
-                className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/10 text-white font-bold text-xs transition-colors"
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
               >
-                <Share2 className="w-4 h-4 text-emerald-400" />
-                <span>Compartir canción</span>
+                <PlusCircle className="w-5 h-5 text-[#b3b3b3]" />
+                <span>Añadir a playlist</span>
               </button>
 
+              {/* Añadir a la fila */}
               <button
                 type="button"
                 onClick={() => {
                   setShowOptionsModal(false);
                   handleOpenQueue();
                 }}
-                className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-white/10 text-white font-bold text-xs transition-colors"
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
               >
-                <ListMusic className="w-4 h-4 text-emerald-400" />
-                <span>Ver fila de reproducción</span>
+                <ListMusic className="w-5 h-5 text-[#b3b3b3]" />
+                <span>Añadir a la fila de reproducción</span>
+              </button>
+
+              {/* Temporizador de sueño (Apagado automático) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOptionsModal(false);
+                  setShowSleepTimerSheet(true);
+                }}
+                className="w-full flex items-center justify-between px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+              >
+                <div className="flex items-center gap-3.5">
+                  <Moon className="w-5 h-5 text-[#b3b3b3]" />
+                  <span>Apagado automático</span>
+                </div>
+                {sleepTimerOption && (
+                  <span className="text-xs font-bold text-[#1DB954] bg-[#1DB954]/10 px-2.5 py-0.5 rounded-full">
+                    {sleepTimerOption === 'end_of_track'
+                      ? 'Fin de canción'
+                      : `${Math.ceil((sleepTimerRemainingSeconds || 0) / 60)} min`}
+                  </span>
+                )}
+              </button>
+
+              {/* Mostrar código de Spotify */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOptionsModal(false);
+                  setShowSpotifyCodeModal(true);
+                }}
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+              >
+                <QrCode className="w-5 h-5 text-[#b3b3b3]" />
+                <span>Mostrar código de Spotify</span>
+              </button>
+
+              {/* Ver álbum */}
+              {currentSong.album && currentSong.album.toLowerCase() !== 'sencillo' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOptionsModal(false);
+                    setIsFullscreenNowPlaying(false);
+                    const targetAlbum = albums.find(
+                      (a) => a.name.trim().toLowerCase() === currentSong.album?.trim().toLowerCase()
+                    );
+                    if (targetAlbum && onSelectAlbum) {
+                      onSelectAlbum(targetAlbum);
+                    }
+                  }}
+                  className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+                >
+                  <Disc className="w-5 h-5 text-[#b3b3b3]" />
+                  <span>Ver álbum ({currentSong.album})</span>
+                </button>
+              )}
+
+              {/* Ver artista */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOptionsModal(false);
+                  setIsFullscreenNowPlaying(false);
+                  if (onSelectArtist) {
+                    onSelectArtist(currentSong.artist);
+                  }
+                }}
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+              >
+                <UserRound className="w-5 h-5 text-[#b3b3b3]" />
+                <span>Ver artista ({currentSong.artist})</span>
+              </button>
+
+              {/* Versiones si existen */}
+              <div className="pt-1">
+                <SongVersionSelector compact />
+              </div>
+
+              {/* Compartir */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOptionsModal(false);
+                  handleShare();
+                }}
+                className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+              >
+                <Share2 className="w-5 h-5 text-[#b3b3b3]" />
+                <span>Compartir</span>
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Sleep Timer Selector Bottom Sheet */}
+      {showSleepTimerSheet && (
+        <div
+          className="fixed inset-0 z-[95] bg-black/70 backdrop-blur-md flex flex-col justify-end animate-in fade-in duration-200 select-none"
+          onClick={() => setShowSleepTimerSheet(false)}
+        >
+          <div
+            className="w-full max-w-lg mx-auto bg-[#181818] border-t border-[#282828] rounded-t-[16px] p-5 pb-8 shadow-2xl relative animate-in slide-in-from-bottom duration-300 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 rounded-full bg-neutral-600 mx-auto mb-4" />
+            <div className="flex items-center justify-between pb-3 border-b border-[#282828] mb-2">
+              <h3 className="text-base font-extrabold text-white">
+                ¿Cuándo quieres detener la música?
+              </h3>
+              <button
+                onClick={() => setShowSleepTimerSheet(false)}
+                className="p-1 text-neutral-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              {[
+                { label: '5 minutos', value: '5' },
+                { label: '10 minutos', value: '10' },
+                { label: '15 minutos', value: '15' },
+                { label: '30 minutos', value: '30' },
+                { label: '45 minutos', value: '45' },
+                { label: '1 hora', value: '60' },
+                { label: 'Al final de la canción', value: 'end_of_track' },
+              ].map((opt) => {
+                const isSelected = sleepTimerOption === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setSleepTimer(opt.value);
+                      setShowSleepTimerSheet(false);
+                      setSleepTimerFeedback(`Temporizador activado: ${opt.label}`);
+                      setTimeout(() => setSleepTimerFeedback(null), 3000);
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-colors text-left ${
+                      isSelected
+                        ? 'text-[#1DB954] font-bold bg-[#242424]'
+                        : 'text-white hover:bg-[#242424]/60'
+                    }`}
+                  >
+                    <span>{opt.label}</span>
+                    {isSelected && <Check className="w-4 h-4 text-[#1DB954] stroke-[3]" />}
+                  </button>
+                );
+              })}
+
+              {sleepTimerOption && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSleepTimer(null);
+                    setShowSleepTimerSheet(false);
+                    setSleepTimerFeedback('Temporizador desactivado');
+                    setTimeout(() => setSleepTimerFeedback(null), 3000);
+                  }}
+                  className="w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-bold text-red-400 hover:bg-red-950/20 transition-colors text-left mt-2 border-t border-[#282828]"
+                >
+                  <span>Desactivar temporizador</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Spotify Code Full Modal */}
+      <SpotifyCodeModal
+        song={currentSong}
+        isOpen={showSpotifyCodeModal}
+        onClose={() => setShowSpotifyCodeModal(false)}
+      />
     </div>
   );
 };
