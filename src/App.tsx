@@ -419,7 +419,9 @@ const MainLayout: React.FC = () => {
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-black text-white select-none">
       {/* Spotify Top Bar (Images 1, 2, 4) */}
       <header
-        className="bg-black border-b border-neutral-900/80 px-4 flex items-center justify-between flex-shrink-0 z-30"
+        className={`${
+          currentTab === 'home' ? 'hidden md:flex' : 'flex'
+        } bg-black border-b border-neutral-900/80 px-4 items-center justify-between flex-shrink-0 z-30`}
         style={{
           height: 'calc(3.5rem + env(safe-area-inset-top))',
           paddingTop: 'env(safe-area-inset-top)',
@@ -550,6 +552,7 @@ const MainLayout: React.FC = () => {
                     onSelectPlaylist={handleSelectPlaylist}
                     onOpenAddToPlaylist={handleOpenAddToPlaylist}
                     onSelectArtist={handleSelectArtist}
+                    onOpenProfileSwitcher={() => setIsProfileSwitcherOpen(true)}
                   />
                 )}
 

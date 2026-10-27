@@ -2,13 +2,13 @@
 
 @layer base {
   :root {
-    --brand-color: #10b981;
-    --brand-hover: #059669;
+    --brand-color: #1DB954;
+    --brand-hover: #1ed760;
     --brand-green: var(--brand-color);
     --dark-bg: #121212;
     --dark-surface: #181818;
     --dark-elevated: #242424;
-    --dark-highlight: #2a2a2a;
+    --dark-highlight: #282828;
     --text-primary: #ffffff;
     --text-secondary: #b3b3b3;
     --text-muted: #727272;
@@ -688,4 +688,38 @@ input[type="range"] {
   background: rgba(18, 18, 18, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+
+/* Hide scrollbars for smooth touch carousels */
+.scrollbar-none {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Spotify Equalizer Wave Animations */
+@keyframes eq-wave-1 {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+@keyframes eq-wave-2 {
+  0%, 100% { height: 16px; }
+  50% { height: 6px; }
+}
+@keyframes eq-wave-3 {
+  0%, 100% { height: 8px; }
+  50% { height: 18px; }
+}
+.animate-eq-1 {
+  animation: eq-wave-1 0.75s ease-in-out infinite;
+}
+.animate-eq-2 {
+  animation: eq-wave-2 0.6s ease-in-out infinite;
+}
+.animate-eq-3 {
+  animation: eq-wave-3 0.85s ease-in-out infinite;
 }

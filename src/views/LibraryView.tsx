@@ -20,6 +20,10 @@ import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import UserRound from 'lucide-react/dist/esm/icons/user-round.mjs';
 import Share2 from 'lucide-react/dist/esm/icons/share-2.mjs';
+import MoreVertical from 'lucide-react/dist/esm/icons/ellipsis-vertical.mjs';
+import MoreHorizontal from 'lucide-react/dist/esm/icons/ellipsis.mjs';
+import Video from 'lucide-react/dist/esm/icons/video.mjs';
+import X from 'lucide-react/dist/esm/icons/x.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -78,8 +82,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     toggleSaveAlbum,
   } = useMusic();
 
-  const { playSong, currentSong, isPlaying, togglePlayPause, isShuffle, toggleShuffle } = useAudio();
+  const { playSong, currentSong, isPlaying, togglePlayPause, isShuffle, toggleShuffle, openVideo } = useAudio();
 
+  const [trackMenuSong, setTrackMenuSong] = useState<Song | null>(null);
+  const [isPlaylistOptionsOpen, setIsPlaylistOptionsOpen] = useState(false);
   const [playlistSearch, setPlaylistSearch] = useState('');
   const [playlistSortBy, setPlaylistSortBy] = useState<'custom' | 'title' | 'artist' | 'album'>('custom');
   const [playlistSortDir, setPlaylistSortDir] = useState<'asc' | 'desc'>('desc');
@@ -337,22 +343,22 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
     return (
       <div className="flex-1 overflow-y-auto pb-36 animate-in fade-in duration-200 select-none">
-        {/* Spotify Hero Banner: the ambient light comes from the cover. */}
-        <div className="relative overflow-hidden p-5 md:p-8 pt-6 md:pt-10 flex flex-col md:flex-row items-start md:items-end gap-5 md:gap-6 shadow-2xl playlist-hero-container">
+        {/* Spotify Hero Banner: dynamic gradient taking predominant cover color fading to #121212 */}
+        <div className="relative overflow-hidden p-5 sm:p-6 md:p-8 pt-6 sm:pt-8 md:pt-10 flex flex-col md:flex-row items-center md:items-end gap-5 md:gap-6 text-center md:text-left shadow-2xl playlist-hero-container">
           {heroCover ? (
             <>
               <div
                 className="absolute inset-0 bg-cover bg-center scale-125 blur-3xl opacity-60 saturate-150 playlist-hero-art"
                 style={{ backgroundImage: `url(${heroCover})` }}
               />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-neutral-950/55 to-neutral-950 playlist-hero-overlay" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-[#121212]/70 to-[#121212] playlist-hero-overlay" />
             </>
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-b from-indigo-900 via-purple-950 to-neutral-950 playlist-hero-default-bg" />
+            <div className="absolute inset-0 bg-gradient-to-b from-indigo-900 via-purple-950 to-[#121212] playlist-hero-default-bg" />
           )}
 
-          {/* Cover Art Box */}
-          <div className="relative z-10 w-52 h-52 sm:w-56 sm:h-56 md:w-56 md:h-56 self-center md:self-auto rounded-xl md:rounded-2xl overflow-hidden shadow-2xl flex-shrink-0 flex items-center justify-center">
+          {/* Cover Art Box: Centered, prominent */}
+          <div className="relative z-10 w-48 h-48 sm:w-56 sm:h-56 md:w-56 md:h-56 self-center rounded-xl md:rounded-2xl overflow-hidden shadow-2xl flex-shrink-0 flex items-center justify-center">
             {isFavorites ? (
               <div className="w-full h-full bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-2xl">
                 <Heart className="w-24 h-24 text-white fill-white" />
@@ -377,8 +383,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
 
           {/* Details */}
-          <div className="relative z-10 flex-1 min-w-0 space-y-2">
-            <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider text-white">
+          <div className="relative z-10 flex-1 min-w-0 space-y-2 flex flex-col items-center md:items-start text-center md:text-left">
+            <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider text-[#b3b3b3]">
               {isFavorites
                 ? 'Colección privada'
                 : isAlbum
@@ -387,16 +393,16 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 ? 'Playlist pública'
                 : 'Playlist privada'}
             </span>
-            <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-white tracking-tight leading-none py-1 break-words">
+            <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight py-0.5 break-words">
               {sourceName}
             </h1>
             {!isFavorites && !isAlbum && playlistObj?.description && (
-              <p className="text-xs text-neutral-300 line-clamp-2">
+              <p className="text-xs text-[#b3b3b3] line-clamp-2 max-w-lg">
                 {playlistObj.description}
               </p>
             )}
 
-            <div className="flex items-center gap-2 text-xs text-neutral-300 font-semibold pt-1">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-xs text-[#b3b3b3] font-semibold pt-1">
               {isAlbum && albumObj && (
                 (() => {
                   const artistProfile = getArtistProfile(albumObj.artist);
@@ -405,7 +411,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     <img
                       src={artistAvatar}
                       alt={albumObj.artist}
-                      className="w-6 h-6 rounded-full object-cover shadow"
+                      className="w-5 h-5 rounded-full object-cover shadow"
                     />
                   ) : null;
                 })()
@@ -423,7 +429,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 </>
               )}
               <span>•</span>
-              <span>{playlistSongs.length} canciones</span>
+              <span>{playlistSongs.length} {playlistSongs.length === 1 ? 'canción' : 'canciones'}</span>
               <span>•</span>
               <span className="text-neutral-400">{formatTime(totalSeconds)}</span>
             </div>
@@ -431,38 +437,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         </div>
 
         {/* Action Controls Bar */}
-        <div className="p-5 md:p-8 pt-4 md:pt-6 space-y-5 md:space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5 md:gap-5">
-              {/* Big Circular Green Play Button */}
-              <button
-                onClick={handlePlayAll}
-                className="w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all"
-                title={isThisPlaylistPlaying ? 'Pausar' : 'Reproducir'}
-              >
-                {isThisPlaylistPlaying ? (
-                  <Pause className="w-6 h-6 fill-black" />
-                ) : (
-                  <Play className="w-6 h-6 fill-black ml-1" />
-                )}
-              </button>
-
-              {/* Shuffle Button */}
-              <button
-                onClick={toggleShuffle}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-90 ${
-                  isShuffle ? 'text-emerald-400' : 'text-neutral-400 hover:text-white'
-                }`}
-                title="Aleatorio"
-              >
-                <Shuffle className="w-5 h-5" />
-              </button>
-
-              {/* Add Album to Library Button (Exact Spotify Style) */}
-              {isAlbum && albumObj && (
+        <div className="p-4 sm:p-6 md:p-8 pt-3 md:pt-5 space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left Actions: Add (+), Download, Options (...) */}
+            <div className="flex items-center gap-3 sm:gap-4">
+              {/* Add / Save to Library */}
+              {isAlbum && albumObj ? (
                 <button
                   onClick={() => toggleSaveAlbum(albumObj)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-90"
+                  className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 text-[#b3b3b3] hover:text-white"
                   title={
                     isAlbumSaved(albumObj.name)
                       ? 'Guardado en tu biblioteca (clic para quitar)'
@@ -470,184 +453,161 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   }
                 >
                   {isAlbumSaved(albumObj.name) ? (
-                    <SavedCheckIcon size={32} />
+                    <SavedCheckIcon size={28} />
                   ) : (
-                    <svg
-                      width="32"
-                      height="32"
-                      viewBox="0 0 32 32"
-                      fill="none"
-                      className="text-neutral-400 hover:text-white"
-                    >
-                      <circle cx="16" cy="16" r="14.5" stroke="currentColor" strokeWidth="1.8" />
-                      <path
-                        d="M16 10v12M10 16h12"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                      />
-                    </svg>
+                    <PlusCircle className="w-7 h-7" />
                   )}
                 </button>
-              )}
+              ) : !isFavorites && playlistObj ? (
+                <button
+                  onClick={() => togglePlaylistPin(playlistObj.id)}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+                    pinnedPlaylistIds.includes(playlistObj.id)
+                      ? 'text-[#1DB954]'
+                      : 'text-[#b3b3b3] hover:text-white'
+                  }`}
+                  title={pinnedPlaylistIds.includes(playlistObj.id) ? 'Fijada en biblioteca' : 'Fijar playlist'}
+                >
+                  <Pin className="w-5 h-5 fill-current" />
+                </button>
+              ) : null}
 
-              {/* Download All Button (Spotify Style 32px circle) */}
+              {/* Download All Button (Spotify Circle Arrow Down) */}
               <button
                 onClick={handleDownloadAll}
-                className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-90"
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 text-[#b3b3b3] hover:text-white"
                 title={areAllDownloaded ? 'Descargado en tu dispositivo' : 'Descargar para escuchar sin conexión'}
               >
                 {areAllDownloaded ? (
-                  <DownloadedIcon size={32} />
+                  <DownloadedIcon size={28} />
                 ) : (
-                  <svg
-                    width="32"
-                    height="32"
-                    viewBox="0 0 32 32"
-                    fill="none"
-                    className="text-neutral-400 hover:text-white"
-                  >
-                    <circle cx="16" cy="16" r="14.5" stroke="currentColor" strokeWidth="1.8" />
-                    <path
-                      d="M16 9v11M11.5 15.5 16 20l4.5-4.5M11 23h10"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
+                  <ArrowDownCircle className="w-7 h-7" />
                 )}
               </button>
 
-              {/* Download ZIP bundle button */}
+              {/* Playlist Options (Three dots) */}
               <button
-                onClick={handleDownloadZip}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white border border-neutral-700/80 hover:border-neutral-400 bg-neutral-900/60 hover:bg-neutral-800 transition-all hover:scale-105 active:scale-90"
-                title="Descargar paquete completo (.ZIP) para tu computador"
-              >
-                <FolderDown className="w-4 h-4" />
-              </button>
-
-              {/* Share Direct Link */}
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href).then(() => {
-                    setCopySuccess(true);
-                    setTimeout(() => setCopySuccess(false), 2500);
-                  });
+                onClick={(e) => {
+                  if (playlistObj) {
+                    openPlaylistMenu(e, playlistObj);
+                  } else {
+                    setIsPlaylistOptionsOpen(true);
+                  }
                 }}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white border border-neutral-700/80 hover:border-neutral-400 bg-neutral-900/60 hover:bg-neutral-800 transition-all hover:scale-105 active:scale-90 relative"
-                title="Copiar enlace para compartir"
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 text-[#b3b3b3] hover:text-white"
+                title="Más opciones"
               >
-                <Share2 className="w-4 h-4" />
-                {copySuccess && (
-                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-md bg-emerald-500 text-black text-[10px] font-bold whitespace-nowrap shadow-xl">
-                    ¡Copiado!
-                  </span>
-                )}
+                <MoreHorizontal className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Right Action Controls: Shuffle + Circular Green Play Button */}
+            <div className="flex items-center gap-3 sm:gap-4">
+              {/* Shuffle Button */}
+              <button
+                onClick={toggleShuffle}
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-90 ${
+                  isShuffle ? 'text-[#1DB954]' : 'text-[#b3b3b3] hover:text-white'
+                }`}
+                title="Aleatorio"
+              >
+                <Shuffle className="w-5 h-5" />
               </button>
 
-              {/* Delete Playlist (only if custom playlist) */}
-              {!isFavorites && !isAlbum && playlistObj && (
+              {/* Big Circular Green Play Button at the Right */}
+              <button
+                onClick={handlePlayAll}
+                className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all flex-shrink-0"
+                title={isThisPlaylistPlaying ? 'Pausar' : 'Reproducir'}
+              >
+                {isThisPlaylistPlaying ? (
+                  <Pause className="w-6 h-6 fill-black" />
+                ) : (
+                  <Play className="w-6 h-6 fill-black ml-0.5" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Search in playlist & Sort Dropdown */}
+          <div className="flex items-center justify-between gap-3 pt-1">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+              <input
+                type="text"
+                value={playlistSearch}
+                onChange={(e) => setPlaylistSearch(e.target.value)}
+                placeholder="Buscar en la lista..."
+                className="w-full bg-[#181818] border border-[#282828] rounded-full pl-9 pr-3 py-1.5 text-xs text-white placeholder-[#727272] focus:outline-none focus:border-[#1DB954]"
+              />
+            </div>
+
+            {!isAlbum && (
+              <div ref={sortMenuRef} className="relative flex-shrink-0">
                 <button
-                  onClick={() => {
-                    if (confirm(`¿Eliminar la playlist "${playlistObj.name}"?`)) {
-                      deletePlaylist(playlistObj.id);
-                      setSelectedPlaylist(null);
-                    }
-                  }}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-red-400 border border-neutral-800 hover:border-red-500/40 bg-neutral-900/60 hover:bg-red-950/20 transition-all hover:scale-105 active:scale-90"
-                  title="Eliminar playlist"
+                  type="button"
+                  onClick={() => setIsSortMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-neutral-300 hover:text-white transition-all bg-[#181818] hover:bg-[#242424] border border-[#282828] select-none shadow-sm"
+                  title="Ordenar canciones"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-              {/* In-playlist Search Filter */}
-              <div className="relative w-full sm:w-56">
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
-                <input
-                  type="text"
-                  value={playlistSearch}
-                  onChange={(e) => setPlaylistSearch(e.target.value)}
-                  placeholder="Buscar en la lista..."
-                  className="w-full bg-neutral-900 border border-neutral-800 rounded-full pl-10 pr-4 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              {/* Sort Dropdown Button (ONLY in playlists, NOT in albums) */}
-              {!isAlbum && (
-                <div ref={sortMenuRef} className="relative flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setIsSortMenuOpen((prev) => !prev)}
-                    className="flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-bold text-neutral-300 hover:text-white transition-all bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-700 select-none shadow-sm"
-                    title="Ordenar canciones de la playlist"
-                  >
-                    <span className="text-xs truncate max-w-[140px]">
-                      {sortLabels[playlistSortBy]}
-                    </span>
-                    {playlistSortDir === 'desc' ? (
-                      <ArrowDown className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                    ) : (
-                      <ArrowUp className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-                    )}
-                    <List className="w-4 h-4 text-neutral-400 ml-0.5 flex-shrink-0" />
-                  </button>
-
-                  {isSortMenuOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-56 p-2 rounded-2xl bg-neutral-900/95 border border-neutral-800 shadow-2xl backdrop-blur-xl z-40 select-none animate-in fade-in zoom-in-95 duration-100 playlist-sort-dropdown">
-                      <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-neutral-400 border-b border-neutral-800/80 mb-1">
-                        Clasificar por
-                      </div>
-
-                      {(['title', 'custom', 'artist', 'album'] as const).map((option) => {
-                        const isSelected = playlistSortBy === option;
-                        return (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => {
-                              handleToggleSortOption(option);
-                            }}
-                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors text-left ${
-                              isSelected
-                                ? 'text-emerald-400 font-extrabold bg-neutral-800/70'
-                                : 'text-neutral-300 hover:text-white hover:bg-neutral-800/40'
-                            }`}
-                          >
-                            <span>{sortLabels[option]}</span>
-                            {isSelected && (
-                              <span className="flex items-center gap-1 text-emerald-400 font-black">
-                                {playlistSortDir === 'desc' ? (
-                                  <ArrowDown className="w-3.5 h-3.5" />
-                                ) : (
-                                  <ArrowUp className="w-3.5 h-3.5" />
-                                )}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
+                  <span className="text-[11px] truncate max-w-[120px]">
+                    {sortLabels[playlistSortBy]}
+                  </span>
+                  {playlistSortDir === 'desc' ? (
+                    <ArrowDown className="w-3 h-3 text-[#1DB954] flex-shrink-0" />
+                  ) : (
+                    <ArrowUp className="w-3 h-3 text-[#1DB954] flex-shrink-0" />
                   )}
-                </div>
-              )}
-            </div>
+                  <List className="w-3.5 h-3.5 text-neutral-400 ml-0.5 flex-shrink-0" />
+                </button>
+
+                {isSortMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-52 p-2 rounded-2xl bg-[#181818]/95 border border-[#282828] shadow-2xl backdrop-blur-xl z-40 select-none animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-neutral-400 border-b border-[#282828] mb-1">
+                      Clasificar por
+                    </div>
+                    {(['title', 'custom', 'artist', 'album'] as const).map((option) => {
+                      const isSelected = playlistSortBy === option;
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => handleToggleSortOption(option)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors text-left ${
+                            isSelected
+                              ? 'text-[#1DB954] font-extrabold bg-[#242424]'
+                              : 'text-neutral-300 hover:text-white hover:bg-[#242424]/40'
+                          }`}
+                        >
+                          <span>{sortLabels[option]}</span>
+                          {isSelected && (
+                            <span className="flex items-center gap-1 text-[#1DB954] font-black">
+                              {playlistSortDir === 'desc' ? (
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              ) : (
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              )}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Download Progress Toast */}
           {downloadProgress && (
-            <div className="p-3 bg-neutral-900 border border-emerald-500/30 rounded-2xl max-w-md">
+            <div className="p-3 bg-[#181818] border border-[#1DB954]/30 rounded-2xl max-w-md">
               <div className="flex justify-between text-xs font-bold text-white mb-1">
                 <span>{downloadProgress.status}</span>
                 <span>{downloadProgress.percent}%</span>
               </div>
-              <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-[#282828] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-emerald-400 transition-all duration-300"
+                  className="h-full bg-[#1DB954] transition-all duration-300"
                   style={{ width: `${downloadProgress.percent}%` }}
                 />
               </div>
@@ -660,26 +620,27 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             </div>
           )}
 
-          {/* Songs Table Header (Spotify Style) */}
-          <div className="border-t border-neutral-900 pt-4">
-            <div className="grid grid-cols-12 gap-4 px-4 py-2 text-[11px] font-black uppercase tracking-wider text-neutral-400 border-b border-neutral-900">
-              <span className="col-span-1 text-center">#</span>
-              <span className="col-span-7 sm:col-span-5 md:col-span-6">Título</span>
-              <span className="col-span-4 md:col-span-4 hidden sm:block">
-                {isAlbum ? 'Reproducciones' : 'Álbum'}
+          {/* Vertical Tracklist */}
+          <div className="border-t border-[#282828] pt-3">
+            {/* Desktop header */}
+            <div className="hidden md:flex items-center gap-4 px-3 py-2 text-[11px] font-black uppercase tracking-wider text-[#b3b3b3] border-b border-[#282828]/60">
+              <span className="w-8 text-center">#</span>
+              <span className="flex-1 min-w-0">Título</span>
+              {!isAlbum && <span className="w-48">Álbum</span>}
+              {isAlbum && <span className="w-28">Reproducciones</span>}
+              <span className="w-12 text-right">
+                <Clock className="w-3.5 h-3.5 inline" />
               </span>
-              <span className="col-span-4 sm:col-span-2 md:col-span-1 text-right flex justify-end">
-                <Clock className="w-4 h-4" />
-              </span>
+              <span className="w-16"></span>
             </div>
 
-            {/* Songs Rows */}
-            <div className="divide-y divide-neutral-900/60 mt-1">
+            {/* Song rows */}
+            <div className="divide-y divide-[#282828]/40 mt-1">
               {sortedAndFilteredSongs.length === 0 ? (
                 <div className="p-12 text-center text-neutral-500">
                   <p className="text-sm font-bold">No se encontraron canciones</p>
                   <p className="text-xs text-neutral-500 mt-1">
-                    Ve a "Explorar la Nube" para añadir canciones a tus playlists.
+                    Ve a "Buscar" para añadir canciones a tus playlists.
                   </p>
                 </div>
               ) : (
@@ -699,117 +660,141 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                           id: isFavorites ? 'favorites' : isAlbum ? albumObj?.name : playlistObj?.id,
                         })
                       }
-                      className="grid grid-cols-12 gap-4 px-4 py-2.5 rounded-xl hover:bg-neutral-900/70 items-center cursor-pointer group transition-colors"
+                      className="flex items-center gap-3 px-2 sm:px-3 py-2.5 rounded-xl hover:bg-[#181818] active:bg-[#242424] cursor-pointer group transition-colors"
                     >
-                      {/* # or Play button */}
-                      <div className="col-span-1 flex items-center justify-center">
-                        <span className="text-xs font-mono text-neutral-500 group-hover:hidden">
-                          {isAlbum ? (song.trackNumber || idx + 1) : idx + 1}
-                        </span>
-                        <button className="hidden group-hover:block text-white">
+                      {/* Index (album) or Artwork Thumbnail (playlist) */}
+                      {isAlbum ? (
+                        <div className="w-8 flex items-center justify-center flex-shrink-0">
                           {isCurrent && isPlaying ? (
-                            <Pause className="w-4 h-4 fill-white" />
+                            <div className="flex items-end gap-0.5 h-3.5">
+                              <span className="w-0.5 bg-[#1DB954] rounded-full animate-eq-1" />
+                              <span className="w-0.5 bg-[#1DB954] rounded-full animate-eq-2" />
+                              <span className="w-0.5 bg-[#1DB954] rounded-full animate-eq-3" />
+                            </div>
                           ) : (
-                            <Play className="w-4 h-4 fill-white ml-0.5" />
+                            <span className={`text-xs font-mono ${isCurrent ? 'text-[#1DB954] font-bold' : 'text-neutral-500'}`}>
+                              {song.trackNumber || idx + 1}
+                            </span>
                           )}
-                        </button>
-                      </div>
-
-                      {/* Title + Artist. Album rows omit the repeated cover. */}
-                      <div className="col-span-7 sm:col-span-5 md:col-span-6 flex items-center gap-3 min-w-0 truncate">
-                        {!isAlbum && (
+                        </div>
+                      ) : (
+                        <div className="relative w-11 h-11 flex-shrink-0 rounded-md overflow-hidden bg-neutral-800 shadow">
                           <img
                             src={song.coverUrl}
                             alt={song.title}
                             loading="lazy"
                             decoding="async"
-                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0 shadow"
+                            className="w-full h-full object-cover"
                           />
-                        )}
-                        <div className="min-w-0 flex-1 truncate">
-                          <span
-                            className={`block font-bold text-sm truncate ${
-                              isCurrent ? 'text-emerald-400' : 'text-white'
-                            }`}
-                          >
+                          {isCurrent && isPlaying && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <div className="flex items-end gap-0.5 h-3.5">
+                                <span className="w-0.5 bg-[#1DB954] rounded-full animate-eq-1" />
+                                <span className="w-0.5 bg-[#1DB954] rounded-full animate-eq-2" />
+                                <span className="w-0.5 bg-[#1DB954] rounded-full animate-eq-3" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Title + Artist info */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`block font-medium text-sm truncate ${isCurrent ? 'text-[#1DB954] font-bold' : 'text-white'}`}>
                             {song.title}
                           </span>
-                          <div className="flex items-center gap-1.5 text-xs text-neutral-400 truncate mt-0.5">
-                            {downloaded && (
-                              <span title="Descargado" className="flex-shrink-0">
-                                <DownloadedIcon size={12} />
-                              </span>
-                            )}
-                            {song.isExplicit && (
-                              <span
-                                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-white text-[9px] font-black flex-shrink-0 select-none leading-none"
-                                title="Contenido explícito"
-                              >
-                                E
-                              </span>
-                            )}
-                            <ArtistLinks artists={song.artist} onSelectArtist={onSelectArtist} />
-                          </div>
+                          {!isAlbum && isCurrent && isPlaying && (
+                            <div className="flex items-end gap-0.5 h-3.5 flex-shrink-0 md:hidden">
+                              <span className="w-0.5 bg-[#1DB954] rounded-full animate-eq-1" />
+                              <span className="w-0.5 bg-[#1DB954] rounded-full animate-eq-2" />
+                              <span className="w-0.5 bg-[#1DB954] rounded-full animate-eq-3" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-[#b3b3b3] truncate mt-0.5">
+                          {downloaded && (
+                            <span title="Descargado" className="flex-shrink-0">
+                              <DownloadedIcon size={12} />
+                            </span>
+                          )}
+                          {song.isExplicit && (
+                            <span
+                              className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-[#3e3e3e] text-white text-[9px] font-black flex-shrink-0 select-none leading-none"
+                              title="Contenido explícito"
+                            >
+                              E
+                            </span>
+                          )}
+                          {song.videoUrl && (
+                            <span
+                              className="inline-flex items-center justify-center px-1 py-0.2 rounded bg-[#282828] text-neutral-300 text-[9px] font-bold flex-shrink-0 select-none"
+                              title="Tiene videoclip musical"
+                            >
+                              Video
+                            </span>
+                          )}
+                          <ArtistLinks artists={song.artist} onSelectArtist={onSelectArtist} />
                         </div>
                       </div>
 
-                      {/* Album / Reproducciones */}
-                      <div className="col-span-4 md:col-span-4 hidden sm:block truncate text-xs text-neutral-400 font-mono">
-                        {isAlbum ? (
-                          <span
-                            className="font-medium text-neutral-300"
-                            title="Tus reproducciones para esta pista"
-                          >
-                            {playCount > 0
-                              ? new Intl.NumberFormat('es-CO').format(playCount)
-                              : '0'}
-                          </span>
-                        ) : (
+                      {/* Desktop Album column */}
+                      {!isAlbum && (
+                        <div className="hidden md:block w-48 truncate text-xs text-[#b3b3b3]">
                           <span
                             onClick={(e) => {
                               e.stopPropagation();
                               const targetAlbum = albums.find(
                                 (a) => a.name.trim().toLowerCase() === song.album?.trim().toLowerCase()
                               );
-                              if (targetAlbum) {
-                                setSelectedPlaylist(targetAlbum);
-                              }
+                              if (targetAlbum) setSelectedPlaylist(targetAlbum);
                             }}
-                            className={
-                              song.album && song.album.trim().toLowerCase() !== 'sencillo'
-                                ? 'hover:underline hover:text-white cursor-pointer font-sans'
-                                : 'font-sans'
-                            }
-                            title={song.album ? `Abrir álbum ${song.album}` : undefined}
+                            className={song.album && song.album.trim().toLowerCase() !== 'sencillo' ? 'hover:underline hover:text-white cursor-pointer' : ''}
                           >
                             {song.album || 'Sencillo'}
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
-                      {/* Actions & Duration */}
-                      <div className="col-span-4 sm:col-span-2 md:col-span-1 flex items-center justify-end gap-2.5 text-xs font-mono text-neutral-400">
-                        {/* Spotify Saved Chulito Verde or Plus */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(song.id);
-                          }}
-                          className={`p-1 rounded-full transition-transform active:scale-90 ${
-                            isSaved
-                              ? 'hover:scale-110'
-                              : 'opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-white hover:scale-110'
-                          }`}
-                          title={isSaved ? 'Guardada en tu biblioteca / favoritos (clic para quitar)' : 'Añadir a Tus me gusta'}
-                        >
-                          {isSaved ? (
-                            <SavedCheckIcon size={16} />
-                          ) : (
-                            <Plus className="w-4 h-4" />
-                          )}
-                        </button>
-                        <span className="min-w-[36px] text-right">{formatTime(song.duration)}</span>
-                      </div>
+                      {/* Desktop Play count for album */}
+                      {isAlbum && (
+                        <div className="hidden md:block w-28 text-xs font-mono text-neutral-400">
+                          {playCount > 0 ? new Intl.NumberFormat('es-CO').format(playCount) : '0'}
+                        </div>
+                      )}
+
+                      {/* Duration */}
+                      <span className="hidden sm:block text-xs font-mono text-neutral-400 min-w-[36px] text-right">
+                        {formatTime(song.duration)}
+                      </span>
+
+                      {/* Quick Like / Saved */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(song.id);
+                        }}
+                        className={`p-1.5 rounded-full transition-transform active:scale-90 ${
+                          isSaved
+                            ? 'hover:scale-110'
+                            : 'opacity-0 md:group-hover:opacity-100 text-neutral-400 hover:text-white'
+                        }`}
+                        title={isSaved ? 'Guardada en tus me gusta' : 'Añadir a tus me gusta'}
+                      >
+                        {isSaved ? <SavedCheckIcon size={18} /> : <Plus className="w-4 h-4" />}
+                      </button>
+
+                      {/* Three Dots Context Menu Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTrackMenuSong(song);
+                        }}
+                        className="p-1.5 rounded-full text-[#b3b3b3] hover:text-white hover:bg-neutral-800/60 transition-colors"
+                        title="Más opciones de la canción"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
                     </div>
                   );
                 })
@@ -817,6 +802,239 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Track Context Menu Bottom Sheet */}
+        {trackMenuSong && (
+          <div
+            className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center bg-black/80 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-200 select-none"
+            onClick={() => setTrackMenuSong(null)}
+          >
+            <div
+              className="bg-[#181818] border border-[#282828] rounded-t-3xl sm:rounded-3xl w-full max-w-md p-5 pb-8 sm:pb-6 shadow-2xl relative animate-in slide-in-from-bottom duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3.5 pb-4 border-b border-[#282828]">
+                <img
+                  src={trackMenuSong.coverUrl}
+                  alt={trackMenuSong.title}
+                  className="w-13 h-13 rounded-lg object-cover shadow"
+                />
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-white text-base truncate">
+                    {trackMenuSong.title}
+                  </h3>
+                  <p className="text-xs text-[#b3b3b3] truncate mt-0.5">
+                    {trackMenuSong.artist}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setTrackMenuSong(null)}
+                  className="p-1.5 rounded-full text-[#b3b3b3] hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="py-2 space-y-1">
+                {/* Me gusta */}
+                <button
+                  onClick={() => {
+                    toggleFavorite(trackMenuSong.id);
+                    setTrackMenuSong(null);
+                  }}
+                  className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+                >
+                  {isFavorite(trackMenuSong.id) ? (
+                    <>
+                      <SavedCheckIcon size={20} />
+                      <span>Quitar de Tus me gusta</span>
+                    </>
+                  ) : (
+                    <>
+                      <Heart className="w-5 h-5 text-[#b3b3b3]" />
+                      <span>Añadir a Tus me gusta</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Añadir a playlist */}
+                <button
+                  onClick={() => {
+                    const s = trackMenuSong;
+                    setTrackMenuSong(null);
+                    onOpenAddToPlaylist(s);
+                  }}
+                  className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+                >
+                  <PlusCircle className="w-5 h-5 text-[#b3b3b3]" />
+                  <span>Añadir a playlist</span>
+                </button>
+
+                {/* Descargar */}
+                <button
+                  onClick={async () => {
+                    const s = trackMenuSong;
+                    setTrackMenuSong(null);
+                    await downloadSongsBatch([s]);
+                  }}
+                  className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+                >
+                  <ArrowDownCircle className="w-5 h-5 text-[#b3b3b3]" />
+                  <span>
+                    {isDownloaded(trackMenuSong.id)
+                      ? 'Descargada en dispositivo'
+                      : 'Descargar canción'}
+                  </span>
+                </button>
+
+                {/* Ver videoclip si existe */}
+                {trackMenuSong.videoUrl && (
+                  <button
+                    onClick={() => {
+                      const s = trackMenuSong;
+                      setTrackMenuSong(null);
+                      if (currentSong?.id !== s.id) {
+                        playSong(s, [s]);
+                      }
+                      openVideo();
+                    }}
+                    className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+                  >
+                    <Video className="w-5 h-5 text-[#1DB954]" />
+                    <span>Ver videoclip musical</span>
+                  </button>
+                )}
+
+                {/* Ir al álbum */}
+                {trackMenuSong.album && trackMenuSong.album.trim().toLowerCase() !== 'sencillo' && (
+                  <button
+                    onClick={() => {
+                      const targetAlbum = albums.find(
+                        (a) => a.name.trim().toLowerCase() === trackMenuSong.album?.trim().toLowerCase()
+                      );
+                      setTrackMenuSong(null);
+                      if (targetAlbum) {
+                        setSelectedPlaylist(targetAlbum);
+                      }
+                    }}
+                    className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+                  >
+                    <Disc className="w-5 h-5 text-[#b3b3b3]" />
+                    <span>Ir al álbum ({trackMenuSong.album})</span>
+                  </button>
+                )}
+
+                {/* Compartir canción */}
+                <button
+                  onClick={() => {
+                    const songUrl = `${window.location.origin}/#/track/${trackMenuSong.id}`;
+                    navigator.clipboard.writeText(songUrl);
+                    setCopySuccess(true);
+                    setTrackMenuSong(null);
+                    setTimeout(() => setCopySuccess(false), 2500);
+                  }}
+                  className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+                >
+                  <Share2 className="w-5 h-5 text-[#b3b3b3]" />
+                  <span>Compartir canción</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Playlist/Album Options Menu Modal */}
+        {isPlaylistOptionsOpen && (
+          <div
+            className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center bg-black/80 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-200 select-none"
+            onClick={() => setIsPlaylistOptionsOpen(false)}
+          >
+            <div
+              className="bg-[#181818] border border-[#282828] rounded-t-3xl sm:rounded-3xl w-full max-w-md p-5 pb-8 sm:pb-6 shadow-2xl relative animate-in slide-in-from-bottom duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3.5 pb-4 border-b border-[#282828]">
+                <div className="w-12 h-12 rounded-lg bg-neutral-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {heroCover ? (
+                    <img src={heroCover} alt={sourceName} className="w-full h-full object-cover" />
+                  ) : (
+                    <Music className="w-6 h-6 text-neutral-400" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-white text-base truncate">{sourceName}</h3>
+                  <p className="text-xs text-[#b3b3b3] truncate mt-0.5">
+                    {playlistSongs.length} canciones
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsPlaylistOptionsOpen(false)}
+                  className="p-1.5 rounded-full text-[#b3b3b3] hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="py-2 space-y-1">
+                {/* Descargar ZIP */}
+                <button
+                  onClick={() => {
+                    setIsPlaylistOptionsOpen(false);
+                    handleDownloadZip();
+                  }}
+                  className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+                >
+                  <FolderDown className="w-5 h-5 text-[#b3b3b3]" />
+                  <span>Descargar paquete completo (.ZIP)</span>
+                </button>
+
+                {/* Compartir enlace */}
+                <button
+                  onClick={() => {
+                    setIsPlaylistOptionsOpen(false);
+                    navigator.clipboard.writeText(window.location.href);
+                    setCopySuccess(true);
+                    setTimeout(() => setCopySuccess(false), 2500);
+                  }}
+                  className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-white hover:bg-[#242424] active:bg-[#282828] transition-colors text-left"
+                >
+                  <Share2 className="w-5 h-5 text-[#b3b3b3]" />
+                  <span>Compartir enlace</span>
+                </button>
+
+                {/* Delete Playlist (only if custom playlist) */}
+                {!isFavorites && !isAlbum && playlistObj && (
+                  <button
+                    onClick={() => {
+                      setIsPlaylistOptionsOpen(false);
+                      if (confirm(`¿Eliminar la playlist "${playlistObj.name}"?`)) {
+                        deletePlaylist(playlistObj.id);
+                        setSelectedPlaylist(null);
+                      }
+                    }}
+                    className="w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-950/30 transition-colors text-left"
+                  >
+                    <Trash2 className="w-5 h-5 text-red-400" />
+                    <span>Eliminar playlist</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PlaylistContextMenu for right click / long press */}
+        <PlaylistContextMenu
+          state={playlistMenu}
+          pinned={
+            playlistMenu
+              ? pinnedPlaylistIds.includes(playlistMenu.playlist.id)
+              : false
+          }
+          onClose={() => setPlaylistMenu(null)}
+          onTogglePin={togglePlaylistPin}
+          onPlay={(playlist) => setSelectedPlaylist(playlist)}
+        />
       </div>
     );
   }

@@ -1,8 +1,8 @@
 import React from 'react';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
-import SkipForward from 'lucide-react/dist/esm/icons/skip-forward.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
+import Laptop2 from 'lucide-react/dist/esm/icons/laptop.mjs';
 import { DownloadedIcon } from './DownloadedIcon';
 import { SavedCheckIcon } from './SavedCheckIcon';
 import { useAudio, useAudioTime } from '../context/AudioContext';
@@ -19,7 +19,6 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
     isPlaying,
     isBuffering,
     togglePlayPause,
-    nextTrack,
     setIsFullscreenNowPlaying,
   } = useAudio();
   const { currentTime, duration } = useAudioTime();
@@ -32,122 +31,124 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
   const liked = isFavorite(currentSong.id);
 
   return (
-    <div
-      onClick={() => setIsFullscreenNowPlaying(true)}
-      className="mobile-player-bar md:hidden relative flex-shrink-0 overflow-hidden border-t border-white/10 bg-neutral-950 cursor-pointer select-none active:brightness-95 transition-all"
-      role="button"
-      tabIndex={0}
-      aria-label="Abrir reproductor a pantalla completa"
-    >
-      {currentSong.coverUrl && (
-        <div
-          className="mobile-player-ambient-blur absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-70"
-          style={{ backgroundImage: `url(${currentSong.coverUrl})` }}
-        />
-      )}
-      <div className="mobile-player-overlay absolute inset-0 bg-black/55" />
+    <div className="md:hidden px-2 pt-0 pb-1.5 bg-transparent flex-shrink-0 z-30 pointer-events-auto">
+      <div
+        onClick={() => setIsFullscreenNowPlaying(true)}
+        className="mobile-player-bar relative overflow-hidden rounded-xl bg-[#242424] border border-[#282828] shadow-[0_8px_24px_rgba(0,0,0,0.6)] cursor-pointer select-none active:scale-[0.99] transition-transform"
+        role="button"
+        tabIndex={0}
+        aria-label="Abrir reproductor a pantalla completa"
+      >
+        {/* Ambient subtle color tint from artwork */}
+        {currentSong.coverUrl && (
+          <div
+            className="mobile-player-ambient-blur absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-40 pointer-events-none"
+            style={{ backgroundImage: `url(${currentSong.coverUrl})` }}
+          />
+        )}
+        <div className="mobile-player-overlay absolute inset-0 bg-gradient-to-r from-[#242424]/95 via-[#242424]/85 to-[#242424]/95" />
 
-      <div className="relative flex items-center gap-2.5 px-3 py-2">
-        {/* Cover Art */}
-        <div className="w-11 h-11 rounded-lg overflow-hidden bg-neutral-800 flex-shrink-0 shadow-lg">
-          {currentSong.coverUrl ? (
-            <img
-              src={currentSong.coverUrl}
-              alt={currentSong.title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span className="w-full h-full flex items-center justify-center text-neutral-500 text-xs">
-              ♪
-            </span>
-          )}
-        </div>
-
-        {/* Track Title & Artist */}
-        <div className="min-w-0 flex-1 text-left">
-          <div className="flex items-center gap-1.5 min-w-0">
-            {currentSong.isExplicit && (
-              <span
-                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-white text-[9px] font-black flex-shrink-0 select-none leading-none"
-                title="Contenido explícito"
-              >
-                E
-              </span>
-            )}
-            <span className="truncate text-xs font-bold text-white block">{currentSong.title}</span>
-            {downloaded && (
-              <span title="Descargado" className="flex-shrink-0">
-                <DownloadedIcon size={13} />
+        <div className="relative flex items-center gap-2.5 px-2.5 py-2">
+          {/* Cover Art */}
+          <div className="w-10 h-10 rounded-lg overflow-hidden bg-neutral-900 flex-shrink-0 shadow-md border border-white/5">
+            {currentSong.coverUrl ? (
+              <img
+                src={currentSong.coverUrl}
+                alt={currentSong.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="w-full h-full flex items-center justify-center text-neutral-500 text-xs">
+                ♪
               </span>
             )}
           </div>
-          <span className="mobile-player-artist block truncate text-[10px] text-white/70 mt-0.5">
-            <ArtistLinks artists={currentSong.artist} onSelectArtist={onSelectArtist} />
-          </span>
+
+          {/* Track Title & Artist (Smooth scroll / truncate) */}
+          <div className="min-w-0 flex-1 text-left">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {currentSong.isExplicit && (
+                <span
+                  className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-xs bg-neutral-600/90 text-white text-[9px] font-black flex-shrink-0 select-none leading-none"
+                  title="Contenido explícito"
+                >
+                  E
+                </span>
+              )}
+              <span className="truncate text-xs font-bold text-white block">{currentSong.title}</span>
+              {downloaded && (
+                <span title="Descargado" className="flex-shrink-0">
+                  <DownloadedIcon size={12} />
+                </span>
+              )}
+            </div>
+            <span className="mobile-player-artist block truncate text-[10px] text-[#B3B3B3] mt-0.5 font-medium">
+              <ArtistLinks artists={currentSong.artist} onSelectArtist={onSelectArtist} />
+            </span>
+          </div>
+
+          {/* Controls: Device icon, Like button, Play/Pause button */}
+          <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            {/* Connected device icon (Spotify Connect style) */}
+            <button
+              type="button"
+              className="p-1.5 text-[#1DB954] hover:text-white transition-colors"
+              title="Dispositivo conectado"
+              aria-label="Dispositivo conectado"
+            >
+              <Laptop2 className="w-4 h-4" />
+            </button>
+
+            {/* Like button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFavorite(currentSong.id);
+              }}
+              className="p-1.5 text-neutral-400 hover:text-white transition-transform active:scale-90"
+              title={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
+              aria-label={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
+            >
+              {liked ? (
+                <SavedCheckIcon size={19} />
+              ) : (
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" className="text-neutral-400 hover:text-white">
+                  <circle cx="12" cy="12" r="10.5" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M12 7.5v9M7.5 12h9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
+
+            {/* Tactile Play/Pause button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                togglePlayPause();
+              }}
+              className="mobile-play-btn w-9 h-9 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+              title={isBuffering ? 'Cargando...' : isPlaying ? 'Pausar' : 'Reproducir'}
+              aria-label={isBuffering ? 'Cargando...' : isPlaying ? 'Pausar' : 'Reproducir'}
+            >
+              {isBuffering ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : isPlaying ? (
+                <Pause className="w-4 h-4 fill-current" />
+              ) : (
+                <Play className="w-4 h-4 fill-current ml-0.5" />
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* Controls: Like, Play/Pause, Next */}
-        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleFavorite(currentSong.id);
-            }}
-            className="p-1.5 text-neutral-400 hover:text-white transition-transform active:scale-90"
-            title={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
-            aria-label={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
-          >
-            {liked ? (
-              <SavedCheckIcon size={19} />
-            ) : (
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" className="text-neutral-400 hover:text-white">
-                <circle cx="12" cy="12" r="10.5" stroke="currentColor" strokeWidth="1.8" />
-                <path d="M12 7.5v9M7.5 12h9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              togglePlayPause();
-            }}
-            className="mobile-play-btn w-9 h-9 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 transition-transform"
-            title={isBuffering ? 'Cargando...' : isPlaying ? 'Pausar' : 'Reproducir'}
-            aria-label={isBuffering ? 'Cargando...' : isPlaying ? 'Pausar' : 'Reproducir'}
-          >
-            {isBuffering ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : isPlaying ? (
-              <Pause className="w-4 h-4 fill-current" />
-            ) : (
-              <Play className="w-4 h-4 fill-current ml-0.5" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              nextTrack();
-            }}
-            className="p-1.5 text-neutral-300 hover:text-white transition-transform active:scale-90"
-            title="Siguiente canción"
-            aria-label="Siguiente canción"
-          >
-            <SkipForward className="w-4 h-4 fill-current" />
-          </button>
+        {/* Bottom Progress Track */}
+        <div className="mobile-progress-track absolute bottom-0 left-0 right-0 h-[2px] bg-white/10">
+          <div
+            className="mobile-progress-fill h-full bg-[#1DB954] transition-all"
+            style={{ width: `${progress}%` }}
+          />
         </div>
-      </div>
-
-      {/* Progress track */}
-      <div className="mobile-progress-track absolute bottom-0 left-0 right-0 h-[2px] bg-white/15">
-        <div
-          className="mobile-progress-fill h-full bg-white/85 transition-all"
-          style={{ width: `${progress}%` }}
-        />
       </div>
     </div>
   );
