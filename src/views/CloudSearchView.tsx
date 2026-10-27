@@ -28,6 +28,7 @@ import {
   removeRecentSearch,
   clearRecentSearches,
 } from '../services/storage';
+import { splitArtistNames, cleanArtistSeparators } from '../utils/urlMetadataParser';
 
 interface CloudSearchViewProps {
   searchQuery: string;
@@ -88,20 +89,23 @@ function scoreSongSearch(song: Song, query: string): { score: number; snippet: s
   const normAlbum = song.album ? normalizeSearchText(song.album) : '';
   const normGenre = song.genre ? normalizeSearchText(song.genre) : '';
 
+  // Individual collaborating artists (each separated by comma)
+  const individualArtists = splitArtistNames(cleanArtistSeparators(song.artist)).map(normalizeSearchText);
+
   // Cross-field combinations (allows "Aitana En el coche" or "En el coche Aitana")
   const combined = `${normTitle} ${normArtist} ${normAlbum} ${normGenre} ${normArtist} ${normTitle}`;
 
-  // 1. Exact match on title or artist
+  // 1. Exact match on title or any collaborating artist
   if (normTitle === normQ) return { score: 100, snippet: null };
-  if (normArtist === normQ) return { score: 95, snippet: null };
+  if (normArtist === normQ || individualArtists.includes(normQ)) return { score: 95, snippet: null };
 
   // 2. Starts with query
   if (normTitle.startsWith(normQ)) return { score: 90, snippet: null };
-  if (normArtist.startsWith(normQ)) return { score: 85, snippet: null };
+  if (normArtist.startsWith(normQ) || individualArtists.some((a) => a.startsWith(normQ))) return { score: 85, snippet: null };
 
   // 3. Substring match
   if (normTitle.includes(normQ)) return { score: 80, snippet: null };
-  if (normArtist.includes(normQ)) return { score: 75, snippet: null };
+  if (normArtist.includes(normQ) || individualArtists.some((a) => a.includes(normQ))) return { score: 75, snippet: null };
   if (combined.includes(normQ)) return { score: 70, snippet: null };
 
   // 4. Token-level matching (all words in query must exist in combined song info)
@@ -199,21 +203,29 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
     if (!q || q.startsWith('@')) return [];
     const normQ = normalizeSearchText(q);
 
-    // Group songs by artist name (handling multi-artists)
+    // Group songs by INDIVIDUAL artist name (strictly splitting multi-artists by comma and collaborators)
+    // A comma signifies an INDEPENDENT artist; never index multi-artist strings like "J Balvin, Bad Bunny" as a single artist.
     const map = new Map<string, { name: string; songs: Song[] }>();
 
     for (const song of catalog) {
       if (!song.artist) continue;
-      const parts = song.artist
-        .split(/[,&/]|feat\.|ft\./i)
-        .map((p) => p.trim())
-        .filter(Boolean);
+      const individualArtists = splitArtistNames(cleanArtistSeparators(song.artist));
+      const individualAlbumArtists = song.albumArtist
+        ? splitArtistNames(cleanArtistSeparators(song.albumArtist))
+        : [];
 
-      const uniqueNames = Array.from(new Set([song.artist.trim(), ...parts]));
-      for (const name of uniqueNames) {
+      const uniqueIndividualArtists = Array.from(
+        new Set([...individualArtists, ...individualAlbumArtists])
+      );
+
+      for (const rawName of uniqueIndividualArtists) {
+        const name = rawName.trim();
+        if (!name) continue;
         const key = name.toLowerCase();
+
         if (!map.has(key)) {
-          map.set(key, { name, songs: [] });
+          const profile = getArtistProfile(name);
+          map.set(key, { name: profile?.name || name, songs: [] });
         }
         const entry = map.get(key)!;
         if (!entry.songs.some((s) => s.id === song.id)) {

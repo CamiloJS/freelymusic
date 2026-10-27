@@ -271,7 +271,7 @@ export async function searchLyrics(
   }
 }
 
-import { autoDetectCover } from '../utils/audioCoverExtractor';
+import { autoDetectCover, autoDetectOnlineMetadata } from '../utils/audioCoverExtractor';
 import { cleanArtistSeparators } from '../utils/urlMetadataParser';
 
 export async function searchCover(
@@ -354,6 +354,18 @@ export async function enrichSongMetadata(song: Song): Promise<EnrichmentResult> 
     if (lyrics) {
       updated.lyricsLrc = lyrics;
       sources.push('LRCLIB');
+    }
+  }
+
+  if (!song.isExplicit) {
+    try {
+      const onlineMeta = await autoDetectOnlineMetadata(song.title, song.artist, song.album);
+      if (onlineMeta?.isExplicit) {
+        updated.isExplicit = true;
+        sources.push('Apple/Deezer Explicit');
+      }
+    } catch {
+      // non-blocking
     }
   }
 

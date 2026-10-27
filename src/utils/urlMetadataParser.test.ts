@@ -32,6 +32,14 @@ describe('parseAudioUrlMetadata', () => {
     expect(res.title).toBe('CHORRITO PA LAS ANIMAS');
     expect(res.year).toBe('2022');
     expect(res.isExplicit).toBe(true);
+
+    const res1 = parseAudioUrlMetadata('https://example.com/Bad%20Bunny%20-%20Titi%20Me%20Pregunto%20[E].mp3');
+    expect(res1.isExplicit).toBe(true);
+    expect(res1.title).toBe('Titi Me Pregunto');
+
+    const res2 = parseAudioUrlMetadata('https://example.com/Bad%20Bunny%20-%20Dakiti%20(E).mp3');
+    expect(res2.isExplicit).toBe(true);
+    expect(res2.title).toBe('Dakiti');
   });
 
   it('handles underscores in filenames', () => {

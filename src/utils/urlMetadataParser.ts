@@ -59,11 +59,14 @@ export function parseAudioUrlMetadata(urlOrPath: string): ParsedUrlMetadata {
 
   // Detect explicit flag from filename tag before stripping
   let isExplicit: boolean | undefined;
-  if (/[\(\[\s_.-](?:explicit|dirty|uncensored)[\)\]\s_.-]?/i.test(raw)) {
+  if (
+    /[\(\[\s_.-](?:explicit|dirty|uncensored|explicito|explícito)[\)\]\s_.-]?/i.test(raw) ||
+    /[\(\[]\s*e\s*[\)\]]/i.test(raw)
+  ) {
     isExplicit = true;
     raw = raw
-      .replace(/[\(\[]\s*(?:explicit|dirty|uncensored)\s*[\)\]]/gi, '')
-      .replace(/[\s_.-]+(?:explicit|dirty|uncensored)\b/gi, '')
+      .replace(/[\(\[]\s*(?:explicit|dirty|uncensored|explicito|explícito|e)\s*[\)\]]/gi, '')
+      .replace(/[\s_.-]+(?:explicit|dirty|uncensored|explicito|explícito)\b/gi, '')
       .trim();
   }
 
@@ -149,8 +152,8 @@ export function splitArtistNames(artistStr: string): string[] {
  */
 function cleanSongTitle(rawTitle: string): string {
   return rawTitle
-    .replace(/\[\s*(?:320kbps|128kbps|flac|hq|official audio|official video|audio|video|lyrics|explicit|dirty|uncensored)\s*\]/gi, '')
-    .replace(/\(\s*(?:official audio|official video|audio|video|lyrics|explicit|dirty|uncensored)\s*\)/gi, '')
+    .replace(/\[\s*(?:320kbps|128kbps|flac|hq|official audio|official video|audio|video|lyrics|explicit|dirty|uncensored|explicito|explícito|e)\s*\]/gi, '')
+    .replace(/\(\s*(?:official audio|official video|audio|video|lyrics|explicit|dirty|uncensored|explicito|explícito|e)\s*\)/gi, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }

@@ -210,9 +210,18 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   };
 
   const handleUpdateAlbumTrack = (index: number, updates: Partial<AlbumTrackDraft>) => {
+    let finalUpdates = { ...updates };
+    if (typeof updates.title === 'string') {
+      const rawTitle = updates.title;
+      if (/[\(\[]\s*(?:explicit|dirty|uncensored|explicito|explícito|e)\s*[\)\]]/i.test(rawTitle)) {
+        finalUpdates.isExplicit = true;
+        finalUpdates.title = rawTitle.replace(/[\(\[]\s*(?:explicit|dirty|uncensored|explicito|explícito|e)\s*[\)\]]/gi, '').trim();
+      }
+    }
+
     setAlbumTracks((prev) => {
       const updated = [...prev];
-      updated[index] = { ...updated[index], ...updates };
+      updated[index] = { ...updated[index], ...finalUpdates };
       return updated;
     });
 
@@ -304,10 +313,25 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                   title: next[index].title || extracted.title || '',
                   artist: next[index].artist || trackArts || '',
                   lyricsLrc: next[index].lyricsLrc || extracted.lyrics || '',
-                  isExplicit: next[index].isExplicit || extracted.isExplicit || false,
+                  isExplicit: next[index].isExplicit || Boolean(extracted.isExplicit),
                 };
               }
               return next;
+            });
+          }
+
+          // Check online explicit status for album track
+          if (finalTrackTitle && finalTrackArtist) {
+            void autoDetectOnlineMetadata(finalTrackTitle, finalTrackArtist, albumTitle.trim() || undefined).then((trkMeta) => {
+              if (trkMeta?.isExplicit) {
+                setAlbumTracks((prev) => {
+                  const next = [...prev];
+                  if (next[index] && next[index].audioUrl.trim() === targetUrl) {
+                    next[index] = { ...next[index], isExplicit: true };
+                  }
+                  return next;
+                });
+              }
             });
           }
 
@@ -439,8 +463,8 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         if (extracted.year && (!year.trim() || year === '2026')) {
           setYear(extracted.year);
         }
-        if (extracted.isExplicit !== undefined) {
-          setIsExplicit(extracted.isExplicit);
+        if (extracted.isExplicit) {
+          setIsExplicit(true);
         }
         if (!lyricsLrc.trim() && extracted.lyrics) {
           setLyricsLrc(extracted.lyrics);
@@ -476,8 +500,8 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
             if (onlineMeta.genre && !genre.trim()) {
               setGenre(onlineMeta.genre);
             }
-            if (onlineMeta.isExplicit !== undefined) {
-              setIsExplicit(onlineMeta.isExplicit);
+            if (onlineMeta.isExplicit) {
+              setIsExplicit(true);
             }
             setDetectStatus('✓ Metadatos y carátula obtenidos automáticamente');
             setTimeout(() => setDetectStatus(null), 3500);
@@ -508,8 +532,8 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         if (meta.genre && !genre.trim()) {
           setGenre(meta.genre);
         }
-        if (meta.isExplicit !== undefined) {
-          setIsExplicit(meta.isExplicit);
+        if (meta.isExplicit) {
+          setIsExplicit(true);
         }
         setDetectStatus('✓ Metadatos actualizados automáticamente');
         setTimeout(() => setDetectStatus(null), 3500);
@@ -1206,7 +1230,24 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                       type="text"
                       required
                       value={title}
-                      onChange={(e) => setTitle(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (
+                          /[\(\[]\s*(?:explicit|dirty|uncensored|explicito|explícito|e)\s*[\)\]]/i.test(val)
+                        ) {
+                          setIsExplicit(true);
+                          setTitle(
+                            val
+                              .replace(
+                                /[\(\[]\s*(?:explicit|dirty|uncensored|explicito|explícito|e)\s*[\)\]]/gi,
+                                ''
+                              )
+                              .trim()
+                          );
+                        } else {
+                          setTitle(val);
+                        }
+                      }}
                       onBlur={handleSingleMetadataBlur}
                       placeholder="Ej. Blinding Lights"
                       className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
