@@ -102,6 +102,7 @@ interface MusicContextType {
 
   // Offline caching
   downloadedSongIds: string[];
+  refreshDownloadedIds: () => Promise<void>;
   isDownloaded: (songId: string) => boolean;
   toggleDownloadSong: (song: Song) => Promise<boolean>;
   downloadSongsBatch: (songs: Song[]) => Promise<{ downloaded: number; failed: number }>;
@@ -1206,6 +1207,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         userSongListenSeconds: userData.songListenSeconds || {},
         userArtistListenSeconds: userData.artistListenSeconds || {},
         downloadedSongIds,
+        refreshDownloadedIds,
         isDownloaded,
         toggleDownloadSong,
         downloadSongsBatch,

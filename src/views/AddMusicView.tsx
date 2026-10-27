@@ -20,6 +20,12 @@ import ChevronUp from 'lucide-react/dist/esm/icons/chevron-up.mjs';
 import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down.mjs';
 import Sliders from 'lucide-react/dist/esm/icons/sliders-vertical.mjs';
 import ListOrdered from 'lucide-react/dist/esm/icons/list-ordered.mjs';
+import Folder from 'lucide-react/dist/esm/icons/folder.mjs';
+import FolderArchive from 'lucide-react/dist/esm/icons/folder-archive.mjs';
+import Archive from 'lucide-react/dist/esm/icons/archive.mjs';
+import CheckSquare from 'lucide-react/dist/esm/icons/check-square.mjs';
+import Square from 'lucide-react/dist/esm/icons/square.mjs';
+import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -35,6 +41,16 @@ import {
   autoDetectAlbumCover,
   autoDetectOnlineMetadata,
 } from '../utils/audioCoverExtractor';
+import {
+  organizeFolderMusic,
+  unpackZipFile,
+  fetchAndOrganizeRemoteFolder,
+  FolderAnalysisResult,
+  CandidateAlbum,
+  CandidateTrack,
+  RawFolderItem,
+} from '../utils/folderMusicOrganizer';
+import { storeSongBlob } from '../services/storage';
 import { Song, LyricLine } from '../types';
 
 interface AddMusicViewProps {
@@ -75,11 +91,30 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     addMultipleTracksToCatalog,
     deleteCatalogTrack,
     updateCatalogTrack,
+    refreshDownloadedIds,
   } = useMusic();
   const { playSong, currentSong, isPlaying } = useAudio();
 
-  // Mode: Single vs Album
-  const [uploadMode, setUploadMode] = useState<'single' | 'album'>('single');
+  // Mode: Single vs Album vs Folder
+  const [uploadMode, setUploadMode] = useState<'single' | 'album' | 'folder'>('single');
+
+  // Folder / Batch Upload State
+  const [folderUrlInput, setFolderUrlInput] = useState('');
+  const [isAnalyzingFolder, setIsAnalyzingFolder] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<{
+    current: number;
+    total: number;
+    message: string;
+  } | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<FolderAnalysisResult | null>(null);
+  const [isImportingFolder, setIsImportingFolder] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const zipInputRef = useRef<HTMLInputElement | null>(null);
 
   // Single Song Form State
   const [audioUrl, setAudioUrl] = useState('');
@@ -1016,6 +1051,271 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     }
   };
 
+  // Folder / Batch handlers
+  const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    setIsAnalyzingFolder(true);
+    setAnalysisResult(null);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      const rawItems: RawFolderItem[] = Array.from(fileList).map((file) => ({
+        name: file.name,
+        relativePath: (file as unknown as { webkitRelativePath?: string }).webkitRelativePath || file.name,
+        file,
+        size: file.size,
+      }));
+
+      const res = await organizeFolderMusic(rawItems, catalog, (cur, tot, name) => {
+        setAnalysisProgress({ current: cur, total: tot, message: name });
+      });
+      setAnalysisResult(res);
+    } catch (err) {
+      console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : 'Error al analizar la carpeta.');
+    } finally {
+      setIsAnalyzingFolder(false);
+      setAnalysisProgress(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleZipSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsAnalyzingFolder(true);
+    setAnalysisResult(null);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      setAnalysisProgress({ current: 0, total: 1, message: 'Descomprimiendo archivo .zip...' });
+      const rawItems = await unpackZipFile(file);
+      const res = await organizeFolderMusic(rawItems, catalog, (cur, tot, name) => {
+        setAnalysisProgress({ current: cur, total: tot, message: name });
+      });
+      setAnalysisResult(res);
+    } catch (err) {
+      console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : 'Error al descomprimir y analizar el archivo .zip.');
+    } finally {
+      setIsAnalyzingFolder(false);
+      setAnalysisProgress(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleAnalyzeRemoteUrl = async () => {
+    if (!folderUrlInput.trim()) {
+      setErrorMessage('Por favor ingresa un enlace de carpeta o archivo .zip.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      return;
+    }
+
+    setIsAnalyzingFolder(true);
+    setAnalysisResult(null);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      setAnalysisProgress({ current: 0, total: 1, message: 'Descargando y analizando enlace...' });
+      const res = await fetchAndOrganizeRemoteFolder(folderUrlInput.trim(), catalog, (cur, tot, name) => {
+        setAnalysisProgress({ current: cur, total: tot, message: name });
+      });
+      setAnalysisResult(res);
+    } catch (err) {
+      console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : 'Error al analizar el enlace.');
+    } finally {
+      setIsAnalyzingFolder(false);
+      setAnalysisProgress(null);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    setIsAnalyzingFolder(true);
+    setAnalysisResult(null);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      // Check if dropped a single .zip file
+      if (files.length === 1 && (files[0].name.toLowerCase().endsWith('.zip') || files[0].type.includes('zip'))) {
+        setAnalysisProgress({ current: 0, total: 1, message: 'Descomprimiendo archivo .zip...' });
+        const rawItems = await unpackZipFile(files[0]);
+        const res = await organizeFolderMusic(rawItems, catalog, (cur, tot, name) => {
+          setAnalysisProgress({ current: cur, total: tot, message: name });
+        });
+        setAnalysisResult(res);
+        return;
+      }
+
+      // Dropped regular files/folders
+      const rawItems: RawFolderItem[] = files.map((file) => ({
+        name: file.name,
+        relativePath: (file as unknown as { webkitRelativePath?: string }).webkitRelativePath || file.name,
+        file,
+        size: file.size,
+      }));
+
+      const res = await organizeFolderMusic(rawItems, catalog, (cur, tot, name) => {
+        setAnalysisProgress({ current: cur, total: tot, message: name });
+      });
+      setAnalysisResult(res);
+    } catch (err) {
+      console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : 'Error al analizar los archivos arrastrados.');
+    } finally {
+      setIsAnalyzingFolder(false);
+      setAnalysisProgress(null);
+    }
+  };
+
+  const toggleTrackSelection = (trackId: string) => {
+    if (!analysisResult) return;
+    setAnalysisResult((prev) => {
+      if (!prev) return null;
+      const nextAlbums = prev.albums.map((album) => ({
+        ...album,
+        tracks: album.tracks.map((t) => (t.id === trackId ? { ...t, selected: !t.selected } : t)),
+      }));
+      const nextSingles = prev.singles.map((t) => (t.id === trackId ? { ...t, selected: !t.selected } : t));
+      return { ...prev, albums: nextAlbums, singles: nextSingles };
+    });
+  };
+
+  const toggleAlbumSelection = (albumId: string) => {
+    if (!analysisResult) return;
+    setAnalysisResult((prev) => {
+      if (!prev) return null;
+      const targetAlbum = prev.albums.find((a) => a.id === albumId);
+      if (!targetAlbum) return prev;
+      const allSelected = targetAlbum.tracks.every((t) => t.selected);
+      const nextAlbums = prev.albums.map((album) =>
+        album.id === albumId
+          ? {
+              ...album,
+              tracks: album.tracks.map((t) => ({ ...t, selected: !allSelected })),
+            }
+          : album
+      );
+      return { ...prev, albums: nextAlbums };
+    });
+  };
+
+  const toggleSelectAll = (select: boolean) => {
+    if (!analysisResult) return;
+    setAnalysisResult((prev) => {
+      if (!prev) return null;
+      const nextAlbums = prev.albums.map((album) => ({
+        ...album,
+        tracks: album.tracks.map((t) => (t.isDuplicate && select ? t : { ...t, selected: select })),
+      }));
+      const nextSingles = prev.singles.map((t) =>
+        t.isDuplicate && select ? t : { ...t, selected: select }
+      );
+      return { ...prev, albums: nextAlbums, singles: nextSingles };
+    });
+  };
+
+  const handleImportFolderSongs = async () => {
+    if (!analysisResult) return;
+
+    const selectedTracks: CandidateTrack[] = [
+      ...analysisResult.albums.flatMap((a) => a.tracks.filter((t) => t.selected)),
+      ...analysisResult.singles.filter((t) => t.selected),
+    ];
+
+    if (selectedTracks.length === 0) {
+      setErrorMessage('Selecciona al menos una canción nueva para importar a la biblioteca.');
+      setTimeout(() => setErrorMessage(''), 4000);
+      return;
+    }
+
+    setIsImportingFolder(true);
+    setImportProgress({ current: 0, total: selectedTracks.length });
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      const now = Date.now();
+      const songsToCreate: Omit<Song, 'id' | 'createdAt' | 'addedBy'>[] = [];
+      const localBlobsToStore: { id: string; blob: Blob }[] = [];
+
+      for (let i = 0; i < selectedTracks.length; i++) {
+        const track = selectedTracks[i];
+        const generatedId = `song-${now}-${i}-${Math.random().toString(36).substring(2, 7)}`;
+
+        if (track.file || track.blob) {
+          const rawBlob = track.file || track.blob!;
+          const typedBlob =
+            rawBlob.type && rawBlob.type.startsWith('audio/')
+              ? rawBlob
+              : new Blob([rawBlob], { type: 'audio/mpeg' });
+          localBlobsToStore.push({ id: generatedId, blob: typedBlob });
+        }
+
+        songsToCreate.push({
+          title: track.title,
+          artist: track.artist,
+          album: track.album || '',
+          year: track.year || '2026',
+          genre: track.genre || 'Pop',
+          duration: track.duration || 180,
+          coverUrl:
+            track.coverUrl ||
+            'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&w=600&q=80',
+          audioUrl: track.audioUrl || `offline://${generatedId}`,
+          lyricsLrc: track.lyricsLrc || '',
+          isExplicit: track.isExplicit,
+        });
+      }
+
+      // Batch save to catalog / Firestore
+      const createdSongs = await addMultipleTracksToCatalog(songsToCreate);
+
+      // Store local audio blobs in IndexedDB for 100% offline playback
+      for (let i = 0; i < createdSongs.length; i++) {
+        const created = createdSongs[i];
+        const localBlob = localBlobsToStore[i]?.blob;
+        if (localBlob) {
+          await storeSongBlob(created.id, localBlob);
+        }
+        setImportProgress({ current: i + 1, total: createdSongs.length });
+      }
+
+      await refreshDownloadedIds();
+
+      const albumsCount = analysisResult.albums.filter((a) => a.tracks.some((t) => t.selected)).length;
+      const singlesCount = analysisResult.singles.filter((t) => t.selected).length;
+
+      setSuccessMessage(
+        `¡Éxito! Se importaron ${createdSongs.length} canciones a tu biblioteca (${albumsCount > 0 ? `${albumsCount} álbum(es) y ` : ''}${singlesCount} sencillo(s)).`
+      );
+
+      // Clear analysis results
+      setAnalysisResult(null);
+      setFolderUrlInput('');
+      setTimeout(() => setSuccessMessage(''), 6000);
+    } catch (err) {
+      console.error(err);
+      setErrorMessage(err instanceof Error ? err.message : 'Error al guardar las canciones en la biblioteca.');
+      setTimeout(() => setErrorMessage(''), 5000);
+    } finally {
+      setIsImportingFolder(false);
+      setImportProgress(null);
+    }
+  };
+
   // Parse lyrics preview in real time
   const parsedLyricsPreview = useMemo(() => {
     if (!lyricsLrc.trim()) return [];
@@ -1024,6 +1324,16 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
 
   // Recent songs added to repository
   const recentCatalog = catalog.slice(0, 5);
+
+  const totalSelected = useMemo(() => {
+    if (!analysisResult) return 0;
+    const albumSelected = analysisResult.albums.reduce(
+      (acc, alb) => acc + alb.tracks.filter((t) => t.selected).length,
+      0
+    );
+    const singlesSelected = analysisResult.singles.filter((t) => t.selected).length;
+    return albumSelected + singlesSelected;
+  }, [analysisResult]);
 
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto pb-36 animate-in fade-in duration-200">
@@ -1068,7 +1378,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* Mode Switcher: Canción Individual vs Álbum Completo */}
+      {/* Mode Switcher: Canción Individual vs Álbum Completo vs Carpeta / ZIP */}
       <div className="flex flex-wrap items-center gap-2 p-1.5 bg-neutral-900/90 border border-neutral-800 rounded-2xl w-fit shadow-lg">
         <button
           type="button"
@@ -1095,9 +1405,468 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
           <Disc className="w-4 h-4" />
           <span>Álbum Completo (Múltiples Pistas)</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setUploadMode('folder')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all ${
+            uploadMode === 'folder'
+              ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/25'
+              : 'text-neutral-400 hover:text-white'
+          }`}
+        >
+          <FolderArchive className="w-4 h-4" />
+          <span>📁 Carpeta / ZIP (Auto-clasificar)</span>
+        </button>
       </div>
 
-      {/* Main Form Grid */}
+      {uploadMode === 'folder' ? (
+        /* Folder Upload Workspace */
+        <div className="space-y-8 animate-in fade-in">
+          {/* Hidden File Inputs */}
+          <input
+            type="file"
+            ref={(el) => {
+              folderInputRef.current = el;
+              if (el) {
+                el.setAttribute('webkitdirectory', '');
+                el.setAttribute('directory', '');
+                el.setAttribute('multiple', '');
+              }
+            }}
+            onChange={handleFolderSelect}
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={zipInputRef}
+            accept=".zip,application/zip,application/x-zip-compressed"
+            onChange={handleZipSelect}
+            className="hidden"
+          />
+
+          {/* Ingestion & Dropzone Area */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDraggingOver(true);
+            }}
+            onDragLeave={() => setIsDraggingOver(false)}
+            onDrop={handleDrop}
+            className={`p-6 md:p-10 rounded-3xl border-2 transition-all space-y-6 ${
+              isDraggingOver
+                ? 'border-emerald-400 bg-emerald-500/10 shadow-2xl scale-[1.005]'
+                : 'border-dashed border-neutral-800 bg-neutral-900/40 hover:border-neutral-700'
+            }`}
+          >
+            <div className="text-center max-w-2xl mx-auto space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Clasificación Inteligente de Álbumes y Sencillos</span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
+                Sube una Carpeta o Archivo .ZIP
+              </h2>
+              <p className="text-xs md:text-sm text-neutral-400 leading-relaxed">
+                Detecta automáticamente todas las canciones de tu carpeta. Si pertenecen a un álbum, las agrupa con la carátula de su primera pista para todas las demás; si son canciones sueltas, las deja como sencillos individuales. Extrae letras, etiquetas, explícito y <strong className="text-emerald-400">omite duplicados que ya existan en tu biblioteca</strong>.
+              </p>
+            </div>
+
+            {/* Ingestion Action Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+              <button
+                type="button"
+                onClick={() => folderInputRef.current?.click()}
+                className="p-5 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-emerald-500/60 hover:bg-neutral-900 group transition-all text-left flex items-start gap-4 shadow-xl active:scale-[0.99]"
+              >
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                  <Folder className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">
+                    Seleccionar Carpeta
+                  </h4>
+                  <p className="text-[11px] text-neutral-400 mt-1 leading-normal">
+                    Elige una carpeta desde tu equipo o móvil con todas sus canciones y subcarpetas.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => zipInputRef.current?.click()}
+                className="p-5 rounded-2xl bg-neutral-950/80 border border-neutral-800 hover:border-cyan-500/60 hover:bg-neutral-900 group transition-all text-left flex items-start gap-4 shadow-xl active:scale-[0.99]"
+              >
+                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                  <Archive className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors">
+                    Subir Archivo .ZIP
+                  </h4>
+                  <p className="text-[11px] text-neutral-400 mt-1 leading-normal">
+                    Descomprime y organiza colecciones o carpetas de álbumes empaquetadas en .zip.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            {/* Remote URL Ingestion */}
+            <div className="max-w-2xl mx-auto pt-3 border-t border-neutral-800/80">
+              <label className="block text-xs font-bold text-neutral-300 mb-2">
+                O analiza un enlace en la nube (File Garden, ZIP, enlaces directos):
+              </label>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input
+                  type="url"
+                  value={folderUrlInput}
+                  onChange={(e) => setFolderUrlInput(e.target.value)}
+                  placeholder="https://file.garden/.../carpeta o https://.../album.zip"
+                  className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono shadow-inner"
+                />
+                <button
+                  type="button"
+                  disabled={isAnalyzingFolder || !folderUrlInput.trim()}
+                  onClick={handleAnalyzeRemoteUrl}
+                  className="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-black text-xs transition-all flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Analizar Enlace</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Analysis Loading State */}
+          {isAnalyzingFolder && (
+            <div className="p-8 bg-neutral-900/90 border border-emerald-500/30 rounded-3xl text-center space-y-4 shadow-2xl animate-in fade-in">
+              <Loader2 className="w-10 h-10 animate-spin text-emerald-400 mx-auto" />
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">Analizando canciones y metadatos...</h3>
+                {analysisProgress && (
+                  <p className="text-xs text-neutral-400">
+                    Procesando {analysisProgress.current} de {analysisProgress.total}:{' '}
+                    <span className="text-emerald-400 font-mono">{analysisProgress.message}</span>
+                  </p>
+                )}
+                <p className="text-[11px] text-neutral-500">
+                  Extrayendo etiquetas ID3, carátulas compartidas, letras y verificando duplicados...
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Import Loading State */}
+          {isImportingFolder && (
+            <div className="p-8 bg-neutral-900/90 border border-emerald-500/30 rounded-3xl text-center space-y-4 shadow-2xl animate-in fade-in">
+              <Loader2 className="w-10 h-10 animate-spin text-emerald-400 mx-auto" />
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">Importando canciones a tu biblioteca...</h3>
+                {importProgress && (
+                  <p className="text-xs text-neutral-400">
+                    Guardando canción {importProgress.current} de {importProgress.total}...
+                  </p>
+                )}
+                <p className="text-[11px] text-neutral-500">
+                  Almacenando audio en la nube y caché local sin conexión...
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Results Workspace */}
+          {analysisResult && !isAnalyzingFolder && (
+            <div className="space-y-6 animate-in fade-in">
+              {/* Source Note Banner (e.g. File Garden empty zip warning) */}
+              {analysisResult.sourceNote && (
+                <div className="p-5 bg-amber-500/10 border border-amber-500/40 rounded-2xl flex items-start gap-3.5 text-amber-200 text-xs shadow-lg">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-400 mt-0.5" />
+                  <div className="space-y-1">
+                    <strong className="block text-amber-300 font-bold text-sm">
+                      Aviso sobre el enlace analizado
+                    </strong>
+                    <p className="leading-relaxed">{analysisResult.sourceNote}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Metrics Summary Chips */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-neutral-900/80 border border-neutral-800 p-3.5 rounded-2xl">
+                  <span className="text-neutral-400 text-xs block font-semibold">Total Pistas</span>
+                  <span className="text-xl font-black text-white">{analysisResult.totalTracks}</span>
+                </div>
+                <div className="bg-neutral-900/80 border border-neutral-800 p-3.5 rounded-2xl">
+                  <span className="text-emerald-400 text-xs block font-semibold">Álbumes Agrupados</span>
+                  <span className="text-xl font-black text-emerald-400">{analysisResult.albums.length}</span>
+                </div>
+                <div className="bg-neutral-900/80 border border-neutral-800 p-3.5 rounded-2xl">
+                  <span className="text-cyan-400 text-xs block font-semibold">Canciones Sueltas</span>
+                  <span className="text-xl font-black text-cyan-400">{analysisResult.singles.length}</span>
+                </div>
+                <div className="bg-neutral-900/80 border border-neutral-800 p-3.5 rounded-2xl">
+                  <span className="text-amber-400 text-xs block font-semibold">Ya en Biblioteca (Omitidas)</span>
+                  <span className="text-xl font-black text-amber-400">{analysisResult.duplicateCount}</span>
+                </div>
+              </div>
+
+              {/* Action Toolbar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 bg-neutral-900/90 border border-neutral-800 rounded-2xl shadow-xl">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleSelectAll(true)}
+                    className="px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs font-bold transition-colors"
+                  >
+                    Seleccionar todas las nuevas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleSelectAll(false)}
+                    className="px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-xs font-bold transition-colors"
+                  >
+                    Deseleccionar todas
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={totalSelected === 0 || isImportingFolder}
+                  onClick={handleImportFolderSongs}
+                  className="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black font-black text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-[0.99]"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>
+                    {isImportingFolder
+                      ? 'Importando...'
+                      : `Importar a la Biblioteca (${totalSelected} canciones)`}
+                  </span>
+                </button>
+              </div>
+
+              {/* Albums Section */}
+              {analysisResult.albums.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Disc className="w-5 h-5 text-emerald-400" />
+                    <h3 className="text-lg font-black text-white">
+                      Álbumes Detectados ({analysisResult.albums.length})
+                    </h3>
+                    <span className="text-xs text-neutral-400 font-medium ml-2">
+                      (Carátula compartida asignada automáticamente a cada pista)
+                    </span>
+                  </div>
+
+                  <div className="space-y-6">
+                    {analysisResult.albums.map((album) => {
+                      const allSelected = album.tracks.every((t) => t.selected);
+                      const someSelected = album.tracks.some((t) => t.selected);
+
+                      return (
+                        <div
+                          key={album.id}
+                          className="bg-neutral-900/60 border border-neutral-800/80 rounded-3xl p-5 md:p-6 space-y-4 shadow-xl"
+                        >
+                          {/* Album Banner */}
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-neutral-800/80">
+                            <div className="flex items-center gap-4">
+                              <img
+                                src={album.coverUrl}
+                                alt={album.title}
+                                className="w-16 h-16 rounded-2xl object-cover shadow-lg border border-white/10 flex-shrink-0"
+                              />
+                              <div>
+                                <span className="text-[10px] uppercase font-black tracking-wider text-emerald-400 block">
+                                  Álbum • {album.year} • {album.genre}
+                                </span>
+                                <h4 className="text-base font-black text-white">{album.title}</h4>
+                                <span className="text-xs text-neutral-300 font-medium">
+                                  {album.artist} • {album.tracks.length} canciones
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleAlbumSelection(album.id)}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-neutral-200 transition-colors"
+                            >
+                              {allSelected ? (
+                                <CheckSquare className="w-4 h-4 text-emerald-400" />
+                              ) : someSelected ? (
+                                <CheckSquare className="w-4 h-4 text-neutral-400" />
+                              ) : (
+                                <Square className="w-4 h-4 text-neutral-500" />
+                              )}
+                              <span>{allSelected ? 'Deseleccionar álbum' : 'Seleccionar álbum'}</span>
+                            </button>
+                          </div>
+
+                          {/* Track List */}
+                          <div className="divide-y divide-neutral-800/50">
+                            {album.tracks.map((track, idx) => (
+                              <div
+                                key={track.id}
+                                className={`flex items-center justify-between py-2.5 px-2 rounded-xl transition-colors ${
+                                  track.isDuplicate ? 'opacity-60 bg-neutral-950/40' : 'hover:bg-neutral-800/40'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleTrackSelection(track.id)}
+                                    className="text-neutral-400 hover:text-white p-1"
+                                  >
+                                    {track.selected ? (
+                                      <CheckSquare className="w-4 h-4 text-emerald-400" />
+                                    ) : (
+                                      <Square className="w-4 h-4 text-neutral-600" />
+                                    )}
+                                  </button>
+
+                                  <span className="text-xs font-mono text-neutral-500 w-5 text-right flex-shrink-0">
+                                    {idx + 1}
+                                  </span>
+
+                                  <div className="truncate min-w-0">
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      {track.isExplicit && (
+                                        <span
+                                          className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600 text-white text-[8px] font-black flex-shrink-0 leading-none"
+                                          title="Contenido explícito"
+                                        >
+                                          E
+                                        </span>
+                                      )}
+                                      <span className="text-xs font-bold text-white truncate block">
+                                        {track.title}
+                                      </span>
+                                    </div>
+                                    <span className="text-[10px] text-neutral-400 truncate block">
+                                      {track.artist}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                                  {track.isDuplicate ? (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold">
+                                      Ya en biblioteca
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">
+                                      Nueva
+                                    </span>
+                                  )}
+
+                                  {track.lyricsLrc && (
+                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 font-mono font-bold">
+                                      LRC
+                                    </span>
+                                  )}
+
+                                  <span className="text-xs font-mono text-neutral-400 w-12 text-right">
+                                    {formatTime(track.duration)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Singles Section */}
+              {analysisResult.singles.length > 0 && (
+                <div className="space-y-4 pt-4">
+                  <div className="flex items-center gap-2">
+                    <Music className="w-5 h-5 text-cyan-400" />
+                    <h3 className="text-lg font-black text-white">
+                      Canciones Individuales / Sencillos ({analysisResult.singles.length})
+                    </h3>
+                  </div>
+
+                  <div className="bg-neutral-900/60 border border-neutral-800/80 rounded-3xl p-5 md:p-6 shadow-xl divide-y divide-neutral-800/50">
+                    {analysisResult.singles.map((track) => (
+                      <div
+                        key={track.id}
+                        className={`flex items-center justify-between py-2.5 px-2 rounded-xl transition-colors ${
+                          track.isDuplicate ? 'opacity-60 bg-neutral-950/40' : 'hover:bg-neutral-800/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleTrackSelection(track.id)}
+                            className="text-neutral-400 hover:text-white p-1"
+                          >
+                            {track.selected ? (
+                              <CheckSquare className="w-4 h-4 text-emerald-400" />
+                            ) : (
+                              <Square className="w-4 h-4 text-neutral-600" />
+                            )}
+                          </button>
+
+                          <img
+                            src={track.coverUrl}
+                            alt={track.title}
+                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-white/5 shadow-md"
+                          />
+
+                          <div className="truncate min-w-0">
+                            <div className="flex items-center gap-1.5 truncate">
+                              {track.isExplicit && (
+                                <span
+                                  className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600 text-white text-[8px] font-black flex-shrink-0 leading-none"
+                                  title="Contenido explícito"
+                                >
+                                  E
+                                </span>
+                              )}
+                              <span className="text-xs font-bold text-white truncate block">
+                                {track.title}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-neutral-400 truncate block">
+                              {track.artist}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                          {track.isDuplicate ? (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold">
+                              Ya en biblioteca
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">
+                              Nueva
+                            </span>
+                          )}
+
+                          {track.lyricsLrc && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 font-mono font-bold">
+                              LRC
+                            </span>
+                          )}
+
+                          <span className="text-xs font-mono text-neutral-400 w-12 text-right">
+                            {formatTime(track.duration)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Main Form Grid */
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Form Details (2 columns wide) */}
         <div className="lg:col-span-2 space-y-6">
@@ -2149,6 +2918,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };
