@@ -11,6 +11,7 @@ import SquarePen from 'lucide-react/dist/esm/icons/square-pen.mjs';
 import UserPlus from 'lucide-react/dist/esm/icons/user-plus.mjs';
 import Music2 from 'lucide-react/dist/esm/icons/music-2.mjs';
 import LogOut from 'lucide-react/dist/esm/icons/log-out.mjs';
+import Tv from 'lucide-react/dist/esm/icons/tv.mjs';
 import { useAuth } from '../context/AuthContext';
 import { UserProfile, ChatThread } from '../types';
 import { getStoredChatThreads } from '../services/storage';
@@ -26,6 +27,7 @@ interface SpotifySideDrawerProps {
   onOpenCustomize: () => void;
   onOpenSettingsPrivacy: () => void;
   onOpenMessages: (threadId?: string) => void;
+  onOpenTvMode?: () => void;
   onSelectFriendProfile?: (user: UserProfile) => void;
 }
 
@@ -40,6 +42,7 @@ export const SpotifySideDrawer: React.FC<SpotifySideDrawerProps> = ({
   onOpenCustomize,
   onOpenSettingsPrivacy,
   onOpenMessages,
+  onOpenTvMode,
   onSelectFriendProfile,
 }) => {
   const { currentUser, allUsers, isAdmin, logout } = useAuth();
@@ -210,6 +213,30 @@ export const SpotifySideDrawer: React.FC<SpotifySideDrawerProps> = ({
                 Personalizar
               </span>
             </button>
+
+            {/* Modo Smart TV (Visible para todos) */}
+            {onOpenTvMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenTvMode();
+                }}
+                className="w-full flex items-center gap-3.5 px-2.5 py-2.5 rounded-xl text-left hover:bg-white/5 active:bg-white/10 transition-colors group"
+              >
+                <div className="p-1.5 rounded-lg text-emerald-400 group-hover:text-emerald-300 flex-shrink-0">
+                  <Tv className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm font-semibold text-white block truncate">
+                    Modo Smart TV
+                  </span>
+                  <span className="text-xs text-neutral-400 block truncate">
+                    Interfaz para televisor y control remoto
+                  </span>
+                </div>
+              </button>
+            )}
 
             {/* Configuración y privacidad (Solo perfil principal) */}
             {isMainProfile && (

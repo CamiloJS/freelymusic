@@ -18,6 +18,7 @@ import {
   addStoredDeletedSongId,
   getStoredPendingSongs,
   addStoredPendingSong,
+  addMultipleStoredPendingSongs,
   removeStoredPendingSong,
   getStoredArtistProfiles,
   saveStoredArtistProfiles,
@@ -417,7 +418,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (newSongs.length === 0) return [];
 
-    newSongs.forEach((song) => addStoredPendingSong(song));
+    addMultipleStoredPendingSongs(newSongs);
 
     setCatalog((previous) => {
       const existing = new Set(previous.map((song) => song.id));
@@ -426,15 +427,20 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return updated;
     });
 
-    // One batch instead of N sequential round-trips.
+    // Cloud synchronization in background with timeout protection
     try {
       const firebase = await loadFirebaseService();
-      const saved = await firebase.saveSongsToFirestore(newSongs);
-      if (saved) {
-        newSongs.forEach((song) => removeStoredPendingSong(song.id));
+      if (firebase) {
+        const saved = await Promise.race([
+          firebase.saveSongsToFirestore(newSongs),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000)),
+        ]);
+        if (saved) {
+          newSongs.forEach((song) => removeStoredPendingSong(song.id));
+        }
       }
     } catch (err) {
-      console.warn('El álbum quedó pendiente de sincronizar:', err);
+      console.warn('El lote quedó guardado localmente y pendiente de sincronizar en la nube:', err);
     }
 
     return newSongs;

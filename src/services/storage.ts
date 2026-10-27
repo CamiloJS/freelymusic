@@ -765,6 +765,13 @@ export function addStoredPendingSong(song: Song): void {
   safeSetItem(PENDING_SONGS_KEY, JSON.stringify([song, ...current].slice(0, 100)));
 }
 
+export function addMultipleStoredPendingSongs(songs: Song[]): void {
+  if (songs.length === 0) return;
+  const newIds = new Set(songs.map((s) => s.id));
+  const current = getStoredPendingSongs().filter((item) => !newIds.has(item.id));
+  safeSetItem(PENDING_SONGS_KEY, JSON.stringify([...songs, ...current].slice(0, 150)));
+}
+
 export function removeStoredPendingSong(songId: string): void {
   const current = getStoredPendingSongs().filter((song) => song.id !== songId);
   safeSetItem(PENDING_SONGS_KEY, JSON.stringify(current));

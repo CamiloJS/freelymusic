@@ -1316,17 +1316,32 @@ https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
         });
       }
 
-      // Batch save to catalog / Firestore
-      const createdSongs = await addMultipleTracksToCatalog(songsToCreate);
+      // Batch save in progressive chunks of 25 tracks with visible real-time progress
+      const CHUNK_SIZE = 25;
+      const createdSongs: Song[] = [];
 
-      // Store local audio blobs in IndexedDB for 100% offline playback
-      for (let i = 0; i < createdSongs.length; i++) {
-        const created = createdSongs[i];
-        const localBlob = localBlobsToStore[i]?.blob;
-        if (localBlob) {
-          await storeSongBlob(created.id, localBlob);
+      for (let i = 0; i < songsToCreate.length; i += CHUNK_SIZE) {
+        const chunk = songsToCreate.slice(i, i + CHUNK_SIZE);
+        const createdChunk = await addMultipleTracksToCatalog(chunk);
+        createdSongs.push(...createdChunk);
+
+        // Store local audio blobs if present
+        const chunkBlobs = localBlobsToStore.slice(i, i + CHUNK_SIZE);
+        for (let j = 0; j < chunkBlobs.length; j++) {
+          const item = chunkBlobs[j];
+          if (item?.blob && createdChunk[j]) {
+            try {
+              await storeSongBlob(createdChunk[j].id, item.blob);
+            } catch {
+              // ignore local blob error
+            }
+          }
         }
-        setImportProgress({ current: i + 1, total: createdSongs.length });
+
+        const countNow = Math.min(i + chunk.length, songsToCreate.length);
+        setImportProgress({ current: countNow, total: songsToCreate.length });
+        // Allow UI to repaint smooth progress
+        await new Promise((r) => setTimeout(r, 20));
       }
 
       await refreshDownloadedIds();

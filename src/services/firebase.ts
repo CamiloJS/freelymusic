@@ -201,12 +201,26 @@ export async function saveSongsToFirestore(songs: Song[]): Promise<boolean> {
   if (!db || cleanSongs.length === 0) return false;
 
   try {
-    await ensureAuth();
-    const batch = writeBatch(db);
-    cleanSongs.forEach((song) => {
-      batch.set(doc(db!, ...BASE_PATH, 'catalog', song.id), song, { merge: true });
-    });
-    await batch.commit();
+    await Promise.race([
+      ensureAuth(),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2500)),
+    ]);
+
+    // Chunk into sub-batches of 40 documents to stay well below Firestore payload and time limits
+    const BATCH_SIZE = 40;
+    for (let i = 0; i < cleanSongs.length; i += BATCH_SIZE) {
+      const chunk = cleanSongs.slice(i, i + BATCH_SIZE);
+      const batch = writeBatch(db);
+      chunk.forEach((song) => {
+        batch.set(doc(db!, ...BASE_PATH, 'catalog', song.id), song, { merge: true });
+      });
+
+      // Avoid hanging indefinitely if network is sluggish or offline
+      await Promise.race([
+        batch.commit(),
+        new Promise<void>((resolve) => setTimeout(resolve, 3500)),
+      ]);
+    }
     return true;
   } catch (err) {
     console.warn('Error saving songs batch to Firestore:', err);
