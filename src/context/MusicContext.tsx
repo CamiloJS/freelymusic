@@ -32,6 +32,7 @@ import {
 } from '../services/storage';
 import { loadFirebaseService } from '../services/firebaseLoader';
 import { detectAudioDuration } from '../utils/audioDuration';
+import { searchLyrics, searchArtistAvatar } from '../services/metadataEnrichment';
 
 export interface DownloadingState {
   isDownloading: boolean;
@@ -476,6 +477,50 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [catalog, updateCatalogTrack]);
 
+  // Background auto-fetch missing lyrics from LRCLIB
+  const repairedLyricsSongIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!catalog.length || !isCatalogReady) return;
+
+    const songsMissingLyrics = catalog.filter(
+      (s) =>
+        (!s.lyricsLrc || !s.lyricsLrc.trim()) &&
+        Boolean(s.title) &&
+        Boolean(s.artist) &&
+        !repairedLyricsSongIdsRef.current.has(s.id)
+    );
+
+    if (songsMissingLyrics.length === 0) return;
+
+    let isCancelled = false;
+
+    const fetchNextLyrics = async () => {
+      for (const song of songsMissingLyrics) {
+        if (isCancelled) break;
+        repairedLyricsSongIdsRef.current.add(song.id);
+
+        try {
+          const lrc = await searchLyrics(song.title, song.artist, song.album, song.duration);
+          if (lrc && lrc.trim()) {
+            updateCatalogTrack({ ...song, lyricsLrc: lrc });
+          }
+        } catch (err) {
+          console.warn('LRCLIB auto-fetch error:', song.title, err);
+        }
+      }
+    };
+
+    const timer = setTimeout(() => {
+      void fetchNextLyrics();
+    }, 2500);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [catalog, isCatalogReady, updateCatalogTrack]);
+
   const deleteCatalogTrack = (songId: string) => {
     addStoredDeletedSongId(songId);
     removeStoredPendingSong(songId);
@@ -885,7 +930,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
-  const updateArtistProfile = async (artist: ArtistProfile) => {
+  const updateArtistProfile = useCallback(async (artist: ArtistProfile) => {
     const norm = artist.id || artist.name.trim().toLowerCase();
     const updated: ArtistProfile = {
       ...artist,
@@ -903,7 +948,64 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     saveStoredArtistProfile(updated);
     const firebase = await loadFirebaseService();
     await firebase.saveArtistProfileToFirestore(updated);
-  };
+  }, []);
+
+  // Auto-fetch official artist portraits for any artist lacking a profile photo
+  const autoAvatarCheckedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!catalog.length || !isCatalogReady) return;
+
+    const artistNames = new Set<string>();
+    catalog.forEach((s) => {
+      if (s.artist) {
+        s.artist.split(/[,&/]|feat\.|ft\./i).forEach((a) => {
+          const trimmed = a.trim();
+          if (trimmed) artistNames.add(trimmed);
+        });
+      }
+    });
+
+    const missing = Array.from(artistNames).filter((name) => {
+      const key = name.toLowerCase().trim();
+      const existing = artistProfiles.find((p) => p.id === key || p.name.toLowerCase() === key);
+      return !existing?.avatarUrl && !autoAvatarCheckedRef.current.has(key);
+    });
+
+    if (missing.length === 0) return;
+
+    let isCancelled = false;
+
+    const fetchNextAvatars = async () => {
+      for (const name of missing) {
+        if (isCancelled) break;
+        const key = name.toLowerCase().trim();
+        autoAvatarCheckedRef.current.add(key);
+
+        try {
+          const avatarUrl = await searchArtistAvatar(name);
+          if (avatarUrl) {
+            await updateArtistProfile({
+              id: key,
+              name,
+              avatarUrl,
+            });
+          }
+        } catch (e) {
+          console.warn('Could not auto-fetch avatar for artist:', name, e);
+        }
+      }
+    };
+
+    const timer = setTimeout(() => {
+      void fetchNextAvatars();
+    }, 2000);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [catalog, isCatalogReady, artistProfiles, updateArtistProfile]);
 
   // User Play Counts & Analytics Actions
   const recordSongPlay = useCallback(

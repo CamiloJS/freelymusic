@@ -428,3 +428,51 @@ export function buildManualUpdate(
 export function songNeedsEnrichment(song: Song): boolean {
   return song.needsReview === true || hasMissingMetadata(song);
 }
+
+/**
+ * Searches for an official high-resolution artist portrait image across Deezer & iTunes.
+ */
+export async function searchArtistAvatar(artistName: string): Promise<string | null> {
+  const clean = (artistName || '').trim();
+  if (!clean) return null;
+
+  try {
+    const url = `https://api.deezer.com/search/artist?q=${encodeURIComponent(clean)}`;
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (response.ok) {
+      const data = await response.json();
+      if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+        const sorted = [...data.data].sort((a, b) => Number(b.nb_fan || 0) - Number(a.nb_fan || 0));
+        const match = sorted.find((item) => textMatch(String(item.name || ''), clean)) || sorted[0];
+        if (
+          match &&
+          typeof match.picture_xl === 'string' &&
+          match.picture_xl &&
+          !match.picture_xl.includes('/artist//')
+        ) {
+          return match.picture_xl;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Error buscando avatar de artista en Deezer:', clean, err);
+  }
+
+  // Fallback: iTunes album artwork for this artist
+  try {
+    const itunesUrl = `${ITUNES_ENDPOINT}?term=${encodeURIComponent(clean)}&entity=album&limit=3`;
+    const res = await fetch(itunesUrl, { headers: { Accept: 'application/json' } });
+    if (res.ok) {
+      const itunesData = await res.json();
+      const results = (itunesData.results as Array<Record<string, unknown>>) || [];
+      if (results[0]?.artworkUrl100 && typeof results[0].artworkUrl100 === 'string') {
+        return results[0].artworkUrl100.replace(/\/\d+x\d+bb\./, '/600x600bb.');
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return null;
+}
+

@@ -24,6 +24,7 @@ import { saveStoredFirebaseConfig, getStoredFirebaseConfig } from '../services/s
 import { isFirebaseConnected } from '../services/firebase';
 import { compressImage } from '../utils/imageCompressor';
 import { detectAudioDuration } from '../utils/audioDuration';
+import { parseAudioUrlMetadata } from '../utils/urlMetadataParser';
 import { SongMediaEditor, SongMediaValue, EMPTY_SONG_MEDIA } from '../components/SongMediaEditor';
 import { MetadataEnrichmentModal } from '../components/MetadataEnrichmentModal';
 
@@ -189,24 +190,18 @@ export const AdminView: React.FC = () => {
     );
   }
 
-  // Handle URL change to auto-fill title
+  // Handle URL change to auto-fill title & artists
   const handleUrlBlur = () => {
-    if (audioUrl && !title) {
-      try {
-        const urlObj = new URL(audioUrl);
-        const filename = urlObj.pathname.split('/').pop() || '';
-        const cleanName = decodeURIComponent(filename)
-          .replace(/\.(mp3|wav|flac|m4a|aac|ogg)(\?.*)?$/i, '')
-          .replace(/[_-]/g, ' ')
-          .trim();
+    if (!audioUrl.trim()) return;
 
-        if (cleanName) {
-          setTitle(cleanName);
-        }
-      } catch {
-        // invalid URL format, ignore
-      }
+    const parsed = parseAudioUrlMetadata(audioUrl);
+    if (!title && parsed.title) {
+      setTitle(parsed.title);
     }
+    if ((!artistList[0] || artistList.length <= 1) && parsed.artists.length > 0) {
+      setArtistList(parsed.artists);
+    }
+    handleDetectDuration();
   };
 
   // Detect audio duration automatically

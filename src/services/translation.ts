@@ -17,6 +17,123 @@ export interface TranslateLyricsOptions {
   artist?: string;
 }
 
+const FEMALE_ARTIST_HINTS = new Set([
+  'aitana',
+  'marina',
+  'marina and the diamonds',
+  'kenia os',
+  'nicki nicole',
+  'danna paola',
+  'taylor swift',
+  'dua lipa',
+  'billie eilish',
+  'olivia rodrigo',
+  'rosalia',
+  'shakira',
+  'ariana grande',
+  'lady gaga',
+  'beyonce',
+  'adele',
+  'lana del rey',
+  'selena gomez',
+  'miley cyrus',
+  'katy perry',
+  'rihanna',
+  'camila cabello',
+  'sabrina carpenter',
+  'chappell roan',
+  'charli xcx',
+  'lorde',
+  'halsey',
+  'sia',
+  'kesha',
+  'carly rae jepsen',
+  'demi lovato',
+  'bebe rexha',
+  'zara larsson',
+  'becky g',
+  'karol g',
+  'natti natasha',
+  'anitta',
+  'maria becerra',
+  'tini',
+  'paloma mami',
+  'emilia',
+  'bad gyal',
+  'lola indigo',
+  'evaluna',
+  'mon laferte',
+]);
+
+export function isFemaleArtist(artist?: string): boolean {
+  if (!artist) return false;
+  const normalized = artist
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+  for (const name of FEMALE_ARTIST_HINTS) {
+    if (normalized.includes(name) || name.includes(normalized)) {
+      return true;
+    }
+  }
+
+  if (/\b(girl|girls|lady|queen|princess|miss|mrs|sister|women)\b/i.test(normalized)) {
+    return true;
+  }
+
+  return false;
+}
+
+export function applyFeminineConcordance(text: string): string {
+  if (!text) return text;
+
+  let result = text;
+  const replacements: Array<[RegExp, string]> = [
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+solo\b/gi, '$1 sola'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+cansado\b/gi, '$1 cansada'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+listo\b/gi, '$1 lista'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+preparado\b/gi, '$1 preparada'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+seguro\b/gi, '$1 segura'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+enamorado\b/gi, '$1 enamorada'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+obsesionado\b/gi, '$1 obsesionada'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+herido\b/gi, '$1 herida'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+roto\b/gi, '$1 rota'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+agradecido\b/gi, '$1 agradecida'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+perdido\b/gi, '$1 perdida'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+loco\b/gi, '$1 loca'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+confundido\b/gi, '$1 confundida'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+atrapado\b/gi, '$1 atrapada'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+desesperado\b/gi, '$1 desesperada'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+acostumbrado\b/gi, '$1 acostumbrada'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+emocionado\b/gi, '$1 emocionada'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+muerto\b/gi, '$1 muerta'],
+    [/\b(estoy|estaba|he estado|estuve|sigo|ando)\s+vivo\b/gi, '$1 viva'],
+
+    [/\b(me siento|me sentía|me he sentido)\s+solo\b/gi, '$1 sola'],
+    [/\b(me siento|me sentía|me he sentido)\s+cansado\b/gi, '$1 cansada'],
+    [/\b(me siento|me sentía|me he sentido)\s+seguro\b/gi, '$1 segura'],
+    [/\b(me siento|me sentía|me he sentido)\s+perdido\b/gi, '$1 perdida'],
+    [/\b(me siento|me sentía|me he sentido)\s+loco\b/gi, '$1 loca'],
+    [/\b(me siento|me sentía|me he sentido)\s+vivo\b/gi, '$1 viva'],
+    [/\b(me siento|me sentía|me he sentido)\s+muerto\b/gi, '$1 muerta'],
+
+    [/\b(quedarme|dejarme|encontrarme|verme)\s+solo\b/gi, '$1 sola'],
+
+    [/\b(fui|era|seré|soy|he sido)\s+el único\b/gi, '$1 la única'],
+    [/\b(fui|era|seré|soy|he sido)\s+el primero\b/gi, '$1 la primera'],
+    [/\b(fui|era|seré|soy|he sido)\s+un chico malo\b/gi, '$1 una chica mala'],
+    [/\b(fui|era|seré|soy|he sido)\s+un buen chico\b/gi, '$1 una buena chica'],
+  ];
+
+  for (const [pattern, repl] of replacements) {
+    result = result.replace(pattern, repl);
+  }
+
+  return result;
+}
+
 export interface TranslateLyricsResult {
   lines: LyricLine[];
   provider: string;
@@ -300,7 +417,13 @@ export async function translateLyricsWithCache(
     throw new Error('La letra no tiene líneas sincronizadas reconocibles.');
   }
 
-  const lines = await translateLines(originalLines, sourceLang, targetLang);
+  let lines = await translateLines(originalLines, sourceLang, targetLang);
+  if (targetLang === 'es' && isFemaleArtist(options.artist)) {
+    lines = lines.map((l) => ({
+      ...l,
+      text: applyFeminineConcordance(l.text),
+    }));
+  }
   const updatedAt = new Date().toISOString();
 
   const translation: LyricsTranslation = {

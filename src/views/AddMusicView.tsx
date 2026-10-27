@@ -26,8 +26,9 @@ import { useAudio } from '../context/AudioContext';
 import { parseLrc, formatTime } from '../utils/lyrics';
 import { compressImage } from '../utils/imageCompressor';
 import { SongMediaEditor, SongMediaValue, EMPTY_SONG_MEDIA } from '../components/SongMediaEditor';
-import { enrichSongMetadata } from '../services/metadataEnrichment';
+import { enrichSongMetadata, searchLyrics, searchCover } from '../services/metadataEnrichment';
 import { detectAudioDuration } from '../utils/audioDuration';
+import { parseAudioUrlMetadata } from '../utils/urlMetadataParser';
 import { Song, LyricLine } from '../types';
 
 interface AddMusicViewProps {
@@ -182,9 +183,11 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
       return updated;
     });
 
-    // Auto-detect audio duration whenever audioUrl changes
+    // Auto-detect metadata, duration and LRCLIB lyrics whenever audioUrl changes
     if (updates.audioUrl && updates.audioUrl.trim()) {
       const targetUrl = updates.audioUrl.trim();
+
+      // 1. Duration detection
       void detectAudioDuration(targetUrl).then((dur) => {
         if (dur > 0) {
           setAlbumTracks((prev) => {
@@ -196,6 +199,45 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
           });
         }
       });
+
+      // 2. Title & Artist parsing from URL filename
+      const parsed = parseAudioUrlMetadata(targetUrl);
+      const current = albumTracks[index];
+
+      const needTitle = !current?.title?.trim() && Boolean(parsed.title);
+      const detectedAlbumArt = albumArtistList.filter(Boolean).join(', ');
+      const needArtist = !current?.artist?.trim() && parsed.artists.length > 0;
+      const finalTrackArtist = needArtist ? parsed.artists.join(', ') : (current?.artist || detectedAlbumArt);
+      const finalTrackTitle = needTitle ? parsed.title : (current?.title || '');
+
+      if (needTitle || needArtist) {
+        setAlbumTracks((prev) => {
+          const next = [...prev];
+          if (next[index] && next[index].audioUrl.trim() === targetUrl) {
+            next[index] = {
+              ...next[index],
+              ...(needTitle ? { title: parsed.title } : {}),
+              ...(needArtist ? { artist: parsed.artists.join(', ') } : {}),
+            };
+          }
+          return next;
+        });
+      }
+
+      // 3. Search LRCLIB for synced lyrics automatically
+      if (finalTrackTitle && finalTrackArtist && (!current?.lyricsLrc || !current.lyricsLrc.trim())) {
+        void searchLyrics(finalTrackTitle, finalTrackArtist, albumTitle.trim() || undefined).then((lrc) => {
+          if (lrc) {
+            setAlbumTracks((prev) => {
+              const next = [...prev];
+              if (next[index] && next[index].audioUrl.trim() === targetUrl && !next[index].lyricsLrc) {
+                next[index] = { ...next[index], lyricsLrc: lrc };
+              }
+              return next;
+            });
+          }
+        });
+      }
     }
   };
 
@@ -244,37 +286,55 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     };
   }, [previewAudio]);
 
-  // Auto-detect metadata from URL
-  const handleUrlBlur = () => {
-    if (!audioUrl.trim()) return;
+  // Auto-detect metadata (Title, Artists, LRCLIB lyrics, cover) from URL
+  const handleAudioUrlChange = (newUrl: string) => {
+    setAudioUrl(newUrl);
+    if (!newUrl.trim()) return;
 
-    try {
-      const urlObj = new URL(audioUrl.trim());
-      const filename = urlObj.pathname.split('/').pop() || '';
-      const cleanName = decodeURIComponent(filename)
-        .replace(/\.(mp3|wav|flac|m4a|aac|ogg)(\?.*)?$/i, '')
-        .replace(/[_-]/g, ' ')
-        .trim();
+    const parsed = parseAudioUrlMetadata(newUrl);
 
-      if (cleanName && !title) {
-        // If name has "Artist - Song", separate them
-        if (cleanName.includes(' - ')) {
-          const parts = cleanName.split(' - ');
-          if (parts[0]) {
-            const splitArtists = parts[0].split(/[,&]/).map((a) => a.trim()).filter(Boolean);
-            if (splitArtists.length > 0) setArtistList(splitArtists);
-          }
-          if (parts[1]) setTitle(parts[1].trim());
-        } else {
-          setTitle(cleanName);
-        }
-      }
-    } catch {
-      // not a standard valid URL yet
+    let currentTitle = title;
+    let currentArtists = artistList.filter(Boolean);
+
+    if (!title.trim() && parsed.title) {
+      setTitle(parsed.title);
+      currentTitle = parsed.title;
     }
 
-    // Automatically trigger duration detection if not yet detected
-    detectAudioMetadata(audioUrl.trim());
+    if (currentArtists.length === 0 && parsed.artists.length > 0) {
+      setArtistList(parsed.artists);
+      currentArtists = parsed.artists;
+    }
+
+    // Automatically trigger duration detection
+    detectAudioMetadata(newUrl.trim());
+
+    // If title and artist are available, immediately fetch lyrics from LRCLIB & cover
+    const primaryArt = currentArtists[0] || (parsed.artists[0] ?? '');
+    if (currentTitle && primaryArt) {
+      void (async () => {
+        try {
+          if (!lyricsLrc.trim()) {
+            setDetectStatus('Buscando letra sincronizada en LRCLIB...');
+            const lrc = await searchLyrics(currentTitle, primaryArt, album.trim() || undefined);
+            if (lrc) {
+              setLyricsLrc(lrc);
+              setDetectStatus('✓ Letra sincronizada obtenida de LRCLIB');
+            }
+          }
+          if (coverUrl.includes('images.unsplash.com')) {
+            const foundCover = await searchCover(currentTitle, primaryArt, album.trim() || undefined);
+            if (foundCover) setCoverUrl(foundCover);
+          }
+        } catch {
+          // non-blocking
+        }
+      })();
+    }
+  };
+
+  const handleUrlBlur = () => {
+    handleAudioUrlChange(audioUrl);
   };
 
   // Detect audio duration and verify audio stream automatically
@@ -669,7 +729,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                   type="url"
                   required
                   value={audioUrl}
-                  onChange={(e) => setAudioUrl(e.target.value)}
+                  onChange={(e) => handleAudioUrlChange(e.target.value)}
                   onBlur={handleUrlBlur}
                   placeholder="https://filegarden.com/tu-usuario/cancion.mp3"
                   className="w-full bg-neutral-950 border border-neutral-800 rounded-2xl px-4 py-3.5 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono shadow-inner transition-colors"
