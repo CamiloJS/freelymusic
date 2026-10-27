@@ -34,7 +34,7 @@ import { loadFirebaseService } from '../services/firebaseLoader';
 import { detectAudioDuration } from '../utils/audioDuration';
 import { searchLyrics, searchArtistAvatar } from '../services/metadataEnrichment';
 import { cleanArtistSeparators } from '../utils/urlMetadataParser';
-import { preloadAllAppImages } from '../utils/offlineImagePreloader';
+import { preloadAllAppImages, preloadSingleImage } from '../utils/offlineImagePreloader';
 
 export interface DownloadingState {
   isDownloading: boolean;
@@ -614,6 +614,8 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const toggleFavorite = (songId: string) => {
+    const isAdding = !(userData?.favoriteSongIds || []).includes(songId);
+
     mutateUserData((previous) => {
       const currentFavorites = previous.favoriteSongIds || [];
       const nextFavorites = currentFavorites.includes(songId)
@@ -622,6 +624,19 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       return { ...previous, favoriteSongIds: nextFavorites };
     });
+
+    // Auto-download for 100% offline playback when adding to favorites
+    if (isAdding) {
+      const targetSong = catalog.find((s) => s.id === songId);
+      if (targetSong) {
+        if (targetSong.coverUrl) {
+          void preloadSingleImage(targetSong.coverUrl);
+        }
+        void cacheSongOffline(targetSong).then((ok) => {
+          if (ok) refreshDownloadedIds();
+        });
+      }
+    }
   };
 
   const userFavoriteSongs = useMemo(() => {
@@ -765,6 +780,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addSongToPlaylist = (playlistId: string, songId: string) => {
+    const targetPlaylist = (userData.playlists || []).find((pl) => pl.id === playlistId);
+    // If the playlist has downloaded tracks, auto-download the newly added track
+    const hasDownloads =
+      targetPlaylist && targetPlaylist.songIds.some((id) => downloadedSongIds.includes(id));
+
     mutateUserData((previous) => ({
       ...previous,
       playlists: previous.playlists.map((playlist) =>
@@ -777,6 +797,18 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           : playlist
       ),
     }));
+
+    if (hasDownloads) {
+      const targetSong = catalog.find((s) => s.id === songId);
+      if (targetSong) {
+        if (targetSong.coverUrl) {
+          void preloadSingleImage(targetSong.coverUrl);
+        }
+        void cacheSongOffline(targetSong).then((ok) => {
+          if (ok) refreshDownloadedIds();
+        });
+      }
+    }
   };
 
   const removeSongFromPlaylist = (playlistId: string, songId: string) => {

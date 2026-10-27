@@ -300,8 +300,7 @@ async function cover(title, artist, album, isAlbum) {
         const coverUrl = artwork.replace(/\/\d+x\d+bb\./, '/600x600bb.');
         const year = typeof best.releaseDate === 'string' ? best.releaseDate.slice(0, 4) : undefined;
         const genre = typeof best.primaryGenreName === 'string' ? best.primaryGenreName : undefined;
-        const isExplicit =
-          best.trackExplicitness === 'explicit' || best.collectionExplicitness === 'explicit';
+        const isExplicit = best.trackExplicitness === 'explicit';
 
         const result = {
           source: 'iTunes',
@@ -334,7 +333,7 @@ async function cover(title, artist, album, isAlbum) {
         : (best.album?.cover_xl || best.album?.cover_big || best.album?.cover_medium);
       if (artwork) {
         const year = typeof best.release_date === 'string' ? best.release_date.slice(0, 4) : undefined;
-        const isExplicit = Boolean(best.explicit_lyrics || best.explicit_content_lyrics === 1);
+        const isExplicit = !isAlbum && Boolean(best.explicit_lyrics || best.explicit_content_lyrics === 1);
 
         const result = {
           source: 'Deezer',

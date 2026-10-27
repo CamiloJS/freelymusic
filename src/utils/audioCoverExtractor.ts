@@ -523,8 +523,7 @@ export async function autoDetectOnlineMetadata(
           genre = best.primaryGenreName;
         }
 
-        const isExplicit =
-          best.trackExplicitness === 'explicit' || best.collectionExplicitness === 'explicit';
+        const isExplicit = best.trackExplicitness === 'explicit';
 
         return {
           coverUrl,
@@ -563,7 +562,7 @@ export async function autoDetectOnlineMetadata(
           year = best.release_date.slice(0, 4);
         }
 
-        const isExplicit = Boolean(best.explicit_lyrics || best.explicit_content_lyrics === 1);
+        const isExplicit = !isAlbum && Boolean(best.explicit_lyrics || best.explicit_content_lyrics === 1);
 
         return {
           coverUrl: typeof artwork === 'string' ? artwork : null,

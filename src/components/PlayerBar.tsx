@@ -358,7 +358,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
         {videoUrl && (
           <button
             onClick={openVideo}
-            className={`p-2 rounded-xl transition-colors ${
+            className={`player-video-btn p-2 rounded-xl transition-colors ${
               isVideoMode
                 ? 'bg-emerald-500/20 text-emerald-400'
                 : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
@@ -372,7 +372,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
         {/* Fullscreen Artwork Button (Pantalla Completa - Spotify Style) */}
         <button
           onClick={() => setIsFullscreenNowPlaying(true)}
-          className="p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors hidden sm:block"
+          className="player-fullscreen-btn p-2 rounded-xl text-neutral-400 hover:text-white hover:bg-neutral-900 transition-colors hidden sm:block"
           title="Pantalla completa con carátula del artista"
         >
           <Maximize2 className="w-4 h-4" />

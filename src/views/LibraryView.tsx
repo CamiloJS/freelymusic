@@ -372,10 +372,12 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     };
 
     const handleDownloadButtonClick = () => {
-      if (isAnyDownloaded || areAllDownloaded) {
+      if (areAllDownloaded) {
         setShowDeleteDownloadsConfirm(true);
       } else {
-        void handleDownloadAll();
+        // Download all missing tracks that aren't cached yet
+        const missingSongs = playlistSongs.filter((s) => !isDownloaded(s.id));
+        void downloadSongsBatch(missingSongs.length > 0 ? missingSongs : playlistSongs);
       }
     };
 

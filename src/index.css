@@ -96,33 +96,76 @@ input[type="range"] {
 }
 
 /* Mobile & Spotify Surfaces in Light Mode */
-[data-theme="light"] .bg-\[\#121212\] {
+[data-theme="light"] .bg-\[\#121212\],
+[data-theme="light"] .bg-\[\#121212\]\/95,
+[data-theme="light"] .bg-\[\#121212\]\/90,
+[data-theme="light"] .bg-\[\#121212\]\/80 {
   background-color: #ffffff !important;
 }
 [data-theme="light"] .bg-\[\#181818\],
 [data-theme="light"] .bg-\[\#181818\]\/95,
-[data-theme="light"] .bg-\[\#181818\]\/90 {
+[data-theme="light"] .bg-\[\#181818\]\/90,
+[data-theme="light"] .bg-\[\#181818\]\/80 {
   background-color: #f8fafc !important;
 }
 [data-theme="light"] .bg-\[\#242424\],
 [data-theme="light"] .bg-\[\#242424\]\/95,
+[data-theme="light"] .bg-\[\#242424\]\/90,
 [data-theme="light"] .bg-\[\#242424\]\/85,
-[data-theme="light"] .bg-\[\#242424\]\/60 {
+[data-theme="light"] .bg-\[\#242424\]\/60,
+[data-theme="light"] .bg-\[\#242424\]\/40 {
   background-color: #f1f5f9 !important;
 }
 [data-theme="light"] .bg-\[\#282828\],
-[data-theme="light"] .bg-\[\#282828\]\/50 {
+[data-theme="light"] .bg-\[\#282828\]\/90,
+[data-theme="light"] .bg-\[\#282828\]\/80,
+[data-theme="light"] .bg-\[\#282828\]\/50,
+[data-theme="light"] .bg-\[\#2c2c2c\],
+[data-theme="light"] .bg-\[\#2a2a2a\],
+[data-theme="light"] .bg-\[\#333333\],
+[data-theme="light"] .bg-\[\#333\] {
   background-color: #e2e8f0 !important;
 }
 [data-theme="light"] .border-\[\#242424\],
 [data-theme="light"] .border-\[\#282828\],
-[data-theme="light"] .border-\[\#333333\] {
+[data-theme="light"] .border-\[\#333333\],
+[data-theme="light"] .border-\[\#333\],
+[data-theme="light"] .border-white\/5,
+[data-theme="light"] .border-white\/10,
+[data-theme="light"] .border-white\/20,
+[data-theme="light"] .divide-neutral-800 > :not([hidden]) ~ :not([hidden]),
+[data-theme="light"] .divide-neutral-900 > :not([hidden]) ~ :not([hidden]),
+[data-theme="light"] .divide-\[\#282828\] > :not([hidden]) ~ :not([hidden]),
+[data-theme="light"] .divide-\[\#242424\] > :not([hidden]) ~ :not([hidden]) {
   border-color: #e2e8f0 !important;
 }
-[data-theme="light"] .hover\:bg-\[\#282828\]\/50:hover,
+
+/* All dark hover states mapped to clean light grays */
+[data-theme="light"] .hover\:bg-\[\#181818\]:hover,
+[data-theme="light"] .hover\:bg-\[\#242424\]:hover,
+[data-theme="light"] .hover\:bg-\[\#242424\]\/40:hover,
 [data-theme="light"] .hover\:bg-\[\#282828\]:hover,
-[data-theme="light"] .active\:bg-\[\#282828\]:active {
+[data-theme="light"] .hover\:bg-\[\#282828\]\/50:hover,
+[data-theme="light"] .hover\:bg-\[\#2a2a2a\]:hover,
+[data-theme="light"] .hover\:bg-\[\#2c2c2c\]:hover,
+[data-theme="light"] .hover\:bg-neutral-900:hover,
+[data-theme="light"] .hover\:bg-neutral-850:hover,
+[data-theme="light"] .hover\:bg-neutral-800:hover,
+[data-theme="light"] .hover\:bg-neutral-800\/60:hover,
+[data-theme="light"] .hover\:bg-neutral-800\/80:hover,
+[data-theme="light"] .hover\:bg-neutral-700:hover,
+[data-theme="light"] .hover\:bg-white\/5:hover,
+[data-theme="light"] .hover\:bg-white\/10:hover,
+[data-theme="light"] .hover\:bg-white\/20:hover {
   background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .active\:bg-\[\#242424\]:active,
+[data-theme="light"] .active\:bg-\[\#282828\]:active,
+[data-theme="light"] .active\:bg-\[\#2e2e2e\]:active,
+[data-theme="light"] .active\:bg-\[\#333333\]:active {
+  background-color: #e2e8f0 !important;
 }
 [data-theme="light"] .text-\[\#B3B3B3\],
 [data-theme="light"] .text-\[\#b3b3b3\],
@@ -628,30 +671,162 @@ input[type="range"] {
   color: var(--brand-color, #10b981) !important;
 }
 
+/* Home View in Light Mode */
+[data-theme="light"] .home-view-container {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .home-sticky-header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .home-filter-chip-inactive {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="light"] .home-filter-chip-inactive:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .home-greeting {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .home-quick-pick {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .home-quick-pick:hover {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .home-quick-pick-thumb {
+  background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .home-quick-pick-title {
+  color: #0f172a !important;
+}
+
 /* Center Lyrics View in Light Mode */
 [data-theme="light"] .center-lyrics-container {
   background-color: #f8fafc !important;
 }
 
 [data-theme="light"] .center-lyrics-ambient {
-  opacity: 0.15 !important;
+  opacity: 0.1 !important;
 }
 
 [data-theme="light"] .center-lyrics-overlay {
-  background: linear-gradient(to bottom, rgba(248, 250, 252, 0.5), rgba(248, 250, 252, 0.85), #f8fafc) !important;
+  background: linear-gradient(to bottom, rgba(248, 250, 252, 0.4), rgba(248, 250, 252, 0.8), #f8fafc) !important;
 }
 
 [data-theme="light"] .center-lyrics-fade-bottom {
-  background: linear-gradient(to top, #f8fafc, rgba(248, 250, 252, 0.85), transparent) !important;
+  background: linear-gradient(to top, #f8fafc 40%, rgba(248, 250, 252, 0.85) 75%, transparent) !important;
 }
 
 [data-theme="light"] .center-lyrics-fade-top {
-  background: linear-gradient(to bottom, #f8fafc, rgba(248, 250, 252, 0.65), transparent) !important;
+  background: linear-gradient(to bottom, #f8fafc 40%, rgba(248, 250, 252, 0.75) 75%, transparent) !important;
 }
 
-[data-theme="light"] .center-lyrics-container .border-b {
+[data-theme="light"] .center-lyrics-header {
   border-color: #e2e8f0 !important;
-  background-color: rgba(255, 255, 255, 0.85) !important;
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] .center-lyrics-header span.text-neutral-300 {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .center-lyrics-header span.text-white {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .center-lyrics-header button {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .center-lyrics-header button:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .center-lyrics-header button svg {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .center-lyrics-container .text-white {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .center-lyrics-container .text-white\/40,
+[data-theme="light"] .center-lyrics-container .text-white\/25 {
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] .center-lyrics-container .group:hover p {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .center-lyrics-container .text-white\/90 {
+  color: #475569 !important;
+}
+
+/* Player Bar Fullscreen & Video Buttons in Light Mode */
+[data-theme="light"] .player-fullscreen-btn,
+[data-theme="light"] .player-video-btn {
+  color: #64748b !important;
+}
+
+[data-theme="light"] .player-fullscreen-btn:hover,
+[data-theme="light"] .player-video-btn:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .fullscreen-cambiar-video-btn {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .fullscreen-cambiar-video-btn:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .fullscreen-cambiar-video-btn svg {
+  fill: #0f172a !important;
+  color: #0f172a !important;
+}
+
+/* Video modal top controls in Light Mode */
+[data-theme="light"] .music-video-modal-container button.bg-black\/60 {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .music-video-modal-container button.bg-black\/60:hover {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .music-video-modal-container button.bg-black\/60 svg {
+  color: #0f172a !important;
 }
 
 /* Lyrics Translation Popover */

@@ -420,7 +420,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
                   <button
                     type="button"
                     onClick={openVideo}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-white text-xs font-bold border border-white/10 shadow-md transition-all active:scale-95"
+                    className="fullscreen-cambiar-video-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-white text-xs font-bold border border-white/10 shadow-md transition-all active:scale-95"
                     title="Reproducir videoclip musical"
                   >
                     <Play className="w-3.5 h-3.5 fill-white text-white" />

@@ -625,7 +625,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
       const effectiveArtist = artistList.filter(Boolean)[0] || extracted?.artist || '';
       if (effectiveTitle && effectiveArtist && (!extracted?.coverUrl || !detectedGenre || !detectedYear)) {
         try {
-          const onlineMeta = await autoDetectOnlineMetadata('', effectiveArtist, effectiveTitle);
+          const onlineMeta = await autoDetectOnlineMetadata(effectiveTitle, effectiveArtist, album.trim() || undefined);
           if (!extracted?.coverUrl && onlineMeta.coverUrl) {
             setCoverUrl(onlineMeta.coverUrl);
           }

@@ -161,11 +161,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
   }
 
   return (
-    <div className="min-h-full bg-[#121212] text-white select-none pb-36">
+    <div className="home-view-container min-h-full bg-[#121212] text-white select-none pb-36">
       {/* =========================================================================
           A. STICKY TOP HEADER & FILTER CHIPS (Exact Spotify Mobile Style)
           ========================================================================= */}
-      <div className="sticky top-0 z-30 bg-[#121212]/95 backdrop-blur-xl pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 px-4 sm:px-6 border-b border-transparent">
+      <div className="home-sticky-header sticky top-0 z-30 bg-[#121212]/95 backdrop-blur-xl pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-3 px-4 sm:px-6 border-b border-transparent">
         <div className="flex items-center gap-3">
           {/* User profile avatar on left (tappable to open settings/switcher) */}
           <button
@@ -197,10 +197,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   key={chip}
                   type="button"
                   onClick={() => setActiveFilter(chip)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs transition-all whitespace-nowrap snap-start ${
+                  className={`home-filter-chip px-3.5 py-1.5 rounded-full text-xs transition-all whitespace-nowrap snap-start ${
                     isActive
-                      ? 'bg-[#1DB954] text-black font-extrabold shadow-md'
-                      : 'bg-[#242424] text-white hover:bg-[#2a2a2a] active:bg-[#333333] font-medium'
+                      ? 'home-filter-chip-active bg-[#1DB954] text-black font-extrabold shadow-md'
+                      : 'home-filter-chip-inactive bg-[#242424] text-white hover:bg-[#2a2a2a] active:bg-[#333333] font-medium'
                   }`}
                 >
                   {chip}
@@ -239,7 +239,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 B1. GREETING & 2-COLUMN QUICK PICKS GRID (Spotify Mobile Style)
                 ========================================================================= */}
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mb-3">
+              <h1 className="home-greeting text-xl sm:text-2xl font-black text-white tracking-tight mb-3">
                 {greeting}
               </h1>
 
@@ -267,10 +267,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                           });
                         }
                       }}
-                      className="flex items-center bg-[#242424]/90 hover:bg-[#282828] active:bg-[#2e2e2e] rounded-md overflow-hidden cursor-pointer group transition-colors shadow-sm relative"
+                      className="home-quick-pick flex items-center bg-[#242424]/90 hover:bg-[#282828] active:bg-[#2e2e2e] rounded-md overflow-hidden cursor-pointer group transition-colors shadow-sm relative"
                     >
                       {/* Square image on left */}
-                      <div className="w-13 h-13 sm:w-14 sm:h-14 bg-neutral-800 flex-shrink-0 relative overflow-hidden">
+                      <div className="home-quick-pick-thumb w-13 h-13 sm:w-14 sm:h-14 bg-neutral-800 flex-shrink-0 relative overflow-hidden">
                         {pick.isFavorites ? (
                           <div className="w-full h-full bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-600 flex items-center justify-center">
                             <span className="text-white text-base">♥</span>
@@ -292,7 +292,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       {/* Title on right */}
                       <div className="flex-1 min-w-0 px-2.5 py-1 flex items-center justify-between gap-1">
                         <span
-                          className={`text-xs font-bold leading-tight line-clamp-2 ${
+                          className={`home-quick-pick-title text-xs font-bold leading-tight line-clamp-2 ${
                             isCurrent ? 'text-[#1DB954]' : 'text-white'
                           }`}
                         >
