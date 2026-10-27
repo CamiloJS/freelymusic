@@ -6,6 +6,8 @@
  *    for both individual songs and full albums.
  */
 
+import { cleanArtistSeparators } from './urlMetadataParser';
+
 export interface ExtractedAudioMetadata {
   coverUrl?: string;
   title?: string;
@@ -14,7 +16,53 @@ export interface ExtractedAudioMetadata {
   year?: string;
   genre?: string;
   lyrics?: string;
+  isExplicit?: boolean;
   source: 'embedded_file' | 'online_search';
+}
+
+export interface OnlineDetectedMetadata {
+  coverUrl: string | null;
+  year?: string;
+  genre?: string;
+  isExplicit?: boolean;
+  title?: string;
+  artist?: string;
+  album?: string;
+}
+
+const ID3_GENRES = [
+  'Blues', 'Classic Rock', 'Country', 'Dance', 'Disco', 'Funk', 'Grunge', 'Hip-Hop',
+  'Jazz', 'Metal', 'New Age', 'Oldies', 'Other', 'Pop', 'R&B', 'Rap',
+  'Reggae', 'Rock', 'Techno', 'Industrial', 'Alternative', 'Ska', 'Death Metal', 'Pranks',
+  'Soundtrack', 'Euro-Techno', 'Ambient', 'Trip-Hop', 'Vocal', 'Jazz+Funk', 'Fusion', 'Trance',
+  'Classical', 'Instrumental', 'Acid', 'House', 'Game', 'Sound Clip', 'Gospel', 'Noise',
+  'AlternRock', 'Bass', 'Soul', 'Punk', 'Space', 'Meditative', 'Instrumental Pop', 'Instrumental Rock',
+  'Ethnic', 'Gothic', 'Darkwave', 'Techno-Industrial', 'Electronic', 'Pop-Folk', 'Eurodance', 'Dream',
+  'Southern Rock', 'Comedy', 'Cult', 'Gangsta', 'Top 40', 'Christian Rap', 'Pop/Funk', 'Jungle',
+  'Native American', 'Cabaret', 'New Wave', 'Psychadelic', 'Rave', 'Showtunes', 'Trailer', 'Lo-Fi',
+  'Tribal', 'Acid Punk', 'Acid Jazz', 'Polka', 'Retro', 'Musical', 'Rock & Roll', 'Hard Rock',
+  'Folk', 'Folk-Rock', 'National Folk', 'Swing', 'Fast Fusion', 'Bebob', 'Latin', 'Revival',
+  'Celtic', 'Bluegrass', 'Avantgarde', 'Gothic Rock', 'Progressive Rock', 'Psychedelic Rock', 'Symphonic Rock', 'Slow Rock',
+  'Big Band', 'Chorus', 'Easy Listening', 'Acoustic', 'Humour', 'Speech', 'Chanson', 'Opera',
+  'Chamber Music', 'Sonata', 'Symphony', 'Booty Bass', 'Primus', 'Porn Groove', 'Satire', 'Slow Jam',
+  'Club', 'Tango', 'Samba', 'Folklore', 'Ballad', 'Power Ballad', 'Rhythmic Soul', 'Freestyle',
+  'Duet', 'Punk Rock', 'Drum Solo', 'Acapella', 'Euro-House', 'Dance Hall', 'Goa', 'Drum & Bass',
+  'Club-House', 'Hardcore', 'Terror', 'Indie', 'BritPop', 'Negerpunk', 'Polsk Punk', 'Beat',
+  'Christian Gangsta', 'Heavy Metal', 'Black Metal', 'Crossover', 'Contemporary Christian', 'Christian Rock',
+  'Merengue', 'Salsa', 'Thrash Metal', 'Anime', 'JPop', 'Synthpop'
+];
+
+export function cleanGenreText(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  const numMatch = trimmed.match(/^\((\d+)\)$/) || trimmed.match(/^(\d+)$/);
+  if (numMatch) {
+    const idx = parseInt(numMatch[1], 10);
+    if (idx >= 0 && idx < ID3_GENRES.length) {
+      return ID3_GENRES[idx];
+    }
+  }
+  return trimmed.replace(/^\(\d+\)\s*/, '').trim();
 }
 
 function arrayBufferToBase64(buffer: Uint8Array): string {
@@ -207,16 +255,22 @@ export function parseId3(buffer: ArrayBuffer): Partial<ExtractedAudioMetadata> |
       if (frameId === 'TIT2' || frameId === 'TT2') {
         result.title = decodeText(textBytes, encoding);
       } else if (frameId === 'TPE1' || frameId === 'TP1') {
-        result.artist = decodeText(textBytes, encoding);
+        result.artist = cleanArtistSeparators(decodeText(textBytes, encoding));
       } else if (frameId === 'TALB' || frameId === 'TAL') {
         result.album = decodeText(textBytes, encoding);
       } else if (frameId === 'TYER' || frameId === 'TDRC' || frameId === 'TYE') {
         const yr = decodeText(textBytes, encoding);
-        result.year = yr.slice(0, 4);
+        const ym = yr.match(/\b(19\d{2}|20\d{2})\b/);
+        result.year = ym ? ym[1] : yr.slice(0, 4);
       } else if (frameId === 'TCON' || frameId === 'TCO') {
-        result.genre = decodeText(textBytes, encoding);
+        result.genre = cleanGenreText(decodeText(textBytes, encoding));
       } else if (frameId === 'USLT') {
         result.lyrics = decodeText(textBytes.subarray(4), encoding);
+      } else if (frameId === 'TXXX') {
+        const full = decodeText(textBytes, encoding);
+        if (/itunesadvisory/i.test(full) && (/\b1\b|explicit/i.test(full))) {
+          result.isExplicit = true;
+        }
       }
     }
 
@@ -272,6 +326,55 @@ export function parseFlac(buffer: ArrayBuffer): Partial<ExtractedAudioMetadata> 
           const detectedMime = detectMimeTypeFromMagic(rawImage);
           const base64 = arrayBufferToBase64(rawImage);
           result.coverUrl = `data:${detectedMime || mime || 'image/jpeg'};base64,${base64}`;
+        }
+      } catch {
+        // continue
+      }
+    }
+
+    // Block type 4: VORBIS_COMMENT
+    if (blockType === 4 && blockSize > 8) {
+      try {
+        const view = new DataView(buffer, offset, blockSize);
+        let pos = 0;
+        const vendorLen = view.getUint32(pos, true);
+        pos += 4 + vendorLen;
+        if (pos + 4 <= blockSize) {
+          const userCommentCount = view.getUint32(pos, true);
+          pos += 4;
+          const decoder = new TextDecoder('utf-8');
+          for (let i = 0; i < userCommentCount && pos < blockSize - 4; i++) {
+            const commentLen = view.getUint32(pos, true);
+            pos += 4;
+            if (pos + commentLen > blockSize) break;
+            const commentStr = decoder.decode(bytes.subarray(offset + pos, offset + pos + commentLen));
+            pos += commentLen;
+
+            const eqIdx = commentStr.indexOf('=');
+            if (eqIdx > 0) {
+              const field = commentStr.slice(0, eqIdx).toUpperCase().trim();
+              const val = commentStr.slice(eqIdx + 1).trim();
+
+              if (field === 'TITLE' && !result.title) {
+                result.title = val;
+              } else if (field === 'ARTIST' && !result.artist) {
+                result.artist = cleanArtistSeparators(val);
+              } else if (field === 'ALBUM' && !result.album) {
+                result.album = val;
+              } else if ((field === 'DATE' || field === 'YEAR') && !result.year) {
+                const ym = val.match(/\b(19\d{2}|20\d{2})\b/);
+                result.year = ym ? ym[1] : val.slice(0, 4);
+              } else if (field === 'GENRE' && !result.genre) {
+                result.genre = cleanGenreText(val);
+              } else if ((field === 'LYRICS' || field === 'UNSYNCEDLYRICS') && !result.lyrics) {
+                result.lyrics = val;
+              } else if (field === 'ITUNESADVISORY' || field === 'EXPLICIT') {
+                if (val === '1' || val.toLowerCase() === 'explicit' || val.toLowerCase() === 'true') {
+                  result.isExplicit = true;
+                }
+              }
+            }
+          }
         }
       } catch {
         // continue
@@ -350,17 +453,17 @@ export async function extractMetadataFromAudioSource(
 }
 
 /**
- * Automatically detects and fetches high-resolution cover art (iTunes, Deezer, proxy)
- * for an individual song or album.
+ * Automatically detects and fetches metadata (Cover, Year, Genre, Explicit)
+ * from multi-source APIs (iTunes, Deezer, proxy) for an individual song or album.
  */
-export async function autoDetectCover(
+export async function autoDetectOnlineMetadata(
   title: string,
   artist: string,
   album?: string,
   isAlbum = false
-): Promise<string | null> {
+): Promise<OnlineDetectedMetadata> {
   const query = [artist, album || title].filter(Boolean).join(' ').trim();
-  if (!query) return null;
+  if (!query) return { coverUrl: null };
 
   // 1. First attempt: proxy endpoint (server-side, avoids CORS)
   try {
@@ -375,8 +478,16 @@ export async function autoDetectCover(
     const response = await fetch(`/api/metadata?${params.toString()}`);
     if (response.ok) {
       const data = await response.json();
-      if (typeof data.coverUrl === 'string' && data.coverUrl.trim()) {
-        return data.coverUrl.trim();
+      if (data && (data.coverUrl || data.year || data.genre || data.isExplicit !== undefined)) {
+        return {
+          coverUrl: data.coverUrl ? String(data.coverUrl).trim() : null,
+          year: data.year ? String(data.year).trim() : undefined,
+          genre: data.genre ? String(data.genre).trim() : undefined,
+          isExplicit: typeof data.isExplicit === 'boolean' ? data.isExplicit : undefined,
+          title: data.title ? String(data.title).trim() : undefined,
+          artist: data.artist ? cleanArtistSeparators(String(data.artist)) : undefined,
+          album: data.album ? String(data.album).trim() : undefined,
+        };
       }
     }
   } catch {
@@ -396,10 +507,34 @@ export async function autoDetectCover(
       const results = Array.isArray(data.results) ? data.results : [];
       if (results.length > 0) {
         const best = results[0];
+        let coverUrl: string | null = null;
         const rawArtwork = best.artworkUrl100 || best.artworkUrl60;
         if (typeof rawArtwork === 'string') {
-          return rawArtwork.replace(/\/\d+x\d+bb\./, '/600x600bb.');
+          coverUrl = rawArtwork.replace(/\/\d+x\d+bb\./, '/600x600bb.');
         }
+
+        let year: string | undefined;
+        if (typeof best.releaseDate === 'string') {
+          year = best.releaseDate.slice(0, 4);
+        }
+
+        let genre: string | undefined;
+        if (typeof best.primaryGenreName === 'string') {
+          genre = best.primaryGenreName;
+        }
+
+        const isExplicit =
+          best.trackExplicitness === 'explicit' || best.collectionExplicitness === 'explicit';
+
+        return {
+          coverUrl,
+          year,
+          genre,
+          isExplicit,
+          title: best.trackName || best.collectionName,
+          artist: cleanArtistSeparators(best.artistName),
+          album: best.collectionName,
+        };
       }
     }
   } catch {
@@ -422,16 +557,43 @@ export async function autoDetectCover(
         const artwork = isAlbum
           ? best.cover_xl || best.cover_big || best.cover_medium
           : best.album?.cover_xl || best.album?.cover_big || best.album?.cover_medium;
-        if (typeof artwork === 'string') {
-          return artwork;
+
+        let year: string | undefined;
+        if (typeof best.release_date === 'string') {
+          year = best.release_date.slice(0, 4);
         }
+
+        const isExplicit = Boolean(best.explicit_lyrics || best.explicit_content_lyrics === 1);
+
+        return {
+          coverUrl: typeof artwork === 'string' ? artwork : null,
+          year,
+          isExplicit,
+          title: best.title,
+          artist: cleanArtistSeparators(best.artist?.name),
+          album: best.album?.title,
+        };
       }
     }
   } catch {
     // No cover found
   }
 
-  return null;
+  return { coverUrl: null };
+}
+
+/**
+ * Automatically detects and fetches high-resolution cover art (iTunes, Deezer, proxy)
+ * for an individual song or album.
+ */
+export async function autoDetectCover(
+  title: string,
+  artist: string,
+  album?: string,
+  isAlbum = false
+): Promise<string | null> {
+  const meta = await autoDetectOnlineMetadata(title, artist, album, isAlbum);
+  return meta.coverUrl;
 }
 
 /**

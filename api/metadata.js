@@ -272,6 +272,15 @@ async function lyrics(title, artist, album, duration) {
   return result;
 }
 
+function cleanArtistSeparators(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .split(/\s*[\/\\]+\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(', ');
+}
+
 async function cover(title, artist, album, isAlbum) {
   const query = [artist, album || title].filter(Boolean).join(' ');
   const key = `cover:${query}:${Boolean(isAlbum)}`;
@@ -289,7 +298,21 @@ async function cover(title, artist, album, isAlbum) {
       const artwork = best.artworkUrl100 || best.artworkUrl60;
       if (typeof artwork === 'string') {
         const coverUrl = artwork.replace(/\/\d+x\d+bb\./, '/600x600bb.');
-        const result = { source: 'iTunes', coverUrl };
+        const year = typeof best.releaseDate === 'string' ? best.releaseDate.slice(0, 4) : undefined;
+        const genre = typeof best.primaryGenreName === 'string' ? best.primaryGenreName : undefined;
+        const isExplicit =
+          best.trackExplicitness === 'explicit' || best.collectionExplicitness === 'explicit';
+
+        const result = {
+          source: 'iTunes',
+          coverUrl,
+          year,
+          genre,
+          isExplicit,
+          title: best.trackName || best.collectionName,
+          artist: cleanArtistSeparators(best.artistName),
+          album: best.collectionName,
+        };
         cacheSet(key, result);
         return result;
       }
@@ -310,7 +333,18 @@ async function cover(title, artist, album, isAlbum) {
         ? (best.cover_xl || best.cover_big || best.cover_medium)
         : (best.album?.cover_xl || best.album?.cover_big || best.album?.cover_medium);
       if (artwork) {
-        const result = { source: 'Deezer', coverUrl: artwork };
+        const year = typeof best.release_date === 'string' ? best.release_date.slice(0, 4) : undefined;
+        const isExplicit = Boolean(best.explicit_lyrics || best.explicit_content_lyrics === 1);
+
+        const result = {
+          source: 'Deezer',
+          coverUrl: artwork,
+          year,
+          isExplicit,
+          title: best.title,
+          artist: cleanArtistSeparators(best.artist?.name),
+          album: best.album?.title,
+        };
         cacheSet(key, result);
         return result;
       }

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseId3, parseFlac, autoDetectCover, autoDetectAlbumCover } from './audioCoverExtractor';
+import {
+  parseId3,
+  parseFlac,
+  autoDetectCover,
+  autoDetectAlbumCover,
+  cleanGenreText,
+} from './audioCoverExtractor';
 
 describe('audioCoverExtractor', () => {
   it('parses ID3v2.3 tags with title, artist, album and APIC cover', () => {
@@ -17,8 +23,8 @@ describe('audioCoverExtractor', () => {
       ...titleBytes,
     ];
 
-    // Frame 2: TPE1 (Artist)
-    const artistText = 'Queen';
+    // Frame 2: TPE1 (Artist with slash: J Balvin/Bad Bunny)
+    const artistText = 'J Balvin/Bad Bunny';
     const artistBytes = Array.from(new TextEncoder().encode(artistText));
     const tpe1Header = [
       0x54, 0x50, 0x45, 0x31, // 'TPE1'
@@ -60,8 +66,15 @@ describe('audioCoverExtractor', () => {
     const result = parseId3(allBytes.buffer);
     expect(result).not.toBeNull();
     expect(result?.title).toBe('Bohemian Rhapsody');
-    expect(result?.artist).toBe('Queen');
+    expect(result?.artist).toBe('J Balvin, Bad Bunny');
     expect(result?.coverUrl).toContain('data:image/jpeg;base64,');
+  });
+
+  it('translates numeric ID3 genre to human genre name', () => {
+    expect(cleanGenreText('(13)')).toBe('Pop');
+    expect(cleanGenreText('(15)')).toBe('Rap');
+    expect(cleanGenreText('(17)')).toBe('Rock');
+    expect(cleanGenreText('Reggaeton')).toBe('Reggaeton');
   });
 
   it('returns null for non-ID3 buffer', () => {

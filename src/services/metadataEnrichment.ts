@@ -178,7 +178,7 @@ export async function searchMusicBrainz(
 
       return {
         title: recording.title || title,
-        artist: candidateArtist || artist,
+        artist: cleanArtistSeparators(candidateArtist || artist),
         album,
         year,
         genre,
@@ -272,6 +272,7 @@ export async function searchLyrics(
 }
 
 import { autoDetectCover } from '../utils/audioCoverExtractor';
+import { cleanArtistSeparators } from '../utils/urlMetadataParser';
 
 export async function searchCover(
   title: string,

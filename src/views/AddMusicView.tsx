@@ -28,11 +28,12 @@ import { compressImage } from '../utils/imageCompressor';
 import { SongMediaEditor, SongMediaValue, EMPTY_SONG_MEDIA } from '../components/SongMediaEditor';
 import { enrichSongMetadata, searchLyrics, searchCover } from '../services/metadataEnrichment';
 import { detectAudioDuration } from '../utils/audioDuration';
-import { parseAudioUrlMetadata } from '../utils/urlMetadataParser';
+import { parseAudioUrlMetadata, cleanArtistSeparators, splitArtistNames } from '../utils/urlMetadataParser';
 import {
   extractMetadataFromAudioSource,
   autoDetectCover,
   autoDetectAlbumCover,
+  autoDetectOnlineMetadata,
 } from '../utils/audioCoverExtractor';
 import { Song, LyricLine } from '../types';
 
@@ -129,6 +130,18 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   };
 
   const handleArtistChange = (index: number, val: string) => {
+    if (val.includes('/') || val.includes('\\')) {
+      const parts = val.split(/\s*[\/\\]+\s*/).map((p) => p.trim()).filter(Boolean);
+      if (parts.length > 1) {
+        setArtistList((prev) => {
+          const next = [...prev];
+          next[index] = parts[0];
+          next.splice(index + 1, 0, ...parts.slice(1));
+          return next;
+        });
+        return;
+      }
+    }
     const updated = [...artistList];
     updated[index] = val;
     setArtistList(updated);
@@ -148,6 +161,18 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   };
 
   const handleAlbumArtistChange = (index: number, val: string) => {
+    if (val.includes('/') || val.includes('\\')) {
+      const parts = val.split(/\s*[\/\\]+\s*/).map((p) => p.trim()).filter(Boolean);
+      if (parts.length > 1) {
+        setAlbumArtistList((prev) => {
+          const next = [...prev];
+          next[index] = parts[0];
+          next.splice(index + 1, 0, ...parts.slice(1));
+          return next;
+        });
+        return;
+      }
+    }
     const updated = [...albumArtistList];
     updated[index] = val;
     setAlbumArtistList(updated);
@@ -213,12 +238,13 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
       const current = albumTracks[index];
 
       const needTitle = !current?.title?.trim() && Boolean(parsed.title);
-      const detectedAlbumArt = albumArtistList.filter(Boolean).join(', ');
+      const detectedAlbumArt = albumArtistList.filter(Boolean).map(cleanArtistSeparators).join(', ');
       const needArtist = !current?.artist?.trim() && parsed.artists.length > 0;
-      const finalTrackArtist = needArtist ? parsed.artists.join(', ') : (current?.artist || detectedAlbumArt);
+      const finalTrackArtist = needArtist ? parsed.artists.join(', ') : (cleanArtistSeparators(current?.artist || '') || detectedAlbumArt);
       const finalTrackTitle = needTitle ? parsed.title : (current?.title || '');
+      const needExplicit = current?.isExplicit === false && Boolean(parsed.isExplicit);
 
-      if (needTitle || needArtist) {
+      if (needTitle || needArtist || needExplicit) {
         setAlbumTracks((prev) => {
           const next = [...prev];
           if (next[index] && next[index].audioUrl.trim() === targetUrl) {
@@ -226,6 +252,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
               ...next[index],
               ...(needTitle ? { title: parsed.title } : {}),
               ...(needArtist ? { artist: parsed.artists.join(', ') } : {}),
+              ...(needExplicit ? { isExplicit: true } : {}),
             };
           }
           return next;
@@ -247,7 +274,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         });
       }
 
-      // 4. Extract embedded cover art & ID3 tags from audio file
+      // 4. Extract embedded cover art, Year, Genre, Explicit & ID3 tags from audio file
       void (async () => {
         try {
           const extracted = await extractMetadataFromAudioSource(targetUrl);
@@ -258,27 +285,47 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
             if (!albumTitle.trim() && extracted.album) {
               setAlbumTitle(extracted.album);
             }
+            if (extracted.year && (!albumYear.trim() || albumYear === '2026')) {
+              setAlbumYear(extracted.year);
+            }
+            if (extracted.genre && !albumGenre.trim()) {
+              setAlbumGenre(extracted.genre);
+            }
             if (albumArtistList.filter(Boolean).length === 0 && extracted.artist) {
-              setAlbumArtistList([extracted.artist]);
+              const splitArts = splitArtistNames(extracted.artist);
+              if (splitArts.length > 0) setAlbumArtistList(splitArts);
             }
             setAlbumTracks((prev) => {
               const next = [...prev];
               if (next[index] && next[index].audioUrl.trim() === targetUrl) {
+                const trackArts = extracted.artist ? splitArtistNames(extracted.artist).join(', ') : '';
                 next[index] = {
                   ...next[index],
                   title: next[index].title || extracted.title || '',
-                  artist: next[index].artist || extracted.artist || '',
+                  artist: next[index].artist || trackArts || '',
                   lyricsLrc: next[index].lyricsLrc || extracted.lyrics || '',
+                  isExplicit: next[index].isExplicit || extracted.isExplicit || false,
                 };
               }
               return next;
             });
-          } else if (albumCoverUrl.includes('images.unsplash.com')) {
-            const art = albumArtistList.filter(Boolean)[0] || '';
-            const alb = albumTitle.trim();
-            if (art || alb) {
-              const onlineCover = await autoDetectAlbumCover(alb, art);
-              if (onlineCover) setAlbumCoverUrl(onlineCover);
+          }
+
+          // In addition, if album cover/year/genre are still empty, query online metadata
+          const effAlbum = albumTitle.trim() || extracted?.album || '';
+          const effArtist = albumArtistList.filter(Boolean)[0] || (extracted?.artist ? splitArtistNames(extracted.artist)[0] : '');
+          if (effAlbum || effArtist) {
+            const onlineMeta = await autoDetectOnlineMetadata('', effArtist, effAlbum, true);
+            if (onlineMeta) {
+              if (onlineMeta.coverUrl && albumCoverUrl.includes('images.unsplash.com')) {
+                setAlbumCoverUrl(onlineMeta.coverUrl);
+              }
+              if (onlineMeta.year && (!albumYear.trim() || albumYear === '2026')) {
+                setAlbumYear(onlineMeta.year);
+              }
+              if (onlineMeta.genre && !albumGenre.trim()) {
+                setAlbumGenre(onlineMeta.genre);
+              }
             }
           }
         } catch {
@@ -333,7 +380,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     };
   }, [previewAudio]);
 
-  // Auto-detect metadata (Title, Artists, LRCLIB lyrics, cover) from URL or File
+  // Auto-detect metadata (Title, Artists, LRCLIB lyrics, cover, Year, Genre, Explicit) from URL or File
   const handleAudioUrlChange = async (newUrl: string) => {
     setAudioUrl(newUrl);
     if (!newUrl.trim()) return;
@@ -354,25 +401,34 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
       currentArtists = parsed.artists;
     }
 
+    if (parsed.year && (!year.trim() || year === '2026')) {
+      setYear(parsed.year);
+    }
+    if (parsed.isExplicit) {
+      setIsExplicit(true);
+    }
+
     // Automatically trigger duration detection
     detectAudioMetadata(trimmedUrl);
 
-    // 1. First, attempt to extract embedded cover art & ID3 tags from audio stream
-    setDetectStatus('Analizando archivo y extrayendo carátula...');
+    // 1. First, attempt to extract embedded cover art & ID3 / FLAC tags from audio stream
+    setDetectStatus('Analizando archivo y extrayendo metadatos...');
     try {
       const extracted = await extractMetadataFromAudioSource(trimmedUrl);
       if (extracted) {
         if (extracted.coverUrl && (coverUrl.includes('images.unsplash.com') || !coverUrl)) {
           setCoverUrl(extracted.coverUrl);
-          setDetectStatus('✓ Carátula extraída del archivo de audio');
         }
         if (!currentTitle && extracted.title) {
           setTitle(extracted.title);
           currentTitle = extracted.title;
         }
-        if (currentArtists.length === 0 && extracted.artist) {
-          setArtistList([extracted.artist]);
-          currentArtists = [extracted.artist];
+        if (extracted.artist) {
+          const splitArts = splitArtistNames(extracted.artist);
+          if (currentArtists.length === 0 && splitArts.length > 0) {
+            setArtistList(splitArts);
+            currentArtists = splitArts;
+          }
         }
         if (!album.trim() && extracted.album) {
           setAlbum(extracted.album);
@@ -380,18 +436,22 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
         if (!genre.trim() && extracted.genre) {
           setGenre(extracted.genre);
         }
-        if (!year.trim() && extracted.year) {
+        if (extracted.year && (!year.trim() || year === '2026')) {
           setYear(extracted.year);
+        }
+        if (extracted.isExplicit !== undefined) {
+          setIsExplicit(extracted.isExplicit);
         }
         if (!lyricsLrc.trim() && extracted.lyrics) {
           setLyricsLrc(extracted.lyrics);
         }
+        setDetectStatus('✓ Metadatos y etiquetas extraídos del archivo de audio');
       }
     } catch {
       // non-blocking
     }
 
-    // 2. If title and artist are available, immediately fetch lyrics from LRCLIB & cover from iTunes/Deezer
+    // 2. Online search for lyrics, cover, release year, genre, and explicit rating
     const primaryArt = currentArtists[0] || (parsed.artists[0] ?? '');
     if (currentTitle && primaryArt) {
       void (async () => {
@@ -401,15 +461,26 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
             const lrc = await searchLyrics(currentTitle, primaryArt, album.trim() || undefined);
             if (lrc) {
               setLyricsLrc(lrc);
-              setDetectStatus('✓ Letra sincronizada obtenida de LRCLIB');
             }
           }
-          if (coverUrl.includes('images.unsplash.com') || !coverUrl) {
-            const foundCover = await autoDetectCover(currentTitle, primaryArt, album.trim() || undefined);
-            if (foundCover) {
-              setCoverUrl(foundCover);
-              setDetectStatus('✓ Carátula detectada automáticamente (iTunes/Deezer)');
+
+          setDetectStatus('Detectando metadatos en línea (Año, Género, Carátula, Explícito)...');
+          const onlineMeta = await autoDetectOnlineMetadata(currentTitle, primaryArt, album.trim() || undefined);
+          if (onlineMeta) {
+            if (onlineMeta.coverUrl && (coverUrl.includes('images.unsplash.com') || !coverUrl)) {
+              setCoverUrl(onlineMeta.coverUrl);
             }
+            if (onlineMeta.year && (!year.trim() || year === '2026')) {
+              setYear(onlineMeta.year);
+            }
+            if (onlineMeta.genre && !genre.trim()) {
+              setGenre(onlineMeta.genre);
+            }
+            if (onlineMeta.isExplicit !== undefined) {
+              setIsExplicit(onlineMeta.isExplicit);
+            }
+            setDetectStatus('✓ Metadatos y carátula obtenidos automáticamente');
+            setTimeout(() => setDetectStatus(null), 3500);
           }
         } catch {
           // non-blocking
@@ -422,31 +493,46 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     handleAudioUrlChange(audioUrl);
   };
 
-  // Blur handler on title/artist to auto-search cover if still default
+  // Blur handler on title/artist to auto-search metadata & cover if still default
   const handleSingleMetadataBlur = async () => {
     const art = artistList.filter(Boolean)[0] || '';
-    if (title.trim() && art && (coverUrl.includes('images.unsplash.com') || !coverUrl)) {
+    if (title.trim() && art) {
       try {
-        const found = await autoDetectCover(title.trim(), art, album.trim() || undefined);
-        if (found) {
-          setCoverUrl(found);
-          setDetectStatus('✓ Carátula detectada automáticamente');
-          setTimeout(() => setDetectStatus(null), 3500);
+        const meta = await autoDetectOnlineMetadata(title.trim(), art, album.trim() || undefined);
+        if (meta.coverUrl && (coverUrl.includes('images.unsplash.com') || !coverUrl)) {
+          setCoverUrl(meta.coverUrl);
         }
+        if (meta.year && (!year.trim() || year === '2026')) {
+          setYear(meta.year);
+        }
+        if (meta.genre && !genre.trim()) {
+          setGenre(meta.genre);
+        }
+        if (meta.isExplicit !== undefined) {
+          setIsExplicit(meta.isExplicit);
+        }
+        setDetectStatus('✓ Metadatos actualizados automáticamente');
+        setTimeout(() => setDetectStatus(null), 3500);
       } catch {
         // non-blocking
       }
     }
   };
 
-  // Blur handler on album fields to auto-search album cover if still default
+  // Blur handler on album fields to auto-search album cover and album metadata
   const handleAlbumMetadataBlur = async () => {
     const art = albumArtistList.filter(Boolean)[0] || '';
-    if ((albumTitle.trim() || art) && (albumCoverUrl.includes('images.unsplash.com') || !albumCoverUrl)) {
+    if (albumTitle.trim() || art) {
       try {
-        const found = await autoDetectAlbumCover(albumTitle.trim(), art);
-        if (found) {
-          setAlbumCoverUrl(found);
+        const meta = await autoDetectOnlineMetadata('', art, albumTitle.trim(), true);
+        if (meta.coverUrl && (albumCoverUrl.includes('images.unsplash.com') || !albumCoverUrl)) {
+          setAlbumCoverUrl(meta.coverUrl);
+        }
+        if (meta.year && (!albumYear.trim() || albumYear === '2026')) {
+          setAlbumYear(meta.year);
+        }
+        if (meta.genre && !albumGenre.trim()) {
+          setAlbumGenre(meta.genre);
         }
       } catch {
         // non-blocking
@@ -492,29 +578,51 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     setDetectStatus('Extrayendo carátula y metadatos del archivo de audio...');
     try {
       const extracted = await extractMetadataFromAudioSource(target);
+      let detectedExplicit = extracted?.isExplicit;
+      let detectedYear = extracted?.year;
+      let detectedGenre = extracted?.genre;
+
       if (extracted?.coverUrl) {
         setCoverUrl(extracted.coverUrl);
-        if (!title.trim() && extracted.title) setTitle(extracted.title);
-        if (artistList.filter(Boolean).length === 0 && extracted.artist) setArtistList([extracted.artist]);
-        if (!album.trim() && extracted.album) setAlbum(extracted.album);
-        if (!genre.trim() && extracted.genre) setGenre(extracted.genre);
-        if (!year.trim() && extracted.year) setYear(extracted.year);
-        if (!lyricsLrc.trim() && extracted.lyrics) setLyricsLrc(extracted.lyrics);
-        setDetectStatus('✓ Carátula y metadatos extraídos del archivo de audio');
-      } else {
-        const effectiveTitle = title.trim() || extracted?.title || '';
-        const effectiveArtist = artistList.filter(Boolean)[0] || extracted?.artist || '';
-        if (effectiveTitle && effectiveArtist) {
-          const onlineCover = await autoDetectCover(effectiveTitle, effectiveArtist, album.trim() || extracted?.album);
-          if (onlineCover) {
-            setCoverUrl(onlineCover);
-            setDetectStatus('✓ Carátula detectada en línea automáticamente');
-          } else {
-            setDetectStatus('El archivo no contiene carátula incrustada.');
+      }
+      if (!title.trim() && extracted?.title) setTitle(extracted.title);
+      if (extracted?.artist && artistList.filter(Boolean).length === 0) {
+        const parts = splitArtistNames(cleanArtistSeparators(extracted.artist));
+        if (parts.length > 0) setArtistList(parts);
+      }
+      if (!album.trim() && extracted?.album) setAlbum(extracted.album);
+      if (!genre.trim() && detectedGenre) setGenre(detectedGenre);
+      if (!year.trim() && detectedYear) setYear(detectedYear);
+      if (detectedExplicit !== undefined) setIsExplicit(Boolean(detectedExplicit));
+      if (!lyricsLrc.trim() && extracted?.lyrics) setLyricsLrc(extracted.lyrics);
+
+      // If online cover or tags can complement missing data
+      const effectiveTitle = title.trim() || extracted?.title || '';
+      const effectiveArtist = artistList.filter(Boolean)[0] || extracted?.artist || '';
+      if (effectiveTitle && effectiveArtist && (!extracted?.coverUrl || !detectedGenre || !detectedYear)) {
+        try {
+          const onlineMeta = await autoDetectOnlineMetadata('', effectiveArtist, effectiveTitle);
+          if (!extracted?.coverUrl && onlineMeta.coverUrl) {
+            setCoverUrl(onlineMeta.coverUrl);
           }
-        } else {
-          setDetectStatus('El archivo no contiene carátula incrustada.');
+          if (!detectedYear && onlineMeta.year && (!year.trim() || year === '2026')) {
+            setYear(onlineMeta.year);
+          }
+          if (!detectedGenre && onlineMeta.genre && !genre.trim()) {
+            setGenre(onlineMeta.genre);
+          }
+          if (detectedExplicit === undefined && onlineMeta.isExplicit !== undefined) {
+            setIsExplicit(onlineMeta.isExplicit);
+          }
+        } catch {
+          // non-blocking
         }
+      }
+
+      if (extracted?.coverUrl) {
+        setDetectStatus('✓ Carátula y metadatos extraídos con éxito');
+      } else {
+        setDetectStatus('✓ Metadatos procesados');
       }
     } catch {
       setDetectStatus('No se pudo extraer carátula del archivo.');
@@ -534,14 +642,27 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     }
     setIsSearchingAlbumCover(true);
     try {
-      const detected = await autoDetectAlbumCover(albumTitle.trim(), primaryAlbumArt);
-      if (detected) {
-        setAlbumCoverUrl(detected);
-        setSuccessMessage('✓ Carátula del álbum detectada automáticamente');
+      const meta = await autoDetectOnlineMetadata('', primaryAlbumArt, albumTitle.trim(), true);
+      if (meta.coverUrl) {
+        setAlbumCoverUrl(meta.coverUrl);
+        if (meta.year && (!albumYear.trim() || albumYear === '2026')) {
+          setAlbumYear(meta.year);
+        }
+        if (meta.genre && !albumGenre.trim()) {
+          setAlbumGenre(meta.genre);
+        }
+        setSuccessMessage('✓ Carátula y metadatos del álbum detectados automáticamente');
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
-        setErrorMessage('No se encontró carátula para este álbum.');
-        setTimeout(() => setErrorMessage(''), 3000);
+        const detected = await autoDetectAlbumCover(albumTitle.trim(), primaryAlbumArt);
+        if (detected) {
+          setAlbumCoverUrl(detected);
+          setSuccessMessage('✓ Carátula del álbum detectada automáticamente');
+          setTimeout(() => setSuccessMessage(''), 3000);
+        } else {
+          setErrorMessage('No se encontró carátula para este álbum.');
+          setTimeout(() => setErrorMessage(''), 3000);
+        }
       }
     } catch {
       setErrorMessage('Error al buscar carátula del álbum.');
@@ -565,8 +686,17 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
       if (extracted?.coverUrl) {
         setAlbumCoverUrl(extracted.coverUrl);
         if (!albumTitle.trim() && extracted.album) setAlbumTitle(extracted.album);
-        if (albumArtistList.filter(Boolean).length === 0 && extracted.artist) setAlbumArtistList([extracted.artist]);
-        setSuccessMessage('✓ Carátula extraída de la Pista #1 del álbum');
+        if (albumArtistList.filter(Boolean).length === 0 && extracted.artist) {
+          const parts = splitArtistNames(cleanArtistSeparators(extracted.artist));
+          if (parts.length > 0) setAlbumArtistList(parts);
+        }
+        if (extracted.year && (!albumYear.trim() || albumYear === '2026')) {
+          setAlbumYear(extracted.year);
+        }
+        if (extracted.genre && !albumGenre.trim()) {
+          setAlbumGenre(extracted.genre);
+        }
+        setSuccessMessage('✓ Carátula y metadatos extraídos de la Pista #1 del álbum');
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         await handleAutoDetectAlbumCover();
@@ -666,7 +796,12 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   // Save track to repository
   const handleSaveTrack = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalArtist = artistList.map((a) => a.trim()).filter(Boolean).join(', ');
+    const finalArtist = artistList
+      .map(cleanArtistSeparators)
+      .flatMap(splitArtistNames)
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .join(', ');
     if (!audioUrl.trim() || !title.trim() || !finalArtist) {
       setErrorMessage('Por favor completa el enlace de audio, título y al menos un artista.');
       setTimeout(() => setErrorMessage(''), 4000);
@@ -770,7 +905,12 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
   // Save full album
   const handleSaveAlbum = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalAlbumArtist = albumArtistList.map((a) => a.trim()).filter(Boolean).join(', ');
+    const finalAlbumArtist = albumArtistList
+      .map(cleanArtistSeparators)
+      .flatMap(splitArtistNames)
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .join(', ');
     if (!albumTitle.trim() || !finalAlbumArtist) {
       setErrorMessage('Por favor ingresa el título del álbum y al menos un artista.');
       setTimeout(() => setErrorMessage(''), 4000);
@@ -796,7 +936,9 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
     try {
       const tracksToSave = albumTracks.map((t, idx) => ({
         title: t.title.trim(),
-        artist: t.artist?.trim() || finalAlbumArtist,
+        artist: t.artist?.trim()
+          ? splitArtistNames(cleanArtistSeparators(t.artist.trim())).join(', ')
+          : finalAlbumArtist,
         album: albumTitle.trim(),
         albumArtist: finalAlbumArtist,
         genre: albumGenre.trim() || 'General',
@@ -991,10 +1133,14 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                       if (extracted) {
                         if (extracted.coverUrl) setCoverUrl(extracted.coverUrl);
                         if (extracted.title) setTitle(extracted.title);
-                        if (extracted.artist) setArtistList([extracted.artist]);
+                        if (extracted.artist) {
+                          const parts = splitArtistNames(cleanArtistSeparators(extracted.artist));
+                          setArtistList(parts.length > 0 ? parts : [cleanArtistSeparators(extracted.artist)]);
+                        }
                         if (extracted.album) setAlbum(extracted.album);
                         if (extracted.genre) setGenre(extracted.genre);
                         if (extracted.year) setYear(extracted.year);
+                        if (extracted.isExplicit !== undefined) setIsExplicit(Boolean(extracted.isExplicit));
                         if (extracted.lyrics) setLyricsLrc(extracted.lyrics);
                         setDetectStatus('✓ Carátula y metadatos extraídos del archivo local');
                       } else {

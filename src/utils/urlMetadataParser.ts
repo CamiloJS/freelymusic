@@ -7,6 +7,21 @@ export interface ParsedUrlMetadata {
   title: string;
   artists: string[];
   trackNumber?: number;
+  year?: string;
+  isExplicit?: boolean;
+}
+
+/**
+ * Normalizes artist strings so multiple artists are separated by commas and never slashes.
+ * E.g. "J Balvin/Bad Bunny" -> "J Balvin, Bad Bunny"
+ */
+export function cleanArtistSeparators(artistStr: string): string {
+  if (!artistStr || typeof artistStr !== 'string') return '';
+  return artistStr
+    .split(/\s*[\/\\]+\s*/)
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .join(', ');
 }
 
 export function parseAudioUrlMetadata(urlOrPath: string): ParsedUrlMetadata {
@@ -40,6 +55,24 @@ export function parseAudioUrlMetadata(urlOrPath: string): ParsedUrlMetadata {
 
   // Remove audio extensions
   raw = raw.replace(/\.(mp3|wav|flac|m4a|aac|ogg|opus|wma)(\?.*)?$/i, '').trim();
+
+  // Detect explicit flag from filename tag before stripping
+  let isExplicit: boolean | undefined;
+  if (/[\(\[\s_.-](?:explicit|dirty|uncensored)[\)\]\s_.-]?/i.test(raw)) {
+    isExplicit = true;
+    raw = raw
+      .replace(/[\(\[]\s*(?:explicit|dirty|uncensored)\s*[\)\]]/gi, '')
+      .replace(/[\s_.-]+(?:explicit|dirty|uncensored)\b/gi, '')
+      .trim();
+  }
+
+  // Detect release year from filename tag (e.g. "(2023)", "[2022]", "_2021_")
+  let year: string | undefined;
+  const yearMatch = raw.match(/[\(\[\s_-](19\d{2}|20\d{2})[\)\]\s_-]/);
+  if (yearMatch) {
+    year = yearMatch[1];
+    raw = raw.replace(yearMatch[0], ' ').trim();
+  }
 
   // If underscore replaces spaces like "Aitana_-_4to_Azul", preserve " - " separators
   // Replace "_-_" with " - ", then replace remaining single underscores with space
@@ -92,8 +125,10 @@ export function parseAudioUrlMetadata(urlOrPath: string): ParsedUrlMetadata {
 
   return {
     title: title.trim(),
-    artists: artists.map((a) => a.trim()).filter(Boolean),
+    artists: artists.map((a) => cleanArtistSeparators(a).trim()).filter(Boolean),
     trackNumber,
+    year,
+    isExplicit,
   };
 }
 
@@ -113,8 +148,8 @@ export function splitArtistNames(artistStr: string): string[] {
  */
 function cleanSongTitle(rawTitle: string): string {
   return rawTitle
-    .replace(/\[\s*(?:320kbps|128kbps|flac|hq|official audio|official video|audio|video|lyrics)\s*\]/gi, '')
-    .replace(/\(\s*(?:official audio|official video|audio|video|lyrics)\s*\)/gi, '')
+    .replace(/\[\s*(?:320kbps|128kbps|flac|hq|official audio|official video|audio|video|lyrics|explicit|dirty|uncensored)\s*\]/gi, '')
+    .replace(/\(\s*(?:official audio|official video|audio|video|lyrics|explicit|dirty|uncensored)\s*\)/gi, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
