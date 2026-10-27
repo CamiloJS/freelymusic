@@ -5,7 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
-    <title>Música</title>
+    <title>Spotifree</title>
 
     <!-- Warm up the connections needed for the first paint and playback. -->
     <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
@@ -16,16 +16,16 @@
     <link rel="dns-prefetch" href="https://file.garden" />
 
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Música" />
+    <meta property="og:title" content="Spotifree" />
     <meta
       property="og:description"
-      content="Tu reproductor privado de música en la nube con letras sincronizadas y modo sin conexión."
+      content="Tu reproductor privado de música en la nube con letras sincronizadas y modo 100% sin conexión."
     />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Música" />
+    <meta name="twitter:title" content="Spotifree" />
     <meta
       name="twitter:description"
-      content="Tu reproductor privado de música en la nube con letras sincronizadas y modo sin conexión."
+      content="Tu reproductor privado de música en la nube con letras sincronizadas y modo 100% sin conexión."
     />
 
     <style>
@@ -127,34 +127,78 @@
       }, true);
     </script>
 
-    <!-- PWA & Mobile Web App Meta -->
-    <link rel="manifest" href="/api/manifest" />
-    <meta name="theme-color" content="#1ed760" />
-    <meta name="application-name" content="Música" />
+    <!-- PWA & Mobile Web App Meta (iOS / WebKit / Android / Windows) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#121212" />
+    <meta name="application-name" content="Spotifree" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Música" />
-    <link rel="apple-touch-icon" href="/pwa-icon-180.png" />
+    <meta name="apple-mobile-web-app-title" content="Spotifree" />
+
+    <!-- iOS Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon-precomposed.png" />
     
-    <meta name="description" content="Reproductor privado de música por enlaces en la nube con letras sincronizadas estilo Apple Music y modo sin conexión." />
+    <meta name="description" content="Spotifree: reproductor móvil de música en la nube con letras sincronizadas y soporte offline nativo." />
   </head>
   <body class="bg-black text-white">
     <div id="root">
       <div class="app-boot" role="status" aria-live="polite">
-        <div class="app-boot-logo" aria-hidden="true">🎵</div>
-        <div class="app-boot-title">Música</div>
+        <div class="app-boot-logo" aria-hidden="true">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="#000">
+            <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.563.387-.857.207-2.35-1.435-5.308-1.76-8.793-.963-.335.077-.67-.133-.746-.468-.077-.334.132-.67.467-.746 3.808-.87 7.076-.496 9.722 1.115.294.18.386.562.207.855zm1.225-2.724c-.227.367-.708.482-1.075.255-2.69-1.653-6.79-2.133-9.972-1.168-.413.125-.853-.109-.978-.522-.125-.413.109-.853.522-.978 3.633-1.103 8.147-.568 11.248 1.338.367.227.482.708.255 1.075zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71c-.494.15-1.02-.132-1.17-.626-.15-.494.132-1.02.626-1.17 3.535-1.073 9.404-.866 13.115 1.338.445.264.59.838.326 1.282-.264.444-.838.59-1.282.326z"/>
+          </svg>
+        </div>
+        <div class="app-boot-title">Spotifree</div>
         <div class="app-boot-spinner" aria-hidden="true"></div>
-        <div class="app-boot-text">Cargando tu biblioteca...</div>
+        <div class="app-boot-text">Cargando biblioteca offline...</div>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then((reg) => {
-            reg.update();
-          }).catch((err) => {
-            console.log('SW registration error:', err);
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .then((registration) => {
+              // Manejo de eventos del ciclo de vida: oninstalled y onupdatefound
+              registration.onupdatefound = () => {
+                const installingWorker = registration.installing;
+                if (!installingWorker) return;
+
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed') {
+                    if (navigator.serviceWorker.controller) {
+                      console.log('[PWA] Nueva versión disponible. Actualizando en segundo plano...');
+                      installingWorker.postMessage({ type: 'SKIP_WAITING' });
+                    } else {
+                      console.log('[PWA] Precaché completado exitosamente: lista para uso 100% offline (oninstalled).');
+                    }
+                  }
+                };
+              };
+
+              // Comprobación periódica de actualizaciones
+              setInterval(() => {
+                if (navigator.onLine) {
+                  registration.update().catch(() => {});
+                }
+              }, 45 * 60 * 1000);
+            })
+            .catch((err) => {
+              console.warn('[PWA] Error en registro de Service Worker:', err);
+            });
+
+          // Recarga suave cuando el nuevo worker asume el control
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+              refreshing = true;
+              window.location.reload();
+            }
           });
         });
       }

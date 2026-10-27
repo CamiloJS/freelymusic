@@ -35,11 +35,11 @@ async function getGlobalName() {
     if (!response.ok) throw new Error(`Settings ${response.status}`);
     const payload = await response.json();
     const name = payload?.fields?.globalAppName?.stringValue;
-    cachedName = typeof name === 'string' && name.trim() ? name.trim() : 'Música';
+    cachedName = typeof name === 'string' && name.trim() ? name.trim() : 'Spotifree';
     cachedAt = Date.now();
     return cachedName;
   } catch {
-    return 'Música';
+    return 'Spotifree';
   }
 }
 
@@ -48,17 +48,41 @@ export default async function handler(req, res) {
 
   const manifest = {
     id: '/',
-    name,
-    short_name: name,
+    name: name || 'Spotifree',
+    short_name: name || 'Spotifree',
     description:
       'Tu reproductor privado de música en la nube con letras sincronizadas, versiones, videoclips y modo sin conexión.',
     start_url: '/',
     scope: '/',
     display: 'standalone',
     orientation: 'any',
-    background_color: '#000000',
-    theme_color: '#1ed760',
+    background_color: '#121212',
+    theme_color: '#1DB954',
     icons: [
+      {
+        src: '/apple-touch-icon.png',
+        sizes: '180x180',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
       {
         src: '/pwa-icon-192.png',
         sizes: '192x192',
