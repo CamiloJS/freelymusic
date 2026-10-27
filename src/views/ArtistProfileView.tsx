@@ -302,7 +302,46 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
           </button>
         </div>
 
-        {/* Section 1: Canciones Populares / Repertorio */}
+        {/* Section 1: Discografía / Álbumes (Se muestran primero por solicitud) */}
+        {artistAlbums.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-black text-white flex items-center gap-2">
+              <Disc className="w-6 h-6 text-emerald-400" />
+              <span>Discografía y Álbumes</span>
+            </h2>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {artistAlbums.map((alb) => (
+                <div
+                  key={alb.name}
+                  onClick={() => onSelectAlbum(alb)}
+                  className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group"
+                >
+                  <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center">
+                    {alb.coverUrl ? (
+                      <img
+                        src={alb.coverUrl}
+                        alt={alb.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                    ) : (
+                      <Disc className="w-12 h-12 text-neutral-600" />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Play className="w-8 h-8 text-emerald-400 fill-emerald-400 drop-shadow-lg" />
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-sm text-white truncate">{alb.name}</h3>
+                  <p className="text-xs text-neutral-400 truncate mt-0.5">
+                    {alb.year ? `${alb.year} • ` : ''}{alb.songs.length} pistas
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section 2: Canciones Populares / Repertorio */}
         <div className="space-y-4">
           <h2 className="text-2xl font-black text-white flex items-center gap-2">
             <Flame className="w-6 h-6 text-emerald-400" />
@@ -423,45 +462,6 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
             </div>
           )}
         </div>
-
-        {/* Section 2: Discografía / Álbumes */}
-        {artistAlbums.length > 0 && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-black text-white flex items-center gap-2">
-              <Disc className="w-6 h-6 text-emerald-400" />
-              <span>Discografía y Álbumes</span>
-            </h2>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {artistAlbums.map((alb) => (
-                <div
-                  key={alb.name}
-                  onClick={() => onSelectAlbum(alb)}
-                  className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group"
-                >
-                  <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center">
-                    {alb.coverUrl ? (
-                      <img
-                        src={alb.coverUrl}
-                        alt={alb.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                    ) : (
-                      <Disc className="w-12 h-12 text-neutral-600" />
-                    )}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Play className="w-8 h-8 text-emerald-400 fill-emerald-400 drop-shadow-lg" />
-                    </div>
-                  </div>
-                  <h3 className="font-bold text-sm text-white truncate">{alb.name}</h3>
-                  <p className="text-xs text-neutral-400 truncate mt-0.5">
-                    {alb.year ? `${alb.year} • ` : ''}{alb.songs.length} pistas
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Admin Edit Artist Modal */}

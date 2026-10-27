@@ -5,6 +5,7 @@ import Send from 'lucide-react/dist/esm/icons/send.mjs';
 import SquarePen from 'lucide-react/dist/esm/icons/square-pen.mjs';
 import Music from 'lucide-react/dist/esm/icons/music.mjs';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
+import Users from 'lucide-react/dist/esm/icons/users.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -199,29 +200,41 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
             </div>
 
             <div className="space-y-1">
-              {allUsers
-                .filter((u) => u.id !== currentUser.id)
-                .map((user) => (
-                  <div
-                    key={user.id}
-                    onClick={() => handleStartChatWithUser(user)}
-                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 active:bg-white/10 cursor-pointer transition-colors"
-                  >
-                    <img
-                      src={user.avatarUrl}
-                      alt={user.displayName}
-                      className="w-10 h-10 rounded-full object-cover border border-white/10 shadow"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-semibold text-white truncate">
-                        {user.displayName}
-                      </h4>
-                      <p className="text-xs text-[#b3b3b3] truncate">
-                        @{user.username}
-                      </p>
-                    </div>
+              {allUsers.filter((u) => u.id !== currentUser.id).length === 0 ? (
+                <div className="py-12 text-center space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-[#181818] border border-[#282828] flex items-center justify-center mx-auto text-neutral-400">
+                    <Users className="w-5 h-5" />
                   </div>
-                ))}
+                  <h4 className="text-sm font-bold text-white">No hay otras cuentas registradas</h4>
+                  <p className="text-xs text-[#b3b3b3] max-w-xs mx-auto">
+                    Puedes agregar otra cuenta desde el menú lateral para alternar perfiles y chatear entre ellos.
+                  </p>
+                </div>
+              ) : (
+                allUsers
+                  .filter((u) => u.id !== currentUser.id)
+                  .map((user) => (
+                    <div
+                      key={user.id}
+                      onClick={() => handleStartChatWithUser(user)}
+                      className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 active:bg-white/10 cursor-pointer transition-colors"
+                    >
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.displayName}
+                        className="w-10 h-10 rounded-full object-cover border border-white/10 shadow"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-sm font-semibold text-white truncate">
+                          {user.displayName}
+                        </h4>
+                        <p className="text-xs text-[#b3b3b3] truncate">
+                          @{user.username}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+              )}
             </div>
           </div>
         ) : activeThreadId && activeThread ? (

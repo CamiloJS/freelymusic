@@ -140,6 +140,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
     isDownloaded,
     toggleDownloadSong,
     downloadSingleSongFile,
+    getArtistProfile,
   } = useMusic();
   const { playSong, currentSong } = useAudio();
 
@@ -192,6 +193,78 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
     scored.sort((a, b) => b.score - a.score);
     return scored.map((item) => item.song);
   }, [catalog, searchQuery]);
+
+  const matchedArtists = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q || q.startsWith('@')) return [];
+    const normQ = normalizeSearchText(q);
+
+    // Group songs by artist name (handling multi-artists)
+    const map = new Map<string, { name: string; songs: Song[] }>();
+
+    for (const song of catalog) {
+      if (!song.artist) continue;
+      const parts = song.artist
+        .split(/[,&/]|feat\.|ft\./i)
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      const uniqueNames = Array.from(new Set([song.artist.trim(), ...parts]));
+      for (const name of uniqueNames) {
+        const key = name.toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, { name, songs: [] });
+        }
+        const entry = map.get(key)!;
+        if (!entry.songs.some((s) => s.id === song.id)) {
+          entry.songs.push(song);
+        }
+      }
+    }
+
+    const matches: Array<{
+      name: string;
+      photoUrl?: string;
+      songCount: number;
+      score: number;
+      songs: Song[];
+    }> = [];
+
+    for (const entry of map.values()) {
+      const normName = normalizeSearchText(entry.name);
+      let score = 0;
+
+      if (normName === normQ) {
+        score = 100;
+      } else if (normName.startsWith(normQ)) {
+        score = 85;
+      } else if (normName.includes(normQ)) {
+        score = 65;
+      } else {
+        const words = normName.split(/\s+/);
+        if (words.some((w) => w.startsWith(normQ))) {
+          score = 75;
+        }
+      }
+
+      if (score > 0) {
+        const profile = getArtistProfile(entry.name);
+        const photoUrl =
+          profile?.avatarUrl || entry.songs.find((s) => Boolean(s.coverUrl))?.coverUrl;
+
+        matches.push({
+          name: entry.name,
+          photoUrl,
+          songCount: entry.songs.length,
+          score,
+          songs: entry.songs,
+        });
+      }
+    }
+
+    matches.sort((a, b) => b.score - a.score || b.songCount - a.songCount);
+    return matches;
+  }, [catalog, searchQuery, getArtistProfile]);
 
   const selectRecent = (term: string) => {
     onSearchQueryChange(term);
@@ -303,9 +376,116 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
             <p className="text-sm text-neutral-400 mt-1">
               {searchQuery.trim().startsWith('@')
                 ? `${matchedUsers.length} ${matchedUsers.length === 1 ? 'perfil encontrado' : 'perfiles encontrados'} para “${searchQuery.trim()}”`
-                : `${filteredSongs.length + matchedUsers.length} coincidencias para “${searchQuery.trim()}”`}
+                : `${filteredSongs.length + matchedUsers.length + matchedArtists.length} coincidencias para “${searchQuery.trim()}”`}
             </p>
           </div>
+
+          {/* 1. Sección de Artistas (Aparece de PRIMERO) */}
+          {matchedArtists.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-white">
+                <Mic2 className="w-4 h-4 text-emerald-400" />
+                <span>{matchedArtists[0].score >= 80 ? 'Mejor resultado' : 'Artistas'}</span>
+                <span className="text-xs text-[#b3b3b3] font-normal">({matchedArtists.length})</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Top Artist Highlight Card */}
+                <div
+                  onClick={() => {
+                    const updated = saveRecentSearch(matchedArtists[0].name);
+                    setRecentSearches(updated);
+                    onSelectArtist?.(matchedArtists[0].name);
+                  }}
+                  className="md:col-span-1 p-5 rounded-3xl bg-[#181818] hover:bg-[#222222] border border-[#282828] cursor-pointer transition-all duration-200 group relative flex flex-col justify-between shadow-lg"
+                >
+                  <div className="space-y-4">
+                    <div className="relative w-24 h-24 rounded-full overflow-hidden bg-neutral-800 border-2 border-white/10 shadow-xl">
+                      {matchedArtists[0].photoUrl ? (
+                        <img
+                          src={matchedArtists[0].photoUrl}
+                          alt={matchedArtists[0].name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-900 text-white font-bold text-2xl">
+                          {matchedArtists[0].name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="text-2xl font-black text-white truncate group-hover:text-emerald-400 transition-colors">
+                        {matchedArtists[0].name}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="px-3 py-1 rounded-full bg-white/10 text-white text-[11px] font-bold uppercase tracking-wider">
+                          Artista
+                        </span>
+                        <span className="text-xs text-[#b3b3b3]">
+                          {matchedArtists[0].songCount} {matchedArtists[0].songCount === 1 ? 'canción' : 'canciones'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Floating play button */}
+                  {matchedArtists[0].songs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playSong(matchedArtists[0].songs[0], matchedArtists[0].songs, {
+                          type: 'artist',
+                          name: matchedArtists[0].name,
+                          id: matchedArtists[0].name,
+                        });
+                      }}
+                      className="absolute right-5 bottom-5 w-12 h-12 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black flex items-center justify-center shadow-xl opacity-90 group-hover:opacity-100 group-hover:scale-105 active:scale-95 transition-all"
+                      title={`Reproducir canciones de ${matchedArtists[0].name}`}
+                    >
+                      <Play className="w-5 h-5 fill-black ml-0.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Additional matched artists if any */}
+                {matchedArtists.length > 1 && (
+                  <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {matchedArtists.slice(1, 5).map((artist) => (
+                      <div
+                        key={artist.name}
+                        onClick={() => {
+                          const updated = saveRecentSearch(artist.name);
+                          setRecentSearches(updated);
+                          onSelectArtist?.(artist.name);
+                        }}
+                        className="p-4 rounded-2xl bg-[#181818] hover:bg-[#222222] border border-[#282828] cursor-pointer transition-all group flex flex-col items-center text-center shadow"
+                      >
+                        <div className="w-16 h-16 rounded-full overflow-hidden bg-neutral-800 border border-white/10 mb-2.5 shadow">
+                          {artist.photoUrl ? (
+                            <img
+                              src={artist.photoUrl}
+                              alt={artist.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white font-bold text-sm">
+                              {artist.name.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <h4 className="text-xs font-bold text-white truncate max-w-full group-hover:text-emerald-400">
+                          {artist.name}
+                        </h4>
+                        <span className="text-[10px] text-[#b3b3b3] mt-0.5">Artista</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Perfiles y Amigos (@) Section */}
           {matchedUsers.length > 0 && (
@@ -400,18 +580,24 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                 Prueba buscando con el nombre de usuario o nombre completo.
               </p>
             </div>
-          ) : !searchQuery.trim().startsWith('@') && filteredSongs.length === 0 && matchedUsers.length === 0 ? (
+          ) : !searchQuery.trim().startsWith('@') && filteredSongs.length === 0 && matchedUsers.length === 0 && matchedArtists.length === 0 ? (
             <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-12 text-center">
               <Music className="w-10 h-10 text-neutral-600 mx-auto mb-3" />
               <p className="text-sm font-semibold text-neutral-300">
-                No se encontraron canciones para “{searchQuery.trim()}”
+                No se encontraron resultados para “{searchQuery.trim()}”
               </p>
               <p className="text-xs text-neutral-500 mt-1">
                 Prueba con otra palabra del título, del artista o de la letra.
               </p>
             </div>
           ) : filteredSongs.length > 0 ? (
-            <div className="bg-neutral-900/40 border border-neutral-800/60 rounded-3xl overflow-hidden">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-bold text-white">
+                <Music className="w-4 h-4 text-emerald-400" />
+                <span>Canciones</span>
+                <span className="text-xs text-[#b3b3b3] font-normal">({filteredSongs.length})</span>
+              </div>
+              <div className="bg-neutral-900/40 border border-neutral-800/60 rounded-3xl overflow-hidden">
               <div className="p-4 border-b border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-500 font-bold uppercase tracking-wider">
                 <span>Canción</span>
                 <div className="flex items-center gap-6 sm:gap-12 sm:pr-4">
@@ -604,6 +790,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                   );
                 })}
               </div>
+            </div>
             </div>
           ) : null}
         </div>

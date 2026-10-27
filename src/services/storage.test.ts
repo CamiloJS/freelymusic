@@ -5,6 +5,9 @@ import {
   removeRecentSearch,
   clearRecentSearches,
   normalizeUserData,
+  getStoredChatThreads,
+  getStoredDirectMessages,
+  getStoredProfiles,
 } from './storage';
 
 // In-memory mock for localStorage in node test environment
@@ -107,5 +110,48 @@ describe('user library normalization', () => {
     const data = normalizeUserData({ favoriteSongIds: [], playlists: [] });
     expect(data.followedArtists).toEqual([]);
     expect(data.pinnedPlaylistIds).toEqual([]);
+  });
+});
+
+describe('chat threads and mock profiles cleanup', () => {
+  it('returns empty array when user has not chatted with anyone', () => {
+    const threads = getStoredChatThreads();
+    expect(threads).toEqual([]);
+  });
+
+  it('filters out any mock threads like thread-luis or thread-jhoan', () => {
+    localStorage.setItem(
+      'sonora_chat_threads',
+      JSON.stringify([
+        { id: 'thread-jhoan', participantIds: ['jhoan-user'], displayName: 'Jhoan' },
+        { id: 'thread-luis', participantIds: ['luis-david-user'], displayName: 'Luis' },
+        { id: 'real-thread-1', participantIds: ['user-real'], displayName: 'Amigo Real' },
+      ])
+    );
+    const threads = getStoredChatThreads();
+    expect(threads).toHaveLength(1);
+    expect(threads[0].id).toBe('real-thread-1');
+  });
+
+  it('returns empty messages for mock threads', () => {
+    const msgs = getStoredDirectMessages('thread-luis');
+    expect(msgs).toEqual([]);
+  });
+
+  it('filters out mock users from stored profiles', () => {
+    localStorage.setItem(
+      'sonora_user_profiles',
+      JSON.stringify([
+        { id: 'camilo-admin', username: 'camilo', displayName: 'Camilo' },
+        { id: 'jhoan-user', username: 'jhoan', displayName: 'Jhoan' },
+        { id: 'luis-david-user', username: 'luis', displayName: 'Luis' },
+        { id: 'geraldine-user', username: 'geraldine', displayName: 'Geraldine' },
+      ])
+    );
+    const profiles = getStoredProfiles();
+    expect(profiles.some((p) => p.id === 'jhoan-user')).toBe(false);
+    expect(profiles.some((p) => p.id === 'luis-david-user')).toBe(false);
+    expect(profiles.some((p) => p.id === 'geraldine-user')).toBe(false);
+    expect(profiles.some((p) => p.id === 'camilo-admin')).toBe(true);
   });
 });

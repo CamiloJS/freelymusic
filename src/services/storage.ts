@@ -321,83 +321,17 @@ export const INITIAL_PROFILES: UserProfile[] = [
     isFavoritesPublic: true,
     shareListeningActivity: true,
     isProfilePublic: true,
-    followingUserIds: ['lauris-user', 'ana-maria-user'],
-  },
-  {
-    id: 'lauris-user',
-    username: 'lauris',
-    displayName: 'Lauris 🎸',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    role: 'member',
-    createdAt: '2026-10-26T18:00:00.000Z',
-    isFavoritesPublic: true,
-    shareListeningActivity: true,
-    isProfilePublic: true,
-    currentListeningSong: {
-      title: 'I,I RX',
-      artist: 'Bon Iver',
-      coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=150&auto=format&fit=crop&q=80',
-      relativeTimeText: 'Escuchando ahora',
-      isPlaying: true,
-    },
-    followingUserIds: ['camilo-admin'],
-  },
-  {
-    id: 'ana-maria-user',
-    username: 'anamaria',
-    displayName: 'Ana Maria',
-    avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-    role: 'member',
-    createdAt: '2026-10-26T19:00:00.000Z',
-    isFavoritesPublic: true,
-    shareListeningActivity: true,
-    isProfilePublic: true,
-    currentListeningSong: {
-      title: 'Luz De...',
-      artist: 'Camilo Séptimo',
-      coverUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=150&auto=format&fit=crop&q=80',
-      relativeTimeText: 'Hace 16 h',
-      isPlaying: false,
-    },
-    followingUserIds: ['camilo-admin'],
-  },
-  {
-    id: 'jhoan-user',
-    username: 'jhoan',
-    displayName: 'Jhoan',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    role: 'member',
-    createdAt: '2026-10-26T20:00:00.000Z',
-    isFavoritesPublic: true,
-    shareListeningActivity: false,
-    isProfilePublic: true,
-    followingUserIds: [],
-  },
-  {
-    id: 'luis-david-user',
-    username: 'luisdavid',
-    displayName: 'Luis David Hernandez Rincon',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    role: 'member',
-    createdAt: '2026-10-26T21:00:00.000Z',
-    isFavoritesPublic: true,
-    shareListeningActivity: false,
-    isProfilePublic: true,
-    followingUserIds: [],
-  },
-  {
-    id: 'geraldine-user',
-    username: 'geraldine',
-    displayName: 'Geraldine',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    role: 'member',
-    createdAt: '2026-10-26T22:00:00.000Z',
-    isFavoritesPublic: true,
-    shareListeningActivity: false,
-    isProfilePublic: true,
     followingUserIds: [],
   },
 ];
+
+export const MOCK_PROFILE_IDS = new Set([
+  'jhoan-user',
+  'luis-david-user',
+  'geraldine-user',
+  'lauris-user',
+  'ana-maria-user',
+]);
 
 export const INITIAL_CATALOG: Song[] = [];
 
@@ -854,9 +788,19 @@ export function getStoredProfiles(): UserProfile[] {
     if (!Array.isArray(parsed)) return INITIAL_PROFILES;
     const profiles = parsed
       .map((profile) => normalizeUserProfile(profile))
-      .filter((profile): profile is UserProfile => Boolean(profile));
-    
-    // Ensure default community profiles are always discoverable
+      .filter(
+        (profile): profile is UserProfile =>
+          profile !== null && !MOCK_PROFILE_IDS.has(profile.id)
+      );
+
+    // Clean any followed mock IDs
+    for (const p of profiles) {
+      if (Array.isArray(p.followingUserIds)) {
+        p.followingUserIds = p.followingUserIds.filter((id) => !MOCK_PROFILE_IDS.has(id));
+      }
+    }
+
+    // Ensure Camilo admin is always present
     const existingIds = new Set(profiles.map((p) => p.id));
     for (const init of INITIAL_PROFILES) {
       if (!existingIds.has(init.id)) {
@@ -864,7 +808,9 @@ export function getStoredProfiles(): UserProfile[] {
       }
     }
 
-    return profiles.length > 0 ? profiles : INITIAL_PROFILES;
+    const result = profiles.length > 0 ? profiles : INITIAL_PROFILES;
+    safeSetItem(KEYS.PROFILES, JSON.stringify(result));
+    return result;
   } catch {
     return INITIAL_PROFILES;
   }
@@ -1051,42 +997,38 @@ export function clearRecentSearches(): void {
 // Direct Messages & Chat Threads
 // ---------------------------------------------------------------------------
 
-export const INITIAL_CHAT_THREADS: ChatThread[] = [
-  {
-    id: 'thread-jhoan',
-    participantIds: ['jhoan-user'],
-    displayName: 'Jhoan, Jhoan +3',
-    subtitle: 'kike se unió al chat • 23 de may.',
-    lastMessageTime: '23 de may.',
-    unread: false,
-  },
-  {
-    id: 'thread-luis',
-    participantIds: ['luis-david-user'],
-    displayName: 'Luis David Hernandez Rincon',
-    subtitle: 'Te envió • 8 de feb.',
-    lastMessageTime: '8 de feb.',
-    unread: true,
-  },
-  {
-    id: 'thread-geraldine',
-    participantIds: ['geraldine-user'],
-    displayName: 'Geraldine',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    subtitle: 'Se envió la solicitud de me... • 4 de sep. de 2025',
-    lastMessageTime: '4 de sep. de 2025',
-    unread: false,
-  },
-];
+export const INITIAL_CHAT_THREADS: ChatThread[] = [];
 
 export function getStoredChatThreads(): ChatThread[] {
   try {
+    // Clean mock message keys from localStorage if present
+    safeRemoveItem(`${KEYS.MESSAGES}_thread-jhoan`);
+    safeRemoveItem(`${KEYS.MESSAGES}_thread-luis`);
+    safeRemoveItem(`${KEYS.MESSAGES}_thread-geraldine`);
+
     const raw = safeGetItem(KEYS.CHAT_THREADS);
-    if (!raw) return INITIAL_CHAT_THREADS;
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_CHAT_THREADS;
+    if (!Array.isArray(parsed)) return [];
+
+    const cleaned = parsed.filter((t) => {
+      if (!t || typeof t !== 'object') return false;
+      if (['thread-jhoan', 'thread-luis', 'thread-geraldine'].includes(t.id)) return false;
+      if (
+        Array.isArray(t.participantIds) &&
+        t.participantIds.some((pid: string) => MOCK_PROFILE_IDS.has(pid))
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    if (cleaned.length !== parsed.length) {
+      safeSetItem(KEYS.CHAT_THREADS, JSON.stringify(cleaned));
+    }
+    return cleaned;
   } catch {
-    return INITIAL_CHAT_THREADS;
+    return [];
   }
 }
 
@@ -1096,21 +1038,11 @@ export function saveStoredChatThreads(threads: ChatThread[]): void {
 
 export function getStoredDirectMessages(threadId: string): DirectMessage[] {
   try {
-    const raw = safeGetItem(`${KEYS.MESSAGES}_${threadId}`);
-    if (!raw) {
-      if (threadId === 'thread-luis') {
-        return [
-          {
-            id: 'm1',
-            senderId: 'luis-david-user',
-            receiverId: 'camilo-admin',
-            text: '¡Hola Camilo! Escucha este temazo, sé que te va a encantar.',
-            timestamp: '8 de feb. 14:20',
-          },
-        ];
-      }
+    if (['thread-jhoan', 'thread-luis', 'thread-geraldine'].includes(threadId)) {
       return [];
     }
+    const raw = safeGetItem(`${KEYS.MESSAGES}_${threadId}`);
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch {

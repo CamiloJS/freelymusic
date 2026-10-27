@@ -84,6 +84,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     isDownloaded,
     downloadFullPlaylistZip,
     downloadSongsBatch,
+    removeSongsBatch,
     getUserSongPlayCount,
     isAlbumSaved,
     toggleSaveAlbum,
@@ -114,6 +115,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   }, [isSortMenuOpen]);
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; status: string } | null>(null);
   const [downloadMessage, setDownloadMessage] = useState('');
+  const [showDeleteDownloadsConfirm, setShowDeleteDownloadsConfirm] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [playlistMenu, setPlaylistMenu] = useState<PlaylistMenuState | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
@@ -271,6 +273,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
     const totalSeconds = playlistSongs.reduce((acc, s) => acc + (s?.duration || 0), 0);
     const areAllDownloaded = playlistSongs.length > 0 && playlistSongs.every((s) => isDownloaded(s.id));
+    const isAnyDownloaded = playlistSongs.some((s) => isDownloaded(s.id));
 
     const filteredSongs = playlistSongs.filter((song) => {
       if (!playlistSearch) return true;
@@ -365,6 +368,21 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         );
         setTimeout(() => setDownloadMessage(''), 6000);
       }
+    };
+
+    const handleDownloadButtonClick = () => {
+      if (isAnyDownloaded || areAllDownloaded) {
+        setShowDeleteDownloadsConfirm(true);
+      } else {
+        void handleDownloadAll();
+      }
+    };
+
+    const handleConfirmDeleteDownloads = async () => {
+      setShowDeleteDownloadsConfirm(false);
+      await removeSongsBatch(playlistSongs);
+      setDownloadMessage('Se han borrado las descargas de este dispositivo.');
+      setTimeout(() => setDownloadMessage(''), 4000);
     };
 
     const handleDownloadZip = async () => {
@@ -542,14 +560,20 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
               {/* Download All Button (Spotify Circle Arrow Down) */}
               <button
-                onClick={handleDownloadAll}
+                onClick={handleDownloadButtonClick}
                 className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95 text-[#b3b3b3] hover:text-white"
-                title={areAllDownloaded ? 'Descargado en tu dispositivo' : 'Descargar para escuchar sin conexión'}
+                title={
+                  areAllDownloaded
+                    ? 'Descargado en tu dispositivo (toca para borrar descargas)'
+                    : isAnyDownloaded
+                    ? 'Descargas parciales (toca para borrar descargas)'
+                    : 'Descargar para escuchar sin conexión'
+                }
               >
                 {areAllDownloaded ? (
                   <DownloadedIcon size={28} />
                 ) : (
-                  <ArrowDownCircle className="w-7 h-7" />
+                  <ArrowDownCircle className={`w-7 h-7 ${isAnyDownloaded ? 'text-emerald-400' : ''}`} />
                 )}
               </button>
 
@@ -1104,6 +1128,47 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           onTogglePublic={(pl) => updatePlaylist({ ...pl, isPublic: !pl.isPublic })}
           onPlay={(playlist) => setSelectedPlaylist(playlist)}
         />
+
+        {/* Modal de confirmación para borrar descargas de playlist o álbum */}
+        {showDeleteDownloadsConfirm && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in select-none"
+            onClick={() => setShowDeleteDownloadsConfirm(false)}
+          >
+            <div
+              className="w-full max-w-sm bg-[#181818] border border-[#282828] rounded-3xl p-6 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto shadow-inner">
+                <ArrowDownCircle className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white leading-tight">
+                  ¿Seguro que quieres borrar las descargas?
+                </h3>
+                <p className="text-xs text-[#b3b3b3] mt-2 leading-relaxed">
+                  Se eliminarán las canciones descargadas de "{sourceName}" de la memoria local de tu dispositivo. Podrás volver a descargarlas cuando quieras.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteDownloads}
+                  className="w-full py-3 px-4 rounded-full bg-red-500 hover:bg-red-400 text-black font-bold text-sm transition-all active:scale-95 shadow"
+                >
+                  Borrar descargas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteDownloadsConfirm(false)}
+                  className="w-full py-3 px-4 rounded-full bg-[#242424] hover:bg-[#2c2c2c] text-white font-semibold text-sm transition-all active:scale-95 border border-[#333]"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

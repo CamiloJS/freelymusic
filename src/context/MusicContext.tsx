@@ -103,6 +103,7 @@ interface MusicContextType {
   isDownloaded: (songId: string) => boolean;
   toggleDownloadSong: (song: Song) => Promise<boolean>;
   downloadSongsBatch: (songs: Song[]) => Promise<{ downloaded: number; failed: number }>;
+  removeSongsBatch: (songs: Song[]) => Promise<void>;
   downloadSingleSongFile: (song: Song) => Promise<void>;
   downloadFullPlaylistZip: (
     playlist: Playlist,
@@ -847,6 +848,17 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return { downloaded, failed };
   };
 
+  const removeSongsBatch = async (songs: Song[]): Promise<void> => {
+    for (const song of songs) {
+      try {
+        await deleteSongBlob(song.id);
+      } catch (err) {
+        console.warn('Error borrando audio offline:', err);
+      }
+    }
+    await refreshDownloadedIds();
+  };
+
   const downloadSingleSongFile = async (song: Song) => {
     setDownloadingState({ isDownloading: true, title: song.title });
     await downloadSongFile(song);
@@ -1120,6 +1132,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isDownloaded,
         toggleDownloadSong,
         downloadSongsBatch,
+        removeSongsBatch,
         downloadSingleSongFile,
         downloadFullPlaylistZip,
         downloadingState,
