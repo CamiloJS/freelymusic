@@ -208,6 +208,18 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
     onExitTvMode();
   }, [isVideoActive, handleCloseVideo, isLyricsActive, isPlayerOpen, selectedDetail, activeTab, onExitTvMode]);
 
+  // Keyboard Escape listener to quickly exit TV mode or go back on PC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleRemoteBack();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleRemoteBack]);
+
   // Rewind / Fast Forward 10 seconds via TV remote
   const handleFastForward = useCallback(() => {
     const target = Math.min(duration, currentTime + 10);
@@ -530,8 +542,8 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
           </button>
         </nav>
 
-        {/* Right: User Profile Pill */}
-        <div className="flex items-center">
+        {/* Right: User Profile Pill & Exit Button */}
+        <div className="flex items-center gap-3">
           <div
             data-tv-focus="true"
             tabIndex={0}
@@ -554,6 +566,18 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
               {currentUser?.displayName ? `Bienvenido ${currentUser.displayName}` : 'Bienvenido'}
             </span>
           </div>
+
+          {/* Explicit Exit TV Button */}
+          <button
+            data-tv-focus="true"
+            tabIndex={0}
+            onClick={onExitTvMode}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/10 hover:bg-red-500/20 hover:text-red-400 focus:bg-red-500 focus:text-white border border-white/10 text-neutral-300 font-bold text-xs transition-all shadow"
+            title="Salir del Modo TV y volver a la versión normal (Esc)"
+          >
+            <X className="w-4 h-4" />
+            <span>Salir</span>
+          </button>
         </div>
       </header>
 

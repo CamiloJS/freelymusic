@@ -153,7 +153,7 @@ const MainLayout: React.FC = () => {
 
   useEffect(() => {
     const handleHash = () => {
-      const isTv = isSmartTV();
+      const isTv = getStoredTvMode();
       setIsTvMode(isTv);
     };
     window.addEventListener('hashchange', handleHash);
@@ -164,11 +164,11 @@ const MainLayout: React.FC = () => {
     setIsTvMode(enabled);
     setStoredTvMode(enabled);
     if (enabled) {
-      if (window.location.hash !== '#/tv') {
+      if (!window.location.hash.includes('/tv')) {
         window.location.hash = '#/tv';
       }
     } else {
-      if (window.location.hash === '#/tv') {
+      if (window.location.hash.includes('/tv')) {
         window.location.hash = '#/';
       }
     }

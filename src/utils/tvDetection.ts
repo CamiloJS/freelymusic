@@ -1,20 +1,11 @@
 /**
  * Utility to detect if the current client is running on a Smart TV
- * (Samsung Tizen, LG webOS, Android TV, Google TV, Apple TV, Fire TV, etc.)
+ * (VIDAA OS, Hisense, Samsung Tizen, LG webOS, Android TV, Google TV, Apple TV, Fire TV, etc.)
  */
 
-export function isSmartTV(): boolean {
+export function isUserAgentSmartTV(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = (navigator.userAgent || '').toLowerCase();
-
-  // URL hash or query param override (e.g. #/tv or ?tv=1)
-  if (typeof window !== 'undefined') {
-    const hash = (window.location.hash || '').toLowerCase();
-    const search = (window.location.search || '').toLowerCase();
-    if (hash.includes('/tv') || search.includes('tv=1')) {
-      return true;
-    }
-  }
 
   const tvTokens = [
     'smart-tv',
@@ -54,25 +45,57 @@ export function isSmartTV(): boolean {
   return tvTokens.some((token) => ua.includes(token));
 }
 
+export function isSmartTV(): boolean {
+  // URL hash or query param override (e.g. #/tv or ?tv=1)
+  if (typeof window !== 'undefined') {
+    const hash = (window.location.hash || '').toLowerCase();
+    const search = (window.location.search || '').toLowerCase();
+    if (hash.includes('/tv') || search.includes('tv=1')) {
+      return true;
+    }
+  }
+
+  return isUserAgentSmartTV();
+}
+
 const TV_MODE_STORAGE_KEY = 'sonora_tv_mode_enabled';
 
 export function getStoredTvMode(): boolean {
   try {
-    if (typeof localStorage === 'undefined') return isSmartTV();
-    const stored = localStorage.getItem(TV_MODE_STORAGE_KEY);
-    if (stored !== null) {
-      return stored === 'true';
+    if (typeof window === 'undefined') return false;
+
+    // 1. Explicit hash in URL always activates TV mode for testing
+    const hash = (window.location.hash || '').toLowerCase();
+    const search = (window.location.search || '').toLowerCase();
+    if (hash.includes('/tv') || search.includes('tv=1')) {
+      return true;
     }
-    return isSmartTV();
+
+    // 2. Real Smart TV user agent detection (VIDAA OS, WebOS, Tizen, etc.)
+    if (isUserAgentSmartTV()) {
+      const stored = localStorage.getItem(TV_MODE_STORAGE_KEY);
+      if (stored === 'false') return false;
+      return true;
+    }
+
+    // 3. Regular PC/Mobile: NEVER trap in TV mode. Clear any stale key and return false.
+    try {
+      localStorage.removeItem(TV_MODE_STORAGE_KEY);
+    } catch {}
+    return false;
   } catch {
-    return isSmartTV();
+    return false;
   }
 }
 
 export function setStoredTvMode(enabled: boolean): void {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(TV_MODE_STORAGE_KEY, enabled ? 'true' : 'false');
+      if (enabled) {
+        localStorage.setItem(TV_MODE_STORAGE_KEY, 'true');
+      } else {
+        localStorage.removeItem(TV_MODE_STORAGE_KEY);
+      }
     }
   } catch {
     // ignore
