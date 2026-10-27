@@ -139,7 +139,7 @@ export const LyricsTranslationButton: React.FC<LyricsTranslationButtonProps> = (
       {/* Floating Settings Popover */}
       {isOpen && (
         <div
-          className={`absolute ${
+          className={`lyrics-translation-popover absolute ${
             dropDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
           } right-0 w-64 p-3 rounded-2xl bg-neutral-900/98 border border-white/20 shadow-2xl backdrop-blur-2xl z-[70] text-left select-none animate-in fade-in zoom-in-95 duration-150`}
         >

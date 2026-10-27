@@ -50,15 +50,15 @@ export const CenterLyricsView: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-neutral-950 relative overflow-hidden select-none animate-in fade-in duration-300">
+    <div className="center-lyrics-container flex-1 flex flex-col h-full bg-neutral-950 relative overflow-hidden select-none animate-in fade-in duration-300">
       {/* Ambient Artwork Background (Diffused color wash from song/album cover) */}
       <div
-        className="absolute inset-0 bg-cover bg-center blur-[120px] scale-150 opacity-35 saturate-150 pointer-events-none transition-all duration-1000"
+        className="center-lyrics-ambient absolute inset-0 bg-cover bg-center blur-[120px] scale-150 opacity-35 saturate-150 pointer-events-none transition-all duration-1000"
         style={{ backgroundImage: `url(${currentSong.coverUrl})` }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-neutral-950/70 to-neutral-950 pointer-events-none" />
-      <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-neutral-950 via-neutral-950/80 to-transparent pointer-events-none z-10" />
-      <div className="absolute inset-x-0 top-[65px] h-12 bg-gradient-to-b from-neutral-950 via-neutral-950/60 to-transparent pointer-events-none z-20" />
+      <div className="center-lyrics-overlay absolute inset-0 bg-gradient-to-b from-black/50 via-neutral-950/70 to-neutral-950 pointer-events-none" />
+      <div className="center-lyrics-fade-bottom absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-neutral-950 via-neutral-950/80 to-transparent pointer-events-none z-10" />
+      <div className="center-lyrics-fade-top absolute inset-x-0 top-[65px] h-12 bg-gradient-to-b from-neutral-950 via-neutral-950/60 to-transparent pointer-events-none z-20" />
 
       {/* Top Action Bar (z-40 ensures popover overlays lyrics) */}
       <div className="relative z-40 flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40 backdrop-blur-md flex-shrink-0">

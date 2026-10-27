@@ -109,15 +109,15 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
   };
 
   return (
-    <footer className="h-22 bg-neutral-950/90 backdrop-blur-xl border-t border-neutral-900 px-4 md:px-6 flex items-center justify-between select-none z-40 relative isolate">
+    <footer className="player-bar-footer h-22 bg-neutral-950/90 backdrop-blur-xl border-t border-neutral-900 px-4 md:px-6 flex items-center justify-between select-none z-40 relative isolate">
       {/* Ambient colour taken from the artwork, Spotify-style. */}
       {currentSong?.coverUrl && (
-        <div className="absolute inset-0 overflow-hidden -z-10 pointer-events-none">
+        <div className="player-bar-ambient absolute inset-0 overflow-hidden -z-10 pointer-events-none">
           <div
-            className="absolute inset-0 bg-cover bg-center scale-150 blur-2xl opacity-30 saturate-150"
+            className="player-bar-ambient-blur absolute inset-0 bg-cover bg-center scale-150 blur-2xl opacity-30 saturate-150"
             style={{ backgroundImage: `url(${currentSong.coverUrl})` }}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-neutral-950/80 via-neutral-950/65 to-neutral-950/80" />
+          <div className="player-bar-ambient-overlay absolute inset-0 bg-gradient-to-r from-neutral-950/80 via-neutral-950/65 to-neutral-950/80" />
         </div>
       )}
 
@@ -229,7 +229,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
           {/* Play / Pause Circular Button */}
           <button
             onClick={togglePlayPause}
-            className="w-10 h-10 rounded-full bg-white text-black hover:scale-105 active:scale-95 flex items-center justify-center shadow-lg transition-transform"
+            className="player-play-btn w-10 h-10 rounded-full bg-white text-black hover:scale-105 active:scale-95 flex items-center justify-center shadow-lg transition-transform"
             title={isBuffering ? 'Cargando canción...' : isPlaying ? 'Pausar' : 'Reproducir'}
           >
             {isBuffering ? (
@@ -282,9 +282,9 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
               seek(percent * duration);
             }}
           >
-            <div className="w-full h-1 bg-neutral-800 rounded-full overflow-hidden">
+            <div className="player-progress-track w-full h-1 bg-neutral-800 rounded-full overflow-hidden">
               <div
-                className={`h-full transition-all ${
+                className={`player-progress-fill h-full transition-all ${
                   isHoveringProgress ? 'bg-emerald-400' : 'bg-white'
                 }`}
                 style={{ width: `${progressPercent}%` }}
@@ -351,7 +351,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
             onChange={(e) => setVolume(parseFloat(e.target.value))}
             aria-label="Volumen"
             title="Volumen"
-            className="w-18 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+            className="player-volume-slider w-18 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
           />
         </div>
 

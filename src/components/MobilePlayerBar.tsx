@@ -28,14 +28,14 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
   const downloaded = isDownloaded(currentSong.id);
 
   return (
-    <div className="md:hidden relative flex-shrink-0 overflow-hidden border-t border-white/10 bg-neutral-950">
+    <div className="mobile-player-bar md:hidden relative flex-shrink-0 overflow-hidden border-t border-white/10 bg-neutral-950">
       {currentSong.coverUrl && (
         <div
-          className="absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-70"
+          className="mobile-player-ambient-blur absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-70"
           style={{ backgroundImage: `url(${currentSong.coverUrl})` }}
         />
       )}
-      <div className="absolute inset-0 bg-black/55" />
+      <div className="mobile-player-overlay absolute inset-0 bg-black/55" />
 
       <div className="relative flex items-center gap-3 px-3 py-2.5">
         <button
@@ -68,14 +68,14 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
               </span>
             )}
           </div>
-          <span className="block truncate text-[10px] text-white/70 mt-0.5">
+          <span className="mobile-player-artist block truncate text-[10px] text-white/70 mt-0.5">
             <ArtistLinks artists={currentSong.artist} onSelectArtist={onSelectArtist} />
           </span>
         </button>
 
         <button
           onClick={togglePlayPause}
-          className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center flex-shrink-0 shadow-lg active:scale-95 transition-transform"
+          className="mobile-play-btn w-10 h-10 rounded-full bg-white text-black flex items-center justify-center flex-shrink-0 shadow-lg active:scale-95 transition-transform"
           title={isBuffering ? 'Cargando...' : isPlaying ? 'Pausar' : 'Reproducir'}
         >
           {isBuffering ? (
@@ -88,9 +88,9 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
         </button>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/15">
+      <div className="mobile-progress-track absolute bottom-0 left-0 right-0 h-[2px] bg-white/15">
         <div
-          className="h-full bg-white/85 transition-all"
+          className="mobile-progress-fill h-full bg-white/85 transition-all"
           style={{ width: `${progress}%` }}
         />
       </div>

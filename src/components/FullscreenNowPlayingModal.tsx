@@ -164,7 +164,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
   const remainingTime = Math.max(0, duration - currentTime);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between select-none overflow-hidden animate-in fade-in duration-300">
+    <div className="fullscreen-now-playing-container fixed inset-0 z-50 bg-black flex flex-col justify-between select-none overflow-hidden animate-in fade-in duration-300">
       {/* Dynamic Animated Ambient Mesh Background (Takes album artwork colors) */}
       <div
         className="absolute inset-0 bg-cover bg-center filter blur-3xl scale-150 opacity-55 saturate-150 pointer-events-none transition-all duration-1000 transform motion-safe:animate-pulse"

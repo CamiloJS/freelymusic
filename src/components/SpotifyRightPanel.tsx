@@ -518,8 +518,8 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
               </div>
             </div>
 
-            {/* Videos musicales relacionados (Spotify Image 4) */}
-            {relatedVideos.length > 0 && (
+            {/* Videos musicales relacionados (Spotify Image 4 - solo visible al reproducir video) */}
+            {isVideoMode && relatedVideos.length > 0 && (
               <div className="space-y-2.5 pt-1">
                 <span className="text-[11px] font-black uppercase tracking-wider text-neutral-300 block">
                   Videos musicales relacionados
