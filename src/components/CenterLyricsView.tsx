@@ -49,15 +49,18 @@ export const CenterLyricsView: React.FC = () => {
   if (!currentSong) return null;
 
   const sourceName = useMemo(() => {
-    if (!currentSong) return 'Tus me gusta';
+    if (!currentSong) return null;
     if (playbackSource?.type === 'album') {
       const alb = currentSong.album?.trim().toLowerCase();
       const src = playbackSource.name?.trim().toLowerCase();
-      if (alb && src && alb !== src) {
-        return alb !== 'sencillo' ? currentSong.album : 'Tus me gusta';
+      if (!alb || !src || alb !== src) {
+        return alb && alb !== 'sencillo' ? currentSong.album : null;
       }
     }
-    return playbackSource?.name || (currentSong.album && currentSong.album.toLowerCase() !== 'sencillo' ? currentSong.album : 'Tus me gusta');
+    if (playbackSource?.name) return playbackSource.name;
+    return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
+      ? currentSong.album
+      : null;
   }, [playbackSource, currentSong]);
 
   return (
@@ -74,10 +77,14 @@ export const CenterLyricsView: React.FC = () => {
       {/* Top Action Bar (z-40 ensures popover overlays lyrics) */}
       <div className="center-lyrics-header relative z-40 flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40 backdrop-blur-md flex-shrink-0">
         <div className="flex items-center gap-3 truncate">
-          <span className="text-xs font-black uppercase tracking-wider text-neutral-300">
-            {sourceName}
-          </span>
-          <span className="text-neutral-500">•</span>
+          {sourceName && (
+            <>
+              <span className="text-xs font-black uppercase tracking-wider text-neutral-300">
+                {sourceName}
+              </span>
+              <span className="text-neutral-500">•</span>
+            </>
+          )}
           <span className="text-xs text-white font-bold truncate">
             {currentSong.title} — {currentSong.artist}
           </span>

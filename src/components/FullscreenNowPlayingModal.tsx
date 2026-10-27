@@ -138,21 +138,12 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
     if (playbackSource.type === 'album') {
       const alb = currentSong.album?.trim().toLowerCase();
       const src = playbackSource.name?.trim().toLowerCase();
-      if (alb && src && alb !== src) {
-        return alb !== 'sencillo' ? { type: 'album', name: currentSong.album.trim() } : null;
+      if (!alb || !src || alb !== src) {
+        return alb && alb !== 'sencillo' ? { type: 'album', name: currentSong.album.trim() } : null;
       }
     }
     return playbackSource;
   }, [playbackSource, currentSong]);
-
-  const sourceSubtitle = useMemo(() => {
-    if (validatedSource?.type === 'playlist') return 'DE LA PLAYLIST';
-    if (validatedSource?.type === 'album') return 'DEL ÁLBUM';
-    if (validatedSource?.type === 'artist') return 'DEL ARTISTA';
-    if (validatedSource?.type === 'favorites') return 'DE TUS ME GUSTA';
-    if (validatedSource?.type === 'search') return 'DE LA BÚSQUEDA';
-    return 'REPRODUCIENDO';
-  }, [validatedSource]);
 
   const sourceTitle = useMemo(() => {
     if (validatedSource?.type === 'search' || validatedSource?.name?.startsWith('Buscar "')) {
@@ -162,7 +153,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
     if (currentSong?.album && currentSong.album.toLowerCase() !== 'sencillo') {
       return currentSong.album;
     }
-    return 'Tus me gusta';
+    return null;
   }, [validatedSource, currentSong]);
 
   if (!isFullscreenNowPlaying || !currentSong) return null;
@@ -405,19 +396,20 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
                 <ChevronDown className="w-6 h-6" />
               </button>
 
-              <button
-                type="button"
-                onClick={handleOriginClick}
-                className="flex flex-col items-center min-w-0 px-2 hover:underline cursor-pointer text-center max-w-[220px]"
-                title={`${sourceSubtitle} • ${sourceTitle}`}
-              >
-                <span className="text-[9px] font-black uppercase tracking-wider text-[#b3b3b3] truncate block">
-                  {sourceSubtitle}
-                </span>
-                <span className="text-xs font-bold text-white truncate block">
-                  {sourceTitle}
-                </span>
-              </button>
+              {sourceTitle ? (
+                <button
+                  type="button"
+                  onClick={handleOriginClick}
+                  className="flex flex-col items-center min-w-0 px-2 hover:underline cursor-pointer text-center max-w-[220px]"
+                  title={sourceTitle}
+                >
+                  <span className="text-xs font-bold text-white truncate block">
+                    {sourceTitle}
+                  </span>
+                </button>
+              ) : (
+                <div />
+              )}
 
               <button
                 type="button"
@@ -733,21 +725,18 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
               <ChevronDown className="w-5 h-5" />
             </button>
 
-            <div className="flex flex-col min-w-0 max-w-md">
-              {sourceSubtitle && (
-                <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 truncate block">
-                  {sourceSubtitle}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={handleOriginClick}
-                className="text-xs font-black uppercase tracking-wider text-white/75 hover:text-white hover:underline truncate transition-colors cursor-pointer text-left"
-                title={`Ir a ${sourceTitle}`}
-              >
-                {sourceTitle}
-              </button>
-            </div>
+            {sourceTitle && (
+              <div className="flex flex-col min-w-0 max-w-md">
+                <button
+                  type="button"
+                  onClick={handleOriginClick}
+                  className="text-xs font-black uppercase tracking-wider text-white/75 hover:text-white hover:underline truncate transition-colors cursor-pointer text-left"
+                  title={`Ir a ${sourceTitle}`}
+                >
+                  {sourceTitle}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">

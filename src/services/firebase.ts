@@ -593,7 +593,18 @@ export function subscribeToArtistProfilesUpdates(
       collection(db, ...BASE_PATH, 'artists'),
       (snapshot) => {
         const artists: ArtistProfile[] = [];
-        snapshot.forEach((d) => artists.push(d.data() as ArtistProfile));
+        snapshot.forEach((d) => {
+          const data = d.data() as Partial<ArtistProfile> | undefined;
+          if (!data) return;
+          const id = (typeof data.id === 'string' && data.id.trim()) || d.id || '';
+          const name = (typeof data.name === 'string' && data.name.trim()) || id;
+          if (!id && !name) return;
+          artists.push({
+            ...data,
+            id: id.toLowerCase().replace(/[\/\\]/g, '_'),
+            name: name,
+          } as ArtistProfile);
+        });
         onUpdate(artists);
       },
       (err) => onError?.(err)

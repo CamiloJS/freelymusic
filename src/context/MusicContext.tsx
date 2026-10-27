@@ -348,25 +348,31 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setArtistProfiles((prev) => {
               const map = new Map<string, ArtistProfile>();
               // Keep local profiles first
-              prev.forEach((p) => {
-                const k = (p.id || p.name).trim().toLowerCase().replace(/[\/\\]/g, '_');
-                map.set(k, p);
+              (prev || []).forEach((p) => {
+                if (!p) return;
+                const raw = (p.id || p.name || '').trim();
+                if (!raw) return;
+                const k = raw.toLowerCase().replace(/[\/\\]/g, '_');
+                map.set(k, { ...p, id: p.id || k, name: p.name || k });
               });
               // Merge cloud profiles
-              cloudArtists.forEach((c) => {
-                const k = (c.id || c.name).trim().toLowerCase().replace(/[\/\\]/g, '_');
+              (cloudArtists || []).forEach((c) => {
+                if (!c) return;
+                const raw = (c.id || c.name || '').trim();
+                if (!raw) return;
+                const k = raw.toLowerCase().replace(/[\/\\]/g, '_');
                 const local = map.get(k);
                 if (!local) {
-                  map.set(k, c);
+                  map.set(k, { ...c, id: c.id || k, name: c.name || k });
                 } else {
                   // If local has customAvatar and cloud does not, preserve local
                   if (local.customAvatar && !c.customAvatar) {
-                    map.set(k, { ...c, avatarUrl: local.avatarUrl, customAvatar: true });
+                    map.set(k, { ...c, id: c.id || k, name: c.name || k, avatarUrl: local.avatarUrl, customAvatar: true });
                   } else {
                     const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
                     const cloudTime = c.updatedAt ? new Date(c.updatedAt).getTime() : 0;
                     if (cloudTime >= localTime) {
-                      map.set(k, c);
+                      map.set(k, { ...c, id: c.id || k, name: c.name || k });
                     }
                   }
                 }
@@ -1095,13 +1101,15 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // 1. Direct match by id or name
       const direct = artistProfiles.find(
-        (artist) => artist.id === norm || artist.name.trim().toLowerCase() === norm
+        (artist) =>
+          artist &&
+          (artist.id === norm || (artist.name && artist.name.trim().toLowerCase() === norm))
       );
       if (direct) {
         if (direct.mergedInto) {
           const targetNorm = direct.mergedInto.trim().toLowerCase();
           const target = artistProfiles.find(
-            (a) => a.id === targetNorm || a.name.trim().toLowerCase() === targetNorm
+            (a) => a && (a.id === targetNorm || (a.name && a.name.trim().toLowerCase() === targetNorm))
           );
           if (target) return target;
         }
@@ -1110,17 +1118,18 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // 2. Match by aliases
       const byAlias = artistProfiles.find((artist) =>
-        artist.aliases?.some(
+        artist?.aliases?.some(
           (alias) =>
-            alias.trim().toLowerCase() === norm ||
-            alias.trim().toLowerCase().replace(/[\s._-]+/g, '') === fuzzy
+            alias &&
+            (alias.trim().toLowerCase() === norm ||
+              alias.trim().toLowerCase().replace(/[\s._-]+/g, '') === fuzzy)
         )
       );
       if (byAlias) {
         if (byAlias.mergedInto) {
           const targetNorm = byAlias.mergedInto.trim().toLowerCase();
           const target = artistProfiles.find(
-            (a) => a.id === targetNorm || a.name.trim().toLowerCase() === targetNorm
+            (a) => a && (a.id === targetNorm || (a.name && a.name.trim().toLowerCase() === targetNorm))
           );
           if (target) return target;
         }
@@ -1130,14 +1139,15 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // 3. Match by stripped punctuation fuzzy (e.g. "j. balvin" vs "j balvin")
       const byFuzzy = artistProfiles.find(
         (artist) =>
-          artist.id.replace(/[\s._-]+/g, '') === fuzzy ||
-          artist.name.trim().toLowerCase().replace(/[\s._-]+/g, '') === fuzzy
+          artist &&
+          ((artist.id && artist.id.replace(/[\s._-]+/g, '') === fuzzy) ||
+            (artist.name && artist.name.trim().toLowerCase().replace(/[\s._-]+/g, '') === fuzzy))
       );
       if (byFuzzy) {
         if (byFuzzy.mergedInto) {
           const targetNorm = byFuzzy.mergedInto.trim().toLowerCase();
           const target = artistProfiles.find(
-            (a) => a.id === targetNorm || a.name.trim().toLowerCase() === targetNorm
+            (a) => a && (a.id === targetNorm || (a.name && a.name.trim().toLowerCase() === targetNorm))
           );
           if (target) return target;
         }
@@ -1239,14 +1249,14 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // Find or create target profile
       const targetExisting =
-        artistProfiles.find((a) => a.id === tNorm || a.name.toLowerCase() === tNorm) || {
+        artistProfiles.find((a) => a && (a.id === tNorm || (a.name && a.name.toLowerCase() === tNorm))) || {
           id: tNorm,
           name: tName,
         };
 
       // Find or create source profile
       const sourceExisting =
-        artistProfiles.find((a) => a.id === sNorm || a.name.toLowerCase() === sNorm) || {
+        artistProfiles.find((a) => a && (a.id === sNorm || (a.name && a.name.toLowerCase() === sNorm))) || {
           id: sNorm,
           name: sName,
         };

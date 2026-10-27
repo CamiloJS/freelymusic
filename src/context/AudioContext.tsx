@@ -901,8 +901,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             if (prev?.type === 'album') {
               const currentSongAlb = song.album?.trim().toLowerCase();
               const prevAlb = prev.name?.trim().toLowerCase();
-              if (currentSongAlb && prevAlb && currentSongAlb !== prevAlb) {
-                return currentSongAlb !== 'sencillo'
+              if (!currentSongAlb || !prevAlb || currentSongAlb !== prevAlb) {
+                return currentSongAlb && currentSongAlb !== 'sencillo'
                   ? { type: 'album', name: song.album.trim() }
                   : null;
               }

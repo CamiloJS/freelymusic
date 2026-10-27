@@ -187,39 +187,30 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
     if (playbackSource.type === 'album') {
       const alb = currentSong.album?.trim().toLowerCase();
       const src = playbackSource.name?.trim().toLowerCase();
-      if (alb && src && alb !== src) {
-        return alb !== 'sencillo' ? { type: 'album', name: currentSong.album.trim() } : null;
+      if (!alb || !src || alb !== src) {
+        return alb && alb !== 'sencillo' ? { type: 'album', name: currentSong.album.trim() } : null;
       }
     }
     return playbackSource;
   }, [playbackSource, currentSong]);
-
-  const sourceSubtitle = React.useMemo(() => {
-    if (validatedSource?.type === 'playlist') return 'DE LA PLAYLIST';
-    if (validatedSource?.type === 'album') return 'DEL ÁLBUM';
-    if (validatedSource?.type === 'artist') return 'DEL ARTISTA';
-    if (validatedSource?.type === 'favorites') return 'DE TUS ME GUSTA';
-    if (validatedSource?.type === 'search') return 'DE LA BÚSQUEDA';
-    return null;
-  }, [validatedSource]);
 
   const displayOrigin = React.useMemo(() => {
     if (!currentSong) return null;
     if (validatedSource?.type === 'search' || validatedSource?.name?.startsWith('Buscar "')) {
       return validatedSource.name;
     }
-    if (!validatedSource?.name) {
-      return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
-        ? currentSong.album
-        : null;
+    if (validatedSource?.name) {
+      // If it says "Artista: ...", remove it as redundant
+      if (/^artista:/i.test(validatedSource.name.trim())) {
+        return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
+          ? currentSong.album
+          : null;
+      }
+      return validatedSource.name;
     }
-    // If it says "Artista: ...", remove it as requested (redundant)
-    if (/^artista:/i.test(validatedSource.name.trim())) {
-      return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
-        ? currentSong.album
-        : null;
-    }
-    return validatedSource.name;
+    return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
+      ? currentSong.album
+      : null;
   }, [validatedSource, currentSong]);
 
   if (!isRightPanelOpen || !currentSong) return null;
@@ -382,11 +373,6 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
             {/* Source Origin Title (clickable like Spotify) */}
             {displayOrigin && (
               <div className="min-w-0">
-                {sourceSubtitle && (
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block mb-0.5">
-                    {sourceSubtitle}
-                  </span>
-                )}
                 <button
                   type="button"
                   onClick={handleNavigateToOrigin}
