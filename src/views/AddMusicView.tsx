@@ -1512,27 +1512,37 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
             </div>
 
             {/* Remote URL Ingestion */}
-            <div className="max-w-2xl mx-auto pt-3 border-t border-neutral-800/80">
-              <label className="block text-xs font-bold text-neutral-300 mb-2">
-                O analiza un enlace en la nube (File Garden, ZIP, enlaces directos):
-              </label>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <input
-                  type="url"
+            <div className="max-w-2xl mx-auto pt-4 border-t border-neutral-800/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-neutral-200">
+                  🌐 Enlaces en la nube (File Garden / Streaming directo):
+                </label>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                  0 MB en tu servidor
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                Pega uno o varios enlaces de tus canciones en File Garden (uno por línea o separados por comas), o un archivo .zip en la nube. La música se reproduce en streaming directo desde File Garden <strong className="text-neutral-200">sin subir archivos pesados ni gastar tus 1 GB de almacenamiento</strong> en la página.
+              </p>
+              <div className="space-y-2">
+                <textarea
+                  rows={3}
                   value={folderUrlInput}
                   onChange={(e) => setFolderUrlInput(e.target.value)}
-                  placeholder="https://file.garden/.../carpeta o https://.../album.zip"
-                  className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono shadow-inner"
+                  placeholder={`Pega aquí los enlaces directos de File Garden (uno por línea o separados por comas):\nhttps://file.garden/auDUHr1kjXjsgmOB/Raras/cancion1.mp3\nhttps://file.garden/auDUHr1kjXjsgmOB/Raras/cancion2.mp3`}
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono shadow-inner resize-y placeholder:text-neutral-600"
                 />
-                <button
-                  type="button"
-                  disabled={isAnalyzingFolder || !folderUrlInput.trim()}
-                  onClick={handleAnalyzeRemoteUrl}
-                  className="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-black text-xs transition-all flex items-center justify-center gap-2 shadow-lg"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>Analizar Enlace</span>
-                </button>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    disabled={isAnalyzingFolder || !folderUrlInput.trim()}
+                    onClick={handleAnalyzeRemoteUrl}
+                    className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-black text-xs transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.99]"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Analizar Enlaces y Extraer Canciones</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -378,9 +378,32 @@ export async function fetchAndOrganizeRemoteFolder(
 ): Promise<FolderAnalysisResult> {
   const trimmed = targetUrl.trim();
   if (!trimmed) {
-    throw new Error('Por favor ingresa un enlace válido.');
+    throw new Error('Por favor ingresa un enlace o lista de enlaces válida.');
   }
 
+  // 1. Check if user pasted a batch list of direct audio links (e.g. from File Garden)
+  const directAudioMatches = Array.from(
+    trimmed.matchAll(/https?:\/\/[^\s"'<>]+\.(?:mp3|flac|m4a|wav|aac|ogg|opus)(?:\?[^\s"'<>]*)?/gi)
+  ).map((m) => m[0]);
+
+  const uniqueDirectUrls = Array.from(new Set(directAudioMatches));
+  const hasMultipleLinesOrSpaces = trimmed.includes('\n') || trimmed.includes('\r') || trimmed.includes(',');
+
+  if (uniqueDirectUrls.length > 1 || (uniqueDirectUrls.length === 1 && hasMultipleLinesOrSpaces) || (uniqueDirectUrls.length === 1 && !trimmed.toLowerCase().endsWith('.zip'))) {
+    const rawItems: RawFolderItem[] = uniqueDirectUrls.map((url) => {
+      const parsed = parseAudioUrlMetadata(url);
+      const filename = url.split('/').pop()?.split('?')[0] || 'song.mp3';
+      const cleanName = decodeURIComponent(filename);
+      return {
+        name: parsed.title ? `${parsed.title}.mp3` : cleanName,
+        relativePath: cleanName,
+        url,
+      };
+    });
+    return organizeFolderMusic(rawItems, existingCatalog, onProgress);
+  }
+
+  // 2. Single remote URL: check if it's a ZIP or remote directory/webpage
   const res = await fetch(trimmed);
   if (!res.ok) {
     throw new Error(`El servidor respondió con error HTTP ${res.status}: ${res.statusText}`);
@@ -403,7 +426,7 @@ export async function fetchAndOrganizeRemoteFolder(
         newTracksCount: 0,
         unsupportedCount: 0,
         sourceNote:
-          'El enlace de File Garden devolvió un archivo ZIP vacío (22 bytes). File Garden no permite descargar carpetas públicas directamente sin sesión de usuario activa. Te recomendamos descargar el archivo .zip o la carpeta directamente en tu dispositivo y subirla aquí con el botón "📂 Seleccionar Carpeta / ZIP".',
+          'El enlace de carpeta de File Garden devolvió 0 archivos porque File Garden restringe la descarga masiva de carpetas sin sesión activa en su web. ¡No te preocupes! En Sonora tus canciones se reproducen por streaming sin gastar tu 1 GB de espacio: copia los enlaces directos de tus canciones desde File Garden y pégalos aquí en la lista para organizarlas automáticamente.',
       };
     }
 
@@ -412,19 +435,21 @@ export async function fetchAndOrganizeRemoteFolder(
     return organizeFolderMusic(items, existingCatalog, onProgress);
   }
 
-  // If not zip, check if it contains audio links
+  // If not zip, check if it contains audio links in HTML or plain text response
   const text = await res.text();
   const urlMatches = Array.from(
-    text.matchAll(/https?:\/\/[^\s"'<>]+\.(?:mp3|flac|m4a|wav|aac|ogg)(?:\?[^\s"'<>]*)?/gi)
+    text.matchAll(/https?:\/\/[^\s"'<>]+\.(?:mp3|flac|m4a|wav|aac|ogg|opus)(?:\?[^\s"'<>]*)?/gi)
   ).map((m) => m[0]);
 
   const uniqueUrls = Array.from(new Set(urlMatches));
   if (uniqueUrls.length > 0) {
     const rawItems: RawFolderItem[] = uniqueUrls.map((url) => {
       const parsed = parseAudioUrlMetadata(url);
+      const filename = url.split('/').pop()?.split('?')[0] || 'song.mp3';
+      const cleanName = decodeURIComponent(filename);
       return {
-        name: parsed.title ? `${parsed.title}.mp3` : url.split('/').pop() || 'song.mp3',
-        relativePath: url.split('/').pop() || 'song.mp3',
+        name: parsed.title ? `${parsed.title}.mp3` : cleanName,
+        relativePath: cleanName,
         url,
       };
     });
@@ -432,6 +457,6 @@ export async function fetchAndOrganizeRemoteFolder(
   }
 
   throw new Error(
-    'No se encontraron canciones en este enlace. Asegúrate de que sea un archivo .zip con música o sube la carpeta directamente desde tu dispositivo.'
+    'No se encontraron canciones en este enlace. Puedes pegar los enlaces directos (.mp3) de File Garden, uno por línea, para auto-clasificarlos por streaming sin gastar espacio en la página.'
   );
 }

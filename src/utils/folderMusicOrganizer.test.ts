@@ -137,4 +137,18 @@ describe('folderMusicOrganizer', () => {
       expect(track.artist).toBe('J Balvin, Bad Bunny');
     }
   });
+
+  it('correctly parses batch list of audio URLs without downloading entire files', async () => {
+    const { fetchAndOrganizeRemoteFolder } = await import('./folderMusicOrganizer');
+    const input = `
+      https://file.garden/auDUHr1kjXjsgmOB/Raras/Dua%20Lipa%20-%20Levitating.mp3
+      https://file.garden/auDUHr1kjXjsgmOB/Raras/The%20Weeknd%20-%20Blinding%20Lights.mp3
+    `;
+
+    const result = await fetchAndOrganizeRemoteFolder(input, []);
+    expect(result.totalTracks).toBe(2);
+    expect(result.singles.length).toBe(2);
+    expect(result.singles[0].audioUrl).toBe('https://file.garden/auDUHr1kjXjsgmOB/Raras/Dua%20Lipa%20-%20Levitating.mp3');
+    expect(result.singles[1].audioUrl).toBe('https://file.garden/auDUHr1kjXjsgmOB/Raras/The%20Weeknd%20-%20Blinding%20Lights.mp3');
+  });
 });
