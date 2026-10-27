@@ -955,14 +955,15 @@ export function saveStoredArtistProfiles(artists: ArtistProfile[]): void {
 }
 
 export function getStoredArtistProfile(artistName: string): ArtistProfile | null {
-  const norm = artistName.trim().toLowerCase();
+  const norm = artistName.trim().toLowerCase().replace(/[\/\\]/g, '_');
   const list = getStoredArtistProfiles();
-  return list.find((a) => a.id === norm || a.name.trim().toLowerCase() === norm) || null;
+  return list.find((a) => a.id === norm || a.name.trim().toLowerCase() === artistName.trim().toLowerCase()) || null;
 }
 
 export function saveStoredArtistProfile(artist: ArtistProfile): void {
   const list = getStoredArtistProfiles();
-  const norm = artist.id || artist.name.trim().toLowerCase();
+  const rawId = (artist.id || artist.name || '').trim().toLowerCase();
+  const norm = rawId.replace(/[\/\\]/g, '_');
   const updatedArtist: ArtistProfile = {
     ...artist,
     id: norm,

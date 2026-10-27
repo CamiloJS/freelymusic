@@ -40,6 +40,7 @@ interface FullscreenNowPlayingModalProps {
   onSelectAlbum?: (album: Album) => void;
   onSelectPlaylist?: (playlist: Playlist | 'favorites' | Album) => void;
   onOpenAddToPlaylist?: (song: Song) => void;
+  onNavigateSearch?: () => void;
 }
 
 export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps> = ({
@@ -47,6 +48,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
   onSelectAlbum,
   onSelectPlaylist,
   onOpenAddToPlaylist,
+  onNavigateSearch,
 }) => {
   const {
     currentSong,
@@ -136,10 +138,14 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
     if (playbackSource?.type === 'album') return 'DEL ÁLBUM';
     if (playbackSource?.type === 'artist') return 'DEL ARTISTA';
     if (playbackSource?.type === 'favorites') return 'DE TUS ME GUSTA';
+    if (playbackSource?.type === 'search') return 'DE LA BÚSQUEDA';
     return 'REPRODUCIENDO';
   }, [playbackSource]);
 
   const sourceTitle = useMemo(() => {
+    if (playbackSource?.type === 'search' || playbackSource?.name?.startsWith('Buscar "')) {
+      return playbackSource.name;
+    }
     if (playbackSource?.name) return playbackSource.name;
     if (currentSong?.album && currentSong.album.toLowerCase() !== 'sencillo') {
       return currentSong.album;
@@ -152,6 +158,13 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
   const handleOriginClick = () => {
     setIsFullscreenNowPlaying(false);
     const sourceName = playbackSource?.name;
+
+    if (playbackSource?.type === 'search' || sourceName?.startsWith('Buscar "')) {
+      if (onNavigateSearch) {
+        onNavigateSearch();
+        return;
+      }
+    }
 
     if (
       playbackSource?.type === 'favorites' ||

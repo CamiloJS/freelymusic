@@ -33,7 +33,7 @@ import {
 } from '../services/storage';
 import { loadFirebaseService } from '../services/firebaseLoader';
 import { detectAudioDuration } from '../utils/audioDuration';
-import { searchLyrics, searchArtistAvatar } from '../services/metadataEnrichment';
+import { searchLyrics } from '../services/metadataEnrichment';
 import { cleanArtistSeparators } from '../utils/urlMetadataParser';
 import { preloadAllAppImages, preloadSingleImage } from '../utils/offlineImagePreloader';
 
@@ -101,7 +101,7 @@ interface MusicContextType {
   // Artist Profiles
   artistProfiles: ArtistProfile[];
   getArtistProfile: (artistName: string) => ArtistProfile | null;
-  updateArtistProfile: (artist: ArtistProfile) => Promise<void>;
+  updateArtistProfile: (artist: ArtistProfile) => Promise<boolean>;
   mergeArtists: (sourceArtistName: string, targetArtistName: string) => Promise<void>;
   addArtistAlias: (artistName: string, alias: string) => Promise<void>;
   removeArtistAlias: (artistName: string, alias: string) => Promise<void>;
@@ -334,8 +334,36 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .then((firebase) =>
         firebase.subscribeToArtistProfilesUpdates(
           (cloudArtists) => {
-            setArtistProfiles(cloudArtists);
-            saveStoredArtistProfiles(cloudArtists);
+            setArtistProfiles((prev) => {
+              const map = new Map<string, ArtistProfile>();
+              // Keep local profiles first
+              prev.forEach((p) => {
+                const k = (p.id || p.name).trim().toLowerCase().replace(/[\/\\]/g, '_');
+                map.set(k, p);
+              });
+              // Merge cloud profiles
+              cloudArtists.forEach((c) => {
+                const k = (c.id || c.name).trim().toLowerCase().replace(/[\/\\]/g, '_');
+                const local = map.get(k);
+                if (!local) {
+                  map.set(k, c);
+                } else {
+                  // If local has customAvatar and cloud does not, preserve local
+                  if (local.customAvatar && !c.customAvatar) {
+                    map.set(k, { ...c, avatarUrl: local.avatarUrl, customAvatar: true });
+                  } else {
+                    const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+                    const cloudTime = c.updatedAt ? new Date(c.updatedAt).getTime() : 0;
+                    if (cloudTime >= localTime) {
+                      map.set(k, c);
+                    }
+                  }
+                }
+              });
+              const merged = Array.from(map.values());
+              saveStoredArtistProfiles(merged);
+              return merged;
+            });
             setIsArtistProfilesReady(true);
           },
           (err) => {
@@ -358,7 +386,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const fallbackTimer = setTimeout(() => {
       setIsArtistProfilesReady(true);
-    }, 3000);
+    }, 2000);
 
     return () => {
       cancelled = true;
@@ -1158,8 +1186,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
-  const updateArtistProfile = useCallback(async (artist: ArtistProfile) => {
-    const norm = artist.id || artist.name.trim().toLowerCase();
+  const updateArtistProfile = useCallback(async (artist: ArtistProfile): Promise<boolean> => {
+    const rawId = (artist.id || artist.name || '').trim().toLowerCase();
+    const norm = rawId.replace(/[\/\\]/g, '_');
+    if (!norm) return false;
+
     const updated: ArtistProfile = {
       ...artist,
       id: norm,
@@ -1167,7 +1198,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     setArtistProfiles((previous) => {
-      const filtered = previous.filter((item) => item.id !== norm);
+      const filtered = previous.filter(
+        (item) => item.id !== norm && item.id.replace(/[\/\\]/g, '_') !== norm
+      );
       const next = [...filtered, updated];
       saveStoredArtistProfiles(next);
       return next;
@@ -1175,7 +1208,10 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     saveStoredArtistProfile(updated);
     const firebase = await loadFirebaseService();
-    await firebase.saveArtistProfileToFirestore(updated);
+    if (firebase) {
+      return await firebase.saveArtistProfileToFirestore(updated);
+    }
+    return true;
   }, []);
 
   const mergeArtists = useCallback(
@@ -1351,84 +1387,6 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     },
     [artistProfiles]
   );
-
-  // Auto-fetch official artist portraits for any artist lacking a profile photo
-  const autoAvatarCheckedRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (!catalog.length || !isCatalogReady || !isArtistProfilesReady) return;
-
-    const artistNames = new Set<string>();
-    catalog.forEach((s) => {
-      if (s.artist) {
-        s.artist.split(/[,&/]|feat\.|ft\./i).forEach((a) => {
-          const trimmed = a.trim();
-          if (trimmed) artistNames.add(trimmed);
-        });
-      }
-    });
-
-    const missing = Array.from(artistNames).filter((name) => {
-      const key = name.toLowerCase().trim();
-      if (autoAvatarCheckedRef.current.has(key)) return false;
-
-      // Check resolved profile (following aliases & merges)
-      const resolved = getArtistProfile(name);
-      if (resolved?.customAvatar || resolved?.avatarUrl || resolved?.mergedInto) {
-        return false;
-      }
-
-      const existing = artistProfiles.find((p) => p.id === key || p.name.toLowerCase() === key);
-      if (existing?.customAvatar || existing?.avatarUrl || existing?.mergedInto) {
-        return false;
-      }
-
-      return true;
-    });
-
-    if (missing.length === 0) return;
-
-    let isCancelled = false;
-
-    const fetchNextAvatars = async () => {
-      for (const name of missing) {
-        if (isCancelled) break;
-        const key = name.toLowerCase().trim();
-        autoAvatarCheckedRef.current.add(key);
-
-        try {
-          const avatarUrl = await searchArtistAvatar(name);
-          if (avatarUrl && !isCancelled) {
-            const current =
-              getArtistProfile(name) ||
-              artistProfiles.find((p) => p.id === key || p.name.toLowerCase() === key);
-            if (current?.customAvatar || current?.avatarUrl || current?.mergedInto) {
-              continue;
-            }
-
-            await updateArtistProfile({
-              ...(current || {}),
-              id: key,
-              name: current?.name || name,
-              avatarUrl,
-              customAvatar: false,
-            });
-          }
-        } catch (e) {
-          console.warn('Could not auto-fetch avatar for artist:', name, e);
-        }
-      }
-    };
-
-    const timer = setTimeout(() => {
-      void fetchNextAvatars();
-    }, 2000);
-
-    return () => {
-      isCancelled = true;
-      clearTimeout(timer);
-    };
-  }, [catalog, isCatalogReady, isArtistProfilesReady, artistProfiles, getArtistProfile, updateArtistProfile]);
 
   // User Play Counts & Analytics Actions
   const recordSongPlay = useCallback(

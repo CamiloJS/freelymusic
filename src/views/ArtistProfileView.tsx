@@ -224,7 +224,8 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
     }
 
     try {
-      const compressed = await compressImage(file, 500, 0.8);
+      // 360px gives retina clarity while keeping base64 under 25KB
+      const compressed = await compressImage(file, 360, 0.8);
       if (compressed) {
         setEditAvatarUrl(compressed);
       }
@@ -239,8 +240,11 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
     setIsSaving(true);
     try {
       const cleanAvatar = editAvatarUrl.trim();
+      const rawId = (profile?.id || artistName).trim().toLowerCase();
+      const safeId = rawId.replace(/[\/\\]/g, '_');
+
       const updated: ArtistProfile = {
-        id: (profile?.id || artistName).trim().toLowerCase(),
+        id: safeId,
         name: (profile?.name || artistName).trim(),
         avatarUrl: cleanAvatar || undefined,
         headerUrl: editHeaderUrl.trim() || undefined,
@@ -250,12 +254,16 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
         customAvatar: Boolean(cleanAvatar),
       };
 
-      await updateArtistProfile(updated);
-      setSaveSuccessMsg('¡Perfil de artista guardado y sincronizado para todos los usuarios!');
+      const isCloudSaved = await updateArtistProfile(updated);
+      setSaveSuccessMsg(
+        isCloudSaved
+          ? '¡Perfil y foto guardados y sincronizados con éxito!'
+          : '¡Guardado localmente en tu biblioteca!'
+      );
       setTimeout(() => {
         setIsEditModalOpen(false);
         setSaveSuccessMsg('');
-      }, 1500);
+      }, 1200);
     } catch (err) {
       console.error(err);
       alert('Error al guardar el perfil del artista');

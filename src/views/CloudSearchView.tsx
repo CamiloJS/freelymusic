@@ -635,7 +635,12 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                       onClick={() => {
                         const updated = saveRecentSearch(song.title);
                         setRecentSearches(updated);
-                        playSong(song, filteredSongs);
+                        const queryText = searchQuery.trim();
+                        playSong(song, filteredSongs, {
+                          type: 'search',
+                          name: queryText ? `Buscar "${queryText}"` : `Buscar "${song.title}"`,
+                          id: queryText || song.id,
+                        });
                       }}
                       className={`flex items-center justify-between p-3.5 hover:bg-neutral-800/50 transition-colors cursor-pointer group ${
                         isCurrent ? 'bg-neutral-800/40' : ''
@@ -650,7 +655,12 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                             event.stopPropagation();
                             const updated = saveRecentSearch(song.title);
                             setRecentSearches(updated);
-                            playSong(song, filteredSongs);
+                            const queryText = searchQuery.trim();
+                            playSong(song, filteredSongs, {
+                              type: 'search',
+                              name: queryText ? `Buscar "${queryText}"` : `Buscar "${song.title}"`,
+                              id: queryText || song.id,
+                            });
                           }}
                           className="w-5 text-emerald-400 flex-shrink-0 hidden group-hover:block"
                           title="Reproducir"

@@ -703,6 +703,7 @@ const MainLayout: React.FC = () => {
             onSelectArtist={handleSelectArtist}
             onSelectAlbum={handleSelectAlbum}
             onSelectPlaylist={handleSelectPlaylist}
+            onNavigateSearch={() => setCurrentTab('search')}
           />
         </div>
       </div>
@@ -755,6 +756,7 @@ const MainLayout: React.FC = () => {
             onSelectAlbum={handleSelectAlbum}
             onSelectPlaylist={handleSelectPlaylist}
             onOpenAddToPlaylist={handleOpenAddToPlaylist}
+            onNavigateSearch={() => setCurrentTab('search')}
           />
         </Suspense>
       )}

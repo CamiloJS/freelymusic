@@ -27,12 +27,14 @@ interface SpotifyRightPanelProps {
   onSelectArtist?: (artistName: string) => void;
   onSelectAlbum?: (album: Album) => void;
   onSelectPlaylist?: (playlist: Playlist | 'favorites' | Album) => void;
+  onNavigateSearch?: () => void;
 }
 
 export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
   onSelectArtist,
   onSelectAlbum,
   onSelectPlaylist,
+  onNavigateSearch,
 }) => {
   const {
     currentSong,
@@ -179,8 +181,20 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
 
   const activeInlineLyric = shouldShowInlineSubtitle ? displayLyrics[activeLyricIndex] : null;
 
+  const sourceSubtitle = React.useMemo(() => {
+    if (playbackSource?.type === 'playlist') return 'DE LA PLAYLIST';
+    if (playbackSource?.type === 'album') return 'DEL ÁLBUM';
+    if (playbackSource?.type === 'artist') return 'DEL ARTISTA';
+    if (playbackSource?.type === 'favorites') return 'DE TUS ME GUSTA';
+    if (playbackSource?.type === 'search') return 'DE LA BÚSQUEDA';
+    return null;
+  }, [playbackSource]);
+
   const displayOrigin = React.useMemo(() => {
     if (!currentSong) return null;
+    if (playbackSource?.type === 'search' || playbackSource?.name?.startsWith('Buscar "')) {
+      return playbackSource.name;
+    }
     if (!playbackSource?.name) {
       return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
         ? currentSong.album
@@ -213,6 +227,14 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
 
   const handleNavigateToOrigin = () => {
     if (!displayOrigin && !playbackSource) return;
+
+    // 0. Search check
+    if (playbackSource?.type === 'search' || displayOrigin?.startsWith('Buscar "')) {
+      if (onNavigateSearch) {
+        onNavigateSearch();
+        return;
+      }
+    }
 
     // 1. Favorites check
     if (
@@ -347,6 +369,11 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
             {/* Source Origin Title (clickable like Spotify) */}
             {displayOrigin && (
               <div className="min-w-0">
+                {sourceSubtitle && (
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block mb-0.5">
+                    {sourceSubtitle}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={handleNavigateToOrigin}

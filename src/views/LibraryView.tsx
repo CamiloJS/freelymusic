@@ -527,9 +527,25 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 ? 'Playlist pública'
                 : 'Playlist privada'}
             </span>
-            <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight py-0.5 break-words">
-              {sourceName}
-            </h1>
+            {(() => {
+              const len = sourceName.length;
+              let titleSizeClass = 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl';
+              if (len > 55) {
+                titleSizeClass = 'text-xl sm:text-2xl md:text-3xl lg:text-4xl';
+              } else if (len > 35) {
+                titleSizeClass = 'text-2xl sm:text-3xl md:text-4xl lg:text-5xl';
+              } else if (len > 20) {
+                titleSizeClass = 'text-2xl sm:text-3xl md:text-5xl lg:text-5xl';
+              }
+              return (
+                <h1
+                  className={`${titleSizeClass} font-black text-white tracking-tight leading-tight py-0.5 break-words line-clamp-2 sm:line-clamp-3`}
+                  title={sourceName}
+                >
+                  {sourceName}
+                </h1>
+              );
+            })()}
             {!isFavorites && !isAlbum && playlistObj?.description && (
               <p className="text-xs text-[#b3b3b3] line-clamp-2 max-w-lg">
                 {playlistObj.description}

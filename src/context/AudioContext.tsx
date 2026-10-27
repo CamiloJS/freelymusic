@@ -60,7 +60,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | nul
 export type RepeatMode = 'off' | 'all' | 'one';
 
 export interface PlaybackSource {
-  type: 'playlist' | 'favorites' | 'catalog' | 'album' | 'artist';
+  type: 'playlist' | 'favorites' | 'catalog' | 'album' | 'artist' | 'search';
   name: string;
   id?: string;
 }
@@ -888,8 +888,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setActiveVersionIdState(null);
       setIsKaraoke(false);
       setIsVideoMode(false);
-      if (source) {
+      if (source !== undefined) {
         setPlaybackSource(source);
+      } else {
+        // If source is not explicitly passed:
+        // Check if the song is continuing the active queue (e.g. next/prev track)
+        const isContinuingQueue = queue.some((s) => s.id === song.id);
+        if (!isContinuingQueue) {
+          if (song.album && song.album.trim().toLowerCase() !== 'sencillo') {
+            setPlaybackSource({ type: 'album', name: song.album.trim() });
+          } else {
+            setPlaybackSource(null);
+          }
+        }
       }
       if (newQueue && newQueue.length > 0) {
         setQueue(newQueue);

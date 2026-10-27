@@ -559,14 +559,27 @@ export async function syncArtistProfilesFromFirestore(): Promise<ArtistProfile[]
   }
 }
 
-export async function saveArtistProfileToFirestore(artist: ArtistProfile): Promise<void> {
-  if (!db) return;
+export async function saveArtistProfileToFirestore(artist: ArtistProfile): Promise<boolean> {
+  if (!db) return false;
   try {
-    await ensureAuth();
-    const artistId = artist.id || artist.name.trim().toLowerCase();
-    await setDoc(doc(db, ...BASE_PATH, 'artists', artistId), sanitizeForFirestore({ ...artist, id: artistId }), { merge: true });
+    const authenticated = await ensureAuth();
+    if (!authenticated) {
+      console.warn('Firebase anon auth pending, cannot write artist profile to Firestore');
+      return false;
+    }
+    const rawId = (artist.id || artist.name || '').trim().toLowerCase();
+    const artistId = rawId.replace(/[\/\\]/g, '_');
+    if (!artistId) return false;
+
+    await setDoc(
+      doc(db, ...BASE_PATH, 'artists', artistId),
+      sanitizeForFirestore({ ...artist, id: artistId }),
+      { merge: true }
+    );
+    return true;
   } catch (err) {
     console.warn('Error saving artist profile to Firestore:', err);
+    return false;
   }
 }
 
