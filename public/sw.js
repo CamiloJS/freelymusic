@@ -4,7 +4,7 @@
  * Full offline compatibility for iOS Safari (WebKit Standalone), Android Chrome, and Windows Edge.
  */
 
-const CACHE_NAME = 'spotifree-cache-v9';
+const CACHE_NAME = 'spotifree-cache-v10';
 const PWA_ICON_CACHE = 'spotifree-pwa-icons-v3';
 const IMAGE_CACHE = 'spotifree-images-v1';
 
@@ -133,8 +133,18 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Audio files & external streams are handled by IndexedDB or streamed directly
-  if (AUDIO_EXTENSIONS.test(url.pathname)) return;
+  // Fast bypass for media: Audio files, video files, and HTTP Range (206) requests
+  // must pass directly through to browser/network without SW interference,
+  // guaranteeing 100% stable playback on Android Chromium and iOS WebKit.
+  if (
+    request.destination === 'audio' ||
+    request.destination === 'video' ||
+    request.headers.get('range') ||
+    AUDIO_EXTENSIONS.test(url.pathname) ||
+    AUDIO_EXTENSIONS.test(url.href)
+  ) {
+    return;
+  }
 
   // A. PWA Icons (Apple touch icons, Android launcher icons)
   if (PWA_ICON_PATHS.has(url.pathname)) {

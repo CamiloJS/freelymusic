@@ -67,7 +67,18 @@ export async function getSongBlob(songId: string): Promise<Blob | null> {
     const transaction = db.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
     const request = store.get(songId);
-    request.onsuccess = () => resolve(request.result || null);
+    request.onsuccess = () => {
+      const result = request.result;
+      if (result instanceof Blob) {
+        if (!result.type || result.type === 'application/octet-stream') {
+          resolve(new Blob([result], { type: 'audio/mpeg' }));
+          return;
+        }
+        resolve(result);
+      } else {
+        resolve(null);
+      }
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -140,7 +151,17 @@ async function fetchMediaBlob(url: string, timeoutMs = 120000): Promise<Blob | n
   try {
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) return null;
-    return await res.blob();
+    const blob = await res.blob();
+    if (!blob.type || blob.type === 'application/octet-stream') {
+      let mime = 'audio/mpeg';
+      const lower = url.toLowerCase();
+      if (lower.includes('.ogg')) mime = 'audio/ogg';
+      else if (lower.includes('.wav')) mime = 'audio/wav';
+      else if (lower.includes('.flac')) mime = 'audio/flac';
+      else if (lower.includes('.m4a') || lower.includes('.mp4')) mime = 'audio/mp4';
+      return new Blob([blob], { type: mime });
+    }
+    return blob;
   } catch (err) {
     console.warn('No se pudo descargar archivo multimedia para caché offline:', url, err);
     return null;

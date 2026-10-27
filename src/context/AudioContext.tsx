@@ -200,15 +200,55 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [translationUpdatedAt, setTranslationUpdatedAt] = useState<string | null>(null);
   const translationRequestRef = useRef<number>(0);
 
-  // Initialize Audio element once
+  // Initialize Audio element once with mobile PWA optimizations
   useEffect(() => {
     const audio = new Audio();
-    audio.preload = 'metadata';
-    audio.volume = volume;
+    audio.preload = 'auto';
+    (audio as unknown as { playsInline?: boolean; webkitPlaysInline?: boolean }).playsInline = true;
+    (audio as unknown as { playsInline?: boolean; webkitPlaysInline?: boolean }).webkitPlaysInline = true;
+    audio.setAttribute('playsinline', '');
+    audio.setAttribute('webkit-playsinline', '');
+    audio.style.display = 'none';
+
+    // On mobile devices, ensure volume is 1.0 by default so the device hardware rocker controls sound
+    const isMobile =
+      typeof navigator !== 'undefined' &&
+      (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768));
+    audio.volume = isMobile ? 1.0 : volume;
+
+    // Attach to DOM so Android Chromium / PWA engines grant full foreground audio privileges
+    if (typeof document !== 'undefined' && document.body && !document.body.contains(audio)) {
+      document.body.appendChild(audio);
+    }
+
     audioRef.current = audio;
+
+    // Mobile one-time audio gesture unlocker
+    const unlockAudio = () => {
+      try {
+        if (audio && audio.paused && !audio.src) {
+          audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+          const p = audio.play();
+          if (p && typeof p.then === 'function') {
+            p.then(() => {
+              audio.pause();
+              audio.removeAttribute('src');
+            }).catch(() => {});
+          }
+        }
+      } catch {}
+      window.removeEventListener('pointerdown', unlockAudio, true);
+      window.removeEventListener('touchstart', unlockAudio, true);
+      window.removeEventListener('click', unlockAudio, true);
+    };
+
+    window.addEventListener('pointerdown', unlockAudio, true);
+    window.addEventListener('touchstart', unlockAudio, true);
+    window.addEventListener('click', unlockAudio, true);
 
     const onTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
+      setIsBuffering(false);
     };
 
     const onDurationChange = () => {
@@ -261,7 +301,29 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setDuration(0);
     };
     const onError = (e: Event) => {
-      console.warn('Audio playback error:', e);
+      const mediaErr = audio.error;
+      // Abort error happens normally when switching tracks; do not stop playback
+      if (mediaErr && mediaErr.code === 1) return; // MEDIA_ERR_ABORTED
+
+      console.warn('Audio playback error:', mediaErr ? `code ${mediaErr.code}: ${mediaErr.message}` : e);
+
+      // If playing an offline blob failed on Android, automatically attempt online baseUrl fallback
+      const active = currentSongRef.current;
+      if (blobUrlRef.current && active && typeof navigator !== 'undefined' && navigator.onLine) {
+        console.log('Reintentando reproducción desde audioUrl online tras fallo de blob offline...');
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+        audio.src = active.audioUrl;
+        audio.play().catch(() => {
+          setIsPlaying(false);
+          setIsBuffering(false);
+          setPlaybackError(
+            'No se pudo reproducir esta canción. Verifica el enlace o inténtalo de nuevo.'
+          );
+        });
+        return;
+      }
+
       setIsPlaying(false);
       setIsBuffering(false);
       setPlaybackError(
@@ -282,6 +344,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     audio.addEventListener('error', onError);
 
     return () => {
+      window.removeEventListener('pointerdown', unlockAudio, true);
+      window.removeEventListener('touchstart', unlockAudio, true);
+      window.removeEventListener('click', unlockAudio, true);
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('durationchange', onDurationChange);
       audio.removeEventListener('play', onPlay);
@@ -296,6 +361,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       audio.pause();
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);
+      }
+      if (typeof document !== 'undefined' && document.body && document.body.contains(audio)) {
+        try {
+          document.body.removeChild(audio);
+        } catch {}
       }
     };
   }, []);
@@ -664,24 +734,34 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       let audioSource = karaoke && instrumentalUrl ? instrumentalUrl : baseUrl;
       let usedBlob = false;
 
-      // Touch IndexedDB when the song is downloaded (supports main audio, karaoke and versions)
-      if (canUseOffline && isDownloaded(song.id)) {
+      // Online vs Offline strategy:
+      // When offline or if baseUrl is missing, use the cached blob from IndexedDB.
+      // When online, use the remote audioUrl directly (which gives native HTTP Range 206 support,
+      // reliable lockscreen controls, and avoids the Android WebView blob decode bug).
+      const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+      const shouldUseOfflineBlob = (!isOnline || !audioSource) && canUseOffline && isDownloaded(song.id);
+
+      if (shouldUseOfflineBlob || (canUseOffline && isDownloaded(song.id) && !isOnline)) {
         let cachedBlob: Blob | null = null;
         if (karaoke) {
-          cachedBlob = await withTimeout(getInstrumentalBlob(song.id, options?.versionId), 1200);
+          cachedBlob = await withTimeout(getInstrumentalBlob(song.id, options?.versionId), 1500);
         } else if (options?.versionId) {
-          cachedBlob = await withTimeout(getSongBlob(`${song.id}-version-${options.versionId}`), 1200);
+          cachedBlob = await withTimeout(getSongBlob(`${song.id}-version-${options.versionId}`), 1500);
           if (!cachedBlob) {
-            cachedBlob = await withTimeout(getSongBlob(song.id), 1200);
+            cachedBlob = await withTimeout(getSongBlob(song.id), 1500);
           }
         } else {
-          cachedBlob = await withTimeout(getSongBlob(song.id), 1200);
+          cachedBlob = await withTimeout(getSongBlob(song.id), 1500);
         }
 
         if (requestId !== playRequestRef.current) return;
 
         if (cachedBlob) {
-          const objectUrl = URL.createObjectURL(cachedBlob);
+          const typedBlob =
+            cachedBlob.type && cachedBlob.type.startsWith('audio/')
+              ? cachedBlob
+              : new Blob([cachedBlob], { type: 'audio/mpeg' });
+          const objectUrl = URL.createObjectURL(typedBlob);
           blobUrlRef.current = objectUrl;
           audioSource = objectUrl;
           usedBlob = true;
@@ -702,7 +782,22 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       try {
         audio.preload = 'auto';
-        audio.src = audioSource;
+        (audio as unknown as { playsInline?: boolean; webkitPlaysInline?: boolean }).playsInline = true;
+        (audio as unknown as { playsInline?: boolean; webkitPlaysInline?: boolean }).webkitPlaysInline = true;
+
+        const isMobile =
+          typeof navigator !== 'undefined' &&
+          (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768));
+        if (isMobile) {
+          audio.volume = 1.0;
+        }
+
+        if (audio.src !== audioSource) {
+          audio.src = audioSource;
+          if (usedBlob) {
+            audio.load();
+          }
+        }
 
         const startAt = options?.startAt;
         if (typeof startAt === 'number' && Number.isFinite(startAt) && startAt > 0) {
@@ -716,7 +811,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           };
           audio.addEventListener('loadedmetadata', applyStart);
         } else {
-          audio.currentTime = 0;
+          try {
+            if (audio.currentTime !== 0) audio.currentTime = 0;
+          } catch {}
         }
 
         if (isVideoModeRef.current) {
@@ -737,25 +834,39 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } catch (err) {
         if (requestId !== playRequestRef.current) return;
 
-        // A corrupt/evicted offline blob should never block network playback.
-        if (usedBlob) {
+        // Two-way automatic fallback:
+        // 1. If usedBlob failed, try online baseUrl
+        if (usedBlob && baseUrl) {
           try {
             if (blobUrlRef.current) {
               URL.revokeObjectURL(blobUrlRef.current);
               blobUrlRef.current = null;
             }
             audio.src = baseUrl;
-            if (isVideoModeRef.current && song.videoUrl) {
-              audio.muted = true;
-              audio.pause();
-            } else {
+            audio.muted = isMuted;
+            await audio.play();
+            return;
+          } catch {}
+        }
+
+        // 2. If online baseUrl failed, try offline blob from IndexedDB
+        if (!usedBlob && canUseOffline && isDownloaded(song.id)) {
+          try {
+            const cachedBlob = await getSongBlob(song.id);
+            if (cachedBlob) {
+              const typedBlob =
+                cachedBlob.type && cachedBlob.type.startsWith('audio/')
+                  ? cachedBlob
+                  : new Blob([cachedBlob], { type: 'audio/mpeg' });
+              const objectUrl = URL.createObjectURL(typedBlob);
+              blobUrlRef.current = objectUrl;
+              audio.src = objectUrl;
+              audio.load();
               audio.muted = isMuted;
               await audio.play();
+              return;
             }
-            return;
-          } catch {
-            // fall through to the visible error below
-          }
+          } catch {}
         }
 
         console.warn('Playback error or auto-play prevented:', err);
@@ -766,7 +877,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         );
       }
     },
-    [isDownloaded]
+    [isDownloaded, isMuted]
   );
 
   // Play a specific song and optionally update queue and source
@@ -785,9 +896,37 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } else {
         setQueue((prev) => (prev.some((s) => s.id === song.id) ? prev : [song, ...prev]));
       }
+
+      // Synchronously capture user gesture activation on mobile browsers!
+      const audio = audioRef.current;
+      if (audio) {
+        (audio as unknown as { playsInline?: boolean; webkitPlaysInline?: boolean }).playsInline = true;
+        (audio as unknown as { playsInline?: boolean; webkitPlaysInline?: boolean }).webkitPlaysInline = true;
+        audio.muted = false;
+
+        const isMobile =
+          typeof navigator !== 'undefined' &&
+          (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768));
+        if (isMobile) {
+          audio.volume = 1.0;
+        }
+
+        // Assign initial url immediately inside user gesture so Chrome Android accepts playback
+        const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+        if (song.audioUrl && (isOnline || !isDownloaded(song.id))) {
+          if (audio.src !== song.audioUrl) {
+            audio.src = song.audioUrl;
+          }
+          const p = audio.play();
+          if (p && typeof p.catch === 'function') {
+            p.catch(() => {});
+          }
+        }
+      }
+
       void loadAndPlaySong(song, { versionId: null, karaoke: false });
     },
-    [loadAndPlaySong]
+    [isDownloaded, loadAndPlaySong]
   );
 
   const setActiveVersion = useCallback(
@@ -1006,12 +1145,25 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       audio.pause();
     } else {
       setPlaybackError(null);
+      audio.muted = false;
+      const isMobile =
+        typeof navigator !== 'undefined' &&
+        (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768));
+      if (isMobile) {
+        audio.volume = 1.0;
+      }
+
+      if (!audio.src || audio.src === '' || audio.src === window.location.href) {
+        void loadAndPlaySong(currentSong);
+        return;
+      }
+
       audio.play().catch((err) => {
-        console.warn('No se pudo reanudar la reproducción:', err);
-        setPlaybackError('No se pudo reanudar la reproducción. Inténtalo de nuevo.');
+        console.warn('No se pudo reanudar la reproducción directamente, recargando...', err);
+        void loadAndPlaySong(currentSong);
       });
     }
-  }, [isPlaying, currentSong, isVideoMode]);
+  }, [isPlaying, currentSong, isVideoMode, loadAndPlaySong]);
 
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
@@ -1217,6 +1369,28 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.warn('MediaSession no disponible por completo:', err);
     }
   }, [currentSong, togglePlayPause, prevTrack, nextTrack, seek]);
+
+  // Synchronize MediaSession playbackState with isPlaying for Android OS AudioFocus & lock screen notification
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    } catch {}
+  }, [isPlaying]);
+
+  // Synchronize MediaSession position state for Android lock screen seekbar
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession)) return;
+    try {
+      if (duration > 0 && Number.isFinite(duration) && Number.isFinite(currentTime)) {
+        navigator.mediaSession.setPositionState({
+          duration: Math.max(duration, currentTime),
+          playbackRate: isPlaying ? 1 : 0,
+          position: Math.min(Math.max(0, currentTime), duration),
+        });
+      }
+    } catch {}
+  }, [currentTime, duration, isPlaying]);
 
   const audioTimeValue = React.useMemo(
     () => ({ currentTime, duration, activeLyricIndex }),
