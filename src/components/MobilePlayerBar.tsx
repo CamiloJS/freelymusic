@@ -1,8 +1,10 @@
 import React from 'react';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
+import SkipForward from 'lucide-react/dist/esm/icons/skip-forward.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 import { DownloadedIcon } from './DownloadedIcon';
+import { SavedCheckIcon } from './SavedCheckIcon';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { ArtistLinks } from './ArtistLinks';
@@ -17,18 +19,26 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
     isPlaying,
     isBuffering,
     togglePlayPause,
+    nextTrack,
     setIsFullscreenNowPlaying,
   } = useAudio();
   const { currentTime, duration } = useAudioTime();
-  const { isDownloaded } = useMusic();
+  const { isDownloaded, isFavorite, toggleFavorite } = useMusic();
 
   if (!currentSong) return null;
 
   const progress = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const downloaded = isDownloaded(currentSong.id);
+  const liked = isFavorite(currentSong.id);
 
   return (
-    <div className="mobile-player-bar md:hidden relative flex-shrink-0 overflow-hidden border-t border-white/10 bg-neutral-950">
+    <div
+      onClick={() => setIsFullscreenNowPlaying(true)}
+      className="mobile-player-bar md:hidden relative flex-shrink-0 overflow-hidden border-t border-white/10 bg-neutral-950 cursor-pointer select-none active:brightness-95 transition-all"
+      role="button"
+      tabIndex={0}
+      aria-label="Abrir reproductor a pantalla completa"
+    >
       {currentSong.coverUrl && (
         <div
           className="mobile-player-ambient-blur absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-70"
@@ -37,12 +47,9 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
       )}
       <div className="mobile-player-overlay absolute inset-0 bg-black/55" />
 
-      <div className="relative flex items-center gap-3 px-3 py-2.5">
-        <button
-          onClick={() => setIsFullscreenNowPlaying(true)}
-          className="w-11 h-11 rounded-lg overflow-hidden bg-neutral-800 flex-shrink-0 shadow-lg"
-          title="Abrir reproductor"
-        >
+      <div className="relative flex items-center gap-2.5 px-3 py-2">
+        {/* Cover Art */}
+        <div className="w-11 h-11 rounded-lg overflow-hidden bg-neutral-800 flex-shrink-0 shadow-lg">
           {currentSong.coverUrl ? (
             <img
               src={currentSong.coverUrl}
@@ -54,40 +61,88 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
               ♪
             </span>
           )}
-        </button>
+        </div>
 
-        <button
-          onClick={() => setIsFullscreenNowPlaying(true)}
-          className="min-w-0 flex-1 text-left"
-        >
+        {/* Track Title & Artist */}
+        <div className="min-w-0 flex-1 text-left">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="truncate text-xs font-bold text-white">{currentSong.title}</span>
+            {currentSong.isExplicit && (
+              <span
+                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-white text-[9px] font-black flex-shrink-0 select-none leading-none"
+                title="Contenido explícito"
+              >
+                E
+              </span>
+            )}
+            <span className="truncate text-xs font-bold text-white block">{currentSong.title}</span>
             {downloaded && (
               <span title="Descargado" className="flex-shrink-0">
-                <DownloadedIcon size={14} />
+                <DownloadedIcon size={13} />
               </span>
             )}
           </div>
           <span className="mobile-player-artist block truncate text-[10px] text-white/70 mt-0.5">
             <ArtistLinks artists={currentSong.artist} onSelectArtist={onSelectArtist} />
           </span>
-        </button>
+        </div>
 
-        <button
-          onClick={togglePlayPause}
-          className="mobile-play-btn w-10 h-10 rounded-full bg-white text-black flex items-center justify-center flex-shrink-0 shadow-lg active:scale-95 transition-transform"
-          title={isBuffering ? 'Cargando...' : isPlaying ? 'Pausar' : 'Reproducir'}
-        >
-          {isBuffering ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : isPlaying ? (
-            <Pause className="w-4 h-4 fill-current" />
-          ) : (
-            <Play className="w-4 h-4 fill-current ml-0.5" />
-          )}
-        </button>
+        {/* Controls: Like, Play/Pause, Next */}
+        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFavorite(currentSong.id);
+            }}
+            className="p-1.5 text-neutral-400 hover:text-white transition-transform active:scale-90"
+            title={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
+            aria-label={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
+          >
+            {liked ? (
+              <SavedCheckIcon size={19} />
+            ) : (
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" className="text-neutral-400 hover:text-white">
+                <circle cx="12" cy="12" r="10.5" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M12 7.5v9M7.5 12h9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePlayPause();
+            }}
+            className="mobile-play-btn w-9 h-9 rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+            title={isBuffering ? 'Cargando...' : isPlaying ? 'Pausar' : 'Reproducir'}
+            aria-label={isBuffering ? 'Cargando...' : isPlaying ? 'Pausar' : 'Reproducir'}
+          >
+            {isBuffering ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : isPlaying ? (
+              <Pause className="w-4 h-4 fill-current" />
+            ) : (
+              <Play className="w-4 h-4 fill-current ml-0.5" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              nextTrack();
+            }}
+            className="p-1.5 text-neutral-300 hover:text-white transition-transform active:scale-90"
+            title="Siguiente canción"
+            aria-label="Siguiente canción"
+          >
+            <SkipForward className="w-4 h-4 fill-current" />
+          </button>
+        </div>
       </div>
 
+      {/* Progress track */}
       <div className="mobile-progress-track absolute bottom-0 left-0 right-0 h-[2px] bg-white/15">
         <div
           className="mobile-progress-fill h-full bg-white/85 transition-all"

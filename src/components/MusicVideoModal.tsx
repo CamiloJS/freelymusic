@@ -194,10 +194,17 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
     .filter((s) => Boolean(s.videoUrl) && s.id !== currentSong.id)
     .slice(0, 4);
 
+  const subtitlePositionClass = !showControls
+    ? 'bottom-8 sm:bottom-12'
+    : relatedVideos.length > 0
+    ? 'bottom-56 sm:bottom-60 md:bottom-64'
+    : 'bottom-32 sm:bottom-36';
+
   return (
     <div
       onMouseMove={handleMouseMove}
-      className="fixed inset-0 z-[70] bg-black flex flex-col justify-between select-none overflow-hidden cursor-default animate-in fade-in duration-200"
+      onTouchStart={handleMouseMove}
+      className="music-video-modal-container fixed inset-0 z-[70] bg-black flex flex-col justify-between select-none overflow-hidden cursor-default animate-in fade-in duration-200"
     >
       {/* Background Video Element (Fills the viewport) */}
       <div className="absolute inset-0 flex items-center justify-center bg-black">
@@ -285,11 +292,11 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
         </div>
       </div>
 
-      {/* Synchronized Subtitles (Positioned near bottom above controls, never in middle of video) */}
+      {/* Synchronized Subtitles (Positioned near bottom above controls, safely clear of related videos) */}
       <div
-        className={`absolute left-0 right-0 z-30 pointer-events-none flex justify-center px-4 transition-all duration-300 ease-out ${
-          showControls ? 'bottom-32 sm:bottom-36' : 'bottom-8 sm:bottom-12'
-        } ${activeLyric ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}
+        className={`absolute left-0 right-0 z-30 pointer-events-none flex justify-center px-4 transition-all duration-300 ease-out ${subtitlePositionClass} ${
+          activeLyric ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+        }`}
       >
         {activeLyric && (
           <div className="max-w-2xl sm:max-w-3xl text-center px-5 py-2.5 rounded-2xl bg-black/80 backdrop-blur-md border border-white/10 shadow-2xl transition-all duration-200">
@@ -371,17 +378,17 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
         </div>
 
         {/* Playback Controls Row (Left: Info, Center: Buttons, Right: Volume & Exit) */}
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-3 sm:gap-4">
           {/* Left: Track Info */}
-          <div className="flex items-center gap-3 min-w-0 w-1/4">
-            <div className="w-11 h-11 rounded-xl overflow-hidden bg-neutral-900 shadow-md flex-shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0 max-w-[140px] sm:max-w-none sm:w-1/4">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl overflow-hidden bg-neutral-900 shadow-md flex-shrink-0">
               <img src={currentSong.coverUrl} alt={currentSong.title} className="w-full h-full object-cover" />
             </div>
-            <div className="truncate">
+            <div className="truncate min-w-0">
               <div className="flex items-center gap-1.5 truncate">
-                <span className="text-sm font-bold text-white truncate block">{currentSong.title}</span>
+                <span className="text-xs sm:text-sm font-bold text-white truncate block">{currentSong.title}</span>
               </div>
-              <p className="text-xs text-neutral-400 truncate">
+              <p className="text-[10px] sm:text-xs text-neutral-400 truncate">
                 <ArtistLinks
                   artists={currentSong.artist}
                   onSelectArtist={(name) => {
@@ -394,7 +401,7 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
             <button
               type="button"
               onClick={() => toggleFavorite(currentSong.id)}
-              className="p-1.5 rounded-full hover:scale-105 transition-transform flex-shrink-0"
+              className="p-1 sm:p-1.5 rounded-full hover:scale-105 transition-transform flex-shrink-0 hidden xs:block"
               title={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
             >
               {liked ? (
@@ -409,11 +416,11 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
           </div>
 
           {/* Center: Main Playback Controls */}
-          <div className="flex items-center gap-5 justify-center flex-1 max-w-md">
+          <div className="flex items-center gap-2.5 sm:gap-5 justify-center flex-1 max-w-md">
             <button
               type="button"
               onClick={toggleShuffle}
-              className={`p-1 transition-colors ${
+              className={`p-1 transition-colors hidden sm:block ${
                 isShuffle ? 'text-emerald-400' : 'text-neutral-400 hover:text-white'
               }`}
               title="Aleatorio"
@@ -455,7 +462,7 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
             <button
               type="button"
               onClick={toggleRepeat}
-              className={`p-1 transition-colors ${
+              className={`p-1 transition-colors hidden sm:block ${
                 repeatMode !== 'off' ? 'text-emerald-400' : 'text-neutral-400 hover:text-white'
               }`}
               title="Repetición"
@@ -465,8 +472,8 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
           </div>
 
           {/* Right: Volume & Fullscreen controls */}
-          <div className="flex items-center justify-end gap-3 w-1/4">
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-end gap-2 sm:gap-3 sm:w-1/4">
+            <div className="hidden sm:flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={toggleMute}

@@ -621,6 +621,28 @@ input[type="range"] {
   color: rgba(255, 255, 255, 0.4) !important;
 }
 
+/* Music Video Modal Isolation */
+[data-theme="light"] .music-video-modal-container {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .music-video-modal-container .text-white {
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .music-video-modal-container .hover\:text-white:hover {
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .music-video-modal-container .text-neutral-300 {
+  color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .music-video-modal-container .text-neutral-400 {
+  color: #94a3b8 !important;
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 8px;
