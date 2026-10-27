@@ -2,7 +2,6 @@ import React from 'react';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
-import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
@@ -46,12 +45,11 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
   } = useAudio();
   const { activeLyricIndex } = useAudioTime();
 
-  const { catalog, isFavorite, toggleFavorite, isDownloaded } = useMusic();
+  const { catalog, isFavorite, toggleFavorite } = useMusic();
 
   if (!isRightPanelOpen || !currentSong) return null;
 
   const liked = isFavorite(currentSong.id);
-  const downloaded = isDownloaded(currentSong.id);
 
   // Find upcoming queue tracks
   const currentIndex = queue.findIndex((s) => s.id === currentSong.id);
@@ -179,7 +177,7 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
                   }`}
                   title={liked ? 'Guardado en favoritos' : 'Añadir a favoritos'}
                 >
-                  <CheckCircle2 className={`w-5 h-5 ${liked ? 'fill-emerald-400 text-black' : ''}`} />
+                  <Heart className={`w-5 h-5 ${liked ? 'fill-emerald-400 text-emerald-400' : ''}`} />
                 </button>
               </div>
             </div>

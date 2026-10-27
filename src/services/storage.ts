@@ -443,6 +443,28 @@ export function normalizeUserData(raw: Partial<UserLibraryData> | null | undefin
         .filter((playlist): playlist is Playlist => Boolean(playlist))
     : [];
 
+  const followedArtists = Array.isArray(source.followedArtists)
+    ? Array.from(
+        new Set(
+          source.followedArtists
+            .filter((name): name is string => typeof name === 'string')
+            .map((name) => name.trim().toLowerCase())
+            .filter(Boolean)
+        )
+      )
+    : [];
+
+  const playlistIds = new Set(playlists.map((playlist) => playlist.id));
+  const pinnedPlaylistIds = Array.isArray(source.pinnedPlaylistIds)
+    ? Array.from(
+        new Set(
+          source.pinnedPlaylistIds.filter(
+            (id): id is string => typeof id === 'string' && playlistIds.has(id)
+          )
+        )
+      )
+    : [];
+
   const playCounts: Record<string, number> = {};
   if (source.playCounts && typeof source.playCounts === 'object') {
     Object.entries(source.playCounts).forEach(([songId, value]) => {
@@ -484,6 +506,8 @@ export function normalizeUserData(raw: Partial<UserLibraryData> | null | undefin
     favoriteSongIds,
     historySongIds,
     playlists,
+    followedArtists,
+    pinnedPlaylistIds,
     playCounts,
     playHistory,
     totalListenSeconds:
@@ -671,6 +695,8 @@ export function createDefaultUserData(userId: string): UserLibraryData {
   return {
     favoriteSongIds: [],
     historySongIds: [],
+    followedArtists: [],
+    pinnedPlaylistIds: [],
     playlists: [
       {
         id: `pl-${userId}-1`,

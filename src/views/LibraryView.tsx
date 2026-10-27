@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
@@ -6,15 +6,14 @@ import Music from 'lucide-react/dist/esm/icons/eighth-notes.mjs';
 import Trash2 from 'lucide-react/dist/esm/icons/trash.mjs';
 import Download from 'lucide-react/dist/esm/icons/download.mjs';
 import FolderDown from 'lucide-react/dist/esm/icons/folder-down.mjs';
-import ArrowLeft from 'lucide-react/dist/esm/icons/arrow-left.mjs';
-import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import Pin from 'lucide-react/dist/esm/icons/pin.mjs';
 import Clock from 'lucide-react/dist/esm/icons/clock.mjs';
 import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
 import Shuffle from 'lucide-react/dist/esm/icons/shuffle.mjs';
 import Search from 'lucide-react/dist/esm/icons/search.mjs';
 import ArrowDownCircle from 'lucide-react/dist/esm/icons/circle-arrow-down.mjs';
-import MoreHorizontal from 'lucide-react/dist/esm/icons/ellipsis.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
+import UserRound from 'lucide-react/dist/esm/icons/user-round.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -22,6 +21,15 @@ import { Playlist, Song, Album } from '../types';
 import { formatTime } from '../utils/lyrics';
 import { getAlbumsFromCatalog } from '../utils/albums';
 import { ArtistLinks } from '../components/ArtistLinks';
+import { DownloadedIcon } from '../components/DownloadedIcon';
+import { PlaylistContextMenu, PlaylistMenuState } from '../components/PlaylistContextMenu';
+
+function primaryArtistKey(artist: string): string {
+  return (artist || '')
+    .split(/[,&/]|feat\.|ft\./i)[0]
+    .trim()
+    .toLowerCase();
+}
 
 interface LibraryViewProps {
   selectedPlaylist: Playlist | 'favorites' | Album | null;
@@ -46,12 +54,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     librarySongs,
     userFavoriteSongs,
     playlists,
+    pinnedPlaylistIds,
+    togglePlaylistPin,
+    followedArtists,
+    artistProfiles,
+    getArtistProfile,
     deletePlaylist,
-    removeSongFromPlaylist,
     toggleFavorite,
     isFavorite,
     isDownloaded,
-    toggleDownloadSong,
     downloadFullPlaylistZip,
     downloadSongsBatch,
     getUserSongPlayCount,
@@ -62,8 +73,102 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [playlistSearch, setPlaylistSearch] = useState('');
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; status: string } | null>(null);
   const [downloadMessage, setDownloadMessage] = useState('');
+  const [playlistMenu, setPlaylistMenu] = useState<PlaylistMenuState | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressPlaylistClickRef = useRef(false);
 
   const albums = React.useMemo(() => getAlbumsFromCatalog(librarySongs), [librarySongs]);
+
+  const orderedPlaylists = React.useMemo(
+    () =>
+      [...playlists].sort((a, b) => {
+        const aPinned = pinnedPlaylistIds.includes(a.id) ? 0 : 1;
+        const bPinned = pinnedPlaylistIds.includes(b.id) ? 0 : 1;
+        return aPinned - bPinned;
+      }),
+    [playlists, pinnedPlaylistIds]
+  );
+
+  const followedArtistCards = React.useMemo(
+    () =>
+      followedArtists
+        .map((key) => {
+          const profile = getArtistProfile(key);
+          const songs = catalog.filter((song) => {
+            const parts = song.artist
+              .split(/[,&/]|feat\.|ft\./i)
+              .map((p) => p.trim().toLowerCase());
+            return parts.includes(key) || song.artist.toLowerCase().includes(key);
+          });
+          const firstWithCover = songs.find((song) => Boolean(song.coverUrl));
+          const catalogName = firstWithCover
+            ? firstWithCover.artist.split(/[,&/]|feat\.|ft\./i)[0].trim()
+            : '';
+          return {
+            key,
+            name: profile?.name || catalogName || (key.charAt(0).toUpperCase() + key.slice(1)),
+            coverUrl: profile?.avatarUrl || firstWithCover?.coverUrl || '',
+            songs: songs.length,
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [catalog, followedArtists, artistProfiles, getArtistProfile]
+  );
+
+  const openPlaylistMenu = (
+    event: React.MouseEvent | React.PointerEvent,
+    playlist: Playlist
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    suppressPlaylistClickRef.current = true;
+    window.setTimeout(() => {
+      suppressPlaylistClickRef.current = false;
+    }, 1000);
+    setPlaylistMenu({ playlist, x: event.clientX, y: event.clientY });
+  };
+
+  const clearLongPress = () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
+  };
+
+  const handlePlaylistPointerDown = (
+    event: React.PointerEvent,
+    playlist: Playlist
+  ) => {
+    if (event.pointerType === 'mouse') return;
+    longPressStartRef.current = { x: event.clientX, y: event.clientY };
+    longPressTimerRef.current = window.setTimeout(() => {
+      openPlaylistMenu(event, playlist);
+      longPressTimerRef.current = null;
+    }, 550);
+  };
+
+  const handlePlaylistPointerMove = (event: React.PointerEvent) => {
+    const start = longPressStartRef.current;
+    if (!start) return;
+    if (
+      Math.abs(event.clientX - start.x) > 10 ||
+      Math.abs(event.clientY - start.y) > 10
+    ) {
+      clearLongPress();
+    }
+  };
+
+  const handlePlaylistClick = (playlist: Playlist) => {
+    if (suppressPlaylistClickRef.current) {
+      suppressPlaylistClickRef.current = false;
+      return;
+    }
+    setSelectedPlaylist(playlist);
+  };
+
+  React.useEffect(() => () => clearLongPress(), []);
 
   // If a playlist, album, or 'favorites' is selected, show Spotify-style Hero Detail
   if (selectedPlaylist) {
@@ -267,7 +372,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 title={areAllDownloaded ? 'Descargado en tu dispositivo' : 'Descargar para escuchar sin conexión'}
               >
                 {areAllDownloaded ? (
-                  <CheckCircle2 className="w-8 h-8 fill-emerald-500 text-black" />
+                  <DownloadedIcon size={32} />
                 ) : (
                   <ArrowDownCircle className="w-8 h-8 hover:scale-105 active:scale-95" />
                 )}
@@ -461,7 +566,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       <div className="col-span-4 sm:col-span-2 md:col-span-1 flex items-center justify-end gap-1.5 sm:gap-2 text-xs font-mono text-neutral-400">
                         {downloaded && (
                           <span title="Descargado">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                            <DownloadedIcon size={14} />
                           </span>
                         )}
                         <button
@@ -488,30 +593,31 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
   // Fallback if no playlist is selected: Grid of user playlists
   return (
+    <>
     <div className="p-4 sm:p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-36 animate-in fade-in select-none">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-black text-white">Tu Biblioteca</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-black text-white">Tu Biblioteca</h1>
           <p className="text-xs text-neutral-400 mt-1">
             Explora tus canciones favoritas y playlists creadas.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {onOpenImportPlaylist && (
             <button
               onClick={onOpenImportPlaylist}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-neutral-800 hover:bg-neutral-700 text-emerald-300 font-extrabold text-xs transition-colors"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-neutral-800 hover:bg-neutral-700 text-emerald-300 font-extrabold text-[11px] sm:text-xs transition-colors"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>Importar</span>
             </button>
           )}
           <button
             onClick={onOpenCreatePlaylist}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs shadow-lg transition-transform active:scale-95"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-[11px] sm:text-xs shadow-lg transition-transform active:scale-95"
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
+            <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />
             <span>Crear</span>
           </button>
         </div>
@@ -525,7 +631,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         >
           <Heart className="w-10 h-10 text-white fill-white" />
           <div>
-            <h3 className="font-black text-xl text-white">Tus me gusta</h3>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h3 className="font-black text-base sm:text-xl leading-tight text-white truncate min-w-0">
+                Tus me gusta
+              </h3>
+              <span title="Fijada siempre" className="flex-shrink-0">
+                <Pin className="w-4 h-4 text-white fill-white rotate-45" />
+              </span>
+            </div>
             <p className="text-xs text-indigo-200 mt-1 font-semibold">
               {userFavoriteSongs.length} canciones favoritas
             </p>
@@ -533,25 +646,42 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         </div>
 
         {/* User Playlists */}
-        {playlists.map((pl) => (
-          <div
-            key={pl.id}
-            onClick={() => setSelectedPlaylist(pl)}
-            className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group"
-          >
-            <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center">
-              {pl.coverUrl ? (
-                <img src={pl.coverUrl} alt={pl.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-              ) : (
-                <Music className="w-12 h-12 text-neutral-600" />
-              )}
+        {orderedPlaylists.map((pl) => {
+          const isPinned = pinnedPlaylistIds.includes(pl.id);
+          return (
+            <div
+              key={pl.id}
+              onClick={() => handlePlaylistClick(pl)}
+              onContextMenu={(event) => openPlaylistMenu(event, pl)}
+              onPointerDown={(event) => handlePlaylistPointerDown(event, pl)}
+              onPointerMove={handlePlaylistPointerMove}
+              onPointerUp={clearLongPress}
+              onPointerLeave={clearLongPress}
+              onPointerCancel={clearLongPress}
+              title="Clic derecho o mantener presionado para fijar"
+              className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group"
+            >
+              <div className="aspect-square rounded-xl overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center">
+                {pl.coverUrl ? (
+                  <img src={pl.coverUrl} alt={pl.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                ) : (
+                  <Music className="w-12 h-12 text-neutral-600" />
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h3 className="font-bold text-sm text-white truncate">{pl.name}</h3>
+                {isPinned && (
+                  <span title="Fijada" className="flex-shrink-0">
+                    <Pin className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400 rotate-45" />
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-neutral-500 truncate mt-0.5">
+                Playlist • {pl.songIds.length} temas
+              </p>
             </div>
-            <h3 className="font-bold text-sm text-white truncate">{pl.name}</h3>
-            <p className="text-xs text-neutral-500 truncate mt-0.5">
-              Playlist • {pl.songIds.length} temas
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Álbumes Section */}
@@ -602,6 +732,62 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Followed artists */}
+      {followedArtistCards.length > 0 && (
+        <div className="pt-6 space-y-4">
+          <div>
+            <h2 className="text-2xl font-black text-white flex items-center gap-2">
+              <UserRound className="w-6 h-6 text-emerald-400" />
+              <span>Artistas que sigues</span>
+            </h2>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Solo aparecen los artistas que sigues.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {followedArtistCards.map((artist) => (
+              <div
+                key={artist.key}
+                onClick={() => onSelectArtist?.(artist.name)}
+                className="p-3.5 rounded-2xl bg-neutral-900/60 hover:bg-neutral-800/80 border border-neutral-800 cursor-pointer transition-all group text-center"
+              >
+                <div className="w-full aspect-square rounded-full overflow-hidden bg-neutral-800 mb-3 shadow relative flex items-center justify-center mx-auto">
+                  {artist.coverUrl ? (
+                    <img
+                      src={artist.coverUrl}
+                      alt={artist.name}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    />
+                  ) : (
+                    <UserRound className="w-12 h-12 text-neutral-600" />
+                  )}
+                </div>
+                <h3 className="font-bold text-sm text-white truncate">{artist.name}</h3>
+                <p className="text-xs text-neutral-500 truncate mt-0.5">
+                  {artist.songs === 1 ? '1 canción' : `${artist.songs} canciones`}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
+
+    <PlaylistContextMenu
+      state={playlistMenu}
+      pinned={
+        playlistMenu
+          ? pinnedPlaylistIds.includes(playlistMenu.playlist.id)
+          : false
+      }
+      onClose={() => setPlaylistMenu(null)}
+      onTogglePin={togglePlaylistPin}
+      onPlay={(playlist) => setSelectedPlaylist(playlist)}
+    />
+    </>
   );
 };

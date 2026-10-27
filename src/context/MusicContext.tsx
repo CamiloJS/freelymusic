@@ -54,6 +54,9 @@ interface MusicContextType {
   userFavoriteSongs: Song[];
 
   playlists: Playlist[];
+  pinnedPlaylistIds: string[];
+  isPlaylistPinned: (playlistId: string) => boolean;
+  togglePlaylistPin: (playlistId: string) => void;
   createPlaylist: (name: string, description?: string, coverUrl?: string) => Playlist;
   importPlaylist: (
     name: string,
@@ -70,6 +73,9 @@ interface MusicContextType {
   artistProfiles: ArtistProfile[];
   getArtistProfile: (artistName: string) => ArtistProfile | null;
   updateArtistProfile: (artist: ArtistProfile) => Promise<void>;
+  followedArtists: string[];
+  isFollowingArtist: (artistName: string) => boolean;
+  toggleFollowArtist: (artistName: string) => void;
 
   // User Play Counts & Analytics
   recordSongPlay: (songId: string) => void;
@@ -568,7 +574,30 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     mutateUserData((previous) => ({
       ...previous,
       playlists: previous.playlists.filter((playlist) => playlist.id !== playlistId),
+      pinnedPlaylistIds: (previous.pinnedPlaylistIds || []).filter(
+        (id) => id !== playlistId
+      ),
     }));
+  };
+
+  const isPlaylistPinned = useCallback(
+    (playlistId: string) =>
+      playlistId !== 'favorites' &&
+      (userData?.pinnedPlaylistIds || []).includes(playlistId),
+    [userData?.pinnedPlaylistIds]
+  );
+
+  const togglePlaylistPin = (playlistId: string) => {
+    if (!playlistId || playlistId === 'favorites') return;
+    mutateUserData((previous) => {
+      const current = previous.pinnedPlaylistIds || [];
+      return {
+        ...previous,
+        pinnedPlaylistIds: current.includes(playlistId)
+          ? current.filter((id) => id !== playlistId)
+          : [...current, playlistId],
+      };
+    });
   };
 
   const addSongToPlaylist = (playlistId: string, songId: string) => {
@@ -741,6 +770,26 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [artistProfiles]
   );
 
+  const isFollowingArtist = useCallback(
+    (artistName: string) =>
+      (userData?.followedArtists || []).includes(artistName.trim().toLowerCase()),
+    [userData?.followedArtists]
+  );
+
+  const toggleFollowArtist = (artistName: string) => {
+    const key = artistName.trim().toLowerCase();
+    if (!key) return;
+    mutateUserData((previous) => {
+      const current = previous.followedArtists || [];
+      return {
+        ...previous,
+        followedArtists: current.includes(key)
+          ? current.filter((name) => name !== key)
+          : [...current, key],
+      };
+    });
+  };
+
   const updateArtistProfile = async (artist: ArtistProfile) => {
     const norm = artist.id || artist.name.trim().toLowerCase();
     const updated: ArtistProfile = {
@@ -834,6 +883,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isFavorite,
         userFavoriteSongs,
         playlists: userData.playlists,
+        pinnedPlaylistIds: userData.pinnedPlaylistIds || [],
+        isPlaylistPinned,
+        togglePlaylistPin,
         createPlaylist,
         importPlaylist,
         updatePlaylist,
@@ -843,6 +895,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         artistProfiles,
         getArtistProfile,
         updateArtistProfile,
+        followedArtists: userData.followedArtists || [],
+        isFollowingArtist,
+        toggleFollowArtist,
         recordSongPlay,
         recordListeningTime,
         getUserSongPlayCount,

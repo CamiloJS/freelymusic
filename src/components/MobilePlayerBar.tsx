@@ -2,7 +2,7 @@ import React from 'react';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
-import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import { DownloadedIcon } from './DownloadedIcon';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { ArtistLinks } from './ArtistLinks';
@@ -64,7 +64,7 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
             <span className="truncate text-xs font-bold text-white">{currentSong.title}</span>
             {downloaded && (
               <span title="Descargado" className="flex-shrink-0">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <DownloadedIcon size={14} />
               </span>
             )}
           </div>

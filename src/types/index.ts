@@ -113,6 +113,10 @@ export interface UserLibraryData {
   favoriteSongIds: string[];
   historySongIds: string[];
   playlists: Playlist[];
+  /** Normalized artist names the user follows. */
+  followedArtists?: string[];
+  /** Custom playlists pinned at the top of the library. */
+  pinnedPlaylistIds?: string[];
   playCounts?: Record<string, number>; // songId -> user play count
   playHistory?: PlayEvent[]; // user play history for Top tracks / Wrapped
   totalListenSeconds?: number; // accumulated listening time

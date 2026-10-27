@@ -71,7 +71,23 @@ cada integración. Todo está desplegado en https://freelymusic.vercel.app.
 - Los datos se sincronizan entre dispositivos con la marca `updatedAt` y se
   mantienen en localStorage para uso offline.
 
-## 6. Estadísticas globales de artistas y canciones
+## 6. Biblioteca, artistas seguidos y playlists fijadas
+
+- La biblioteca personal contiene favoritos y canciones de playlists; el catálogo
+  global solo aparece al buscarlo.
+- **Artistas**: solo se muestran los artistas a los que el usuario sigue. El botón
+  **Seguir / Siguiendo** está en el perfil del artista y se sincroniza en
+  `followedArtists`.
+- La foto del perfil de artista se usa en la barra lateral, en la biblioteca y en
+  los rankings del perfil, además de su propia ficha.
+- **Playlists fijadas**: clic derecho en escritorio o pulsación larga en móvil abre
+  el menú contextual con **Fijar playlist / Desfijar playlist**. El orden se guarda
+  en `pinnedPlaylistIds` y se sincroniza entre dispositivos.
+- **Tus me gusta** permanece siempre fijada y en primer lugar.
+- El indicador de descarga es la **flecha verde** en círculo (estilo Spotify), no
+  un check. Se usa en la biblioteca, la búsqueda, el reproductor y el modo offline.
+
+## 7. Estadísticas globales de artistas y canciones
 
 - Fuente por defecto: **Deezer** (API pública, sin clave).
   - Artista: fans totales (`nb_fan`).
@@ -93,7 +109,7 @@ cada integración. Todo está desplegado en https://freelymusic.vercel.app.
 - Las fichas muestran el total acumulado (o la popularidad pública cuando no hay un
   total de reproducciones) sin atribuir la fuente en pantalla.
 
-## 7. Importación de playlists
+## 8. Importación de playlists
 
 - **Deezer**: funciona sin cuenta; el navegador llama a `/api/import-playlist`
   (proxy) para evitar el CORS inconsistente de Deezer.
@@ -116,7 +132,7 @@ cada integración. Todo está desplegado en https://freelymusic.vercel.app.
 - Se evita el falso positivo de cadenas cortas (por ejemplo, “MØ” normalizado a “m”
   coincidiendo con “música”); hay una prueba de regresión.
 
-## 8. Perfiles de usuario
+## 9. Perfiles de usuario
 
 - Cada perfil tiene su biblioteca, favoritos, playlists y estadísticas separadas.
 - El perfil **Mi Perfil** muestra identidad, rol, fecha de alta, totales, tops,
@@ -126,7 +142,7 @@ cada integración. Todo está desplegado en https://freelymusic.vercel.app.
 - El desbloqueo por PIN sigue siendo una protección local de la interfaz, no una
   autenticación de servidor.
 
-## 9. Enriquecimiento de metadatos
+## 10. Enriquecimiento de metadatos
 
 - Fuentes:
   - **MusicBrainz**: álbum, año, género, ISRC, candidato y confianza.
@@ -146,7 +162,7 @@ cada integración. Todo está desplegado en https://freelymusic.vercel.app.
   evitar CORS y reducir llamadas.
 - Si una canción no se puede verificar, queda pendiente; no se inventan datos.
 
-## 10. Endpoints desplegados
+## 11. Endpoints desplegados
 
 - `POST /api/import-playlist`
   - Body: `{ provider: "spotify" | "deezer" | "apple-music", url, appleMusicToken? }`.
@@ -156,7 +172,7 @@ cada integración. Todo está desplegado en https://freelymusic.vercel.app.
   - `?source=deezer-artist&name=...`
   - `?source=deezer-track&title=...&artist=...`
 
-## 11. Variables de entorno opcionales
+## 12. Variables de entorno opcionales
 
 En Vercel → Project → Settings → Environment Variables:
 
@@ -170,7 +186,7 @@ En Vercel → Project → Settings → Environment Variables:
 La clave de Last.fm se guarda desde la interfaz de administración, no en variables
 de entorno.
 
-## 12. Límites y notas de seguridad
+## 13. Límites y notas de seguridad
 
 - MyMemory y LRCLIB son servicios gratuitos con cuotas y caídas puntuales; la app
   reintenta y muestra errores claros.

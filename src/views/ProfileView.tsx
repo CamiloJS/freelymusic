@@ -52,6 +52,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     userSongListenSeconds,
     userArtistListenSeconds,
     userPlayHistory,
+    artistProfiles,
+    getArtistProfile,
   } = useMusic();
   const { playSong, currentSong, isPlaying, togglePlayPause } = useAudio();
 
@@ -102,7 +104,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     });
 
     map.forEach((rank) => {
-      if (!rank.coverUrl) {
+      const profile = getArtistProfile(rank.name);
+      if (profile?.avatarUrl) {
+        rank.coverUrl = profile.avatarUrl;
+      } else if (!rank.coverUrl) {
         const song = catalog.find((item) => primaryArtist(item.artist) === rank.name);
         rank.coverUrl = song?.coverUrl;
       }
@@ -111,7 +116,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     return Array.from(map.values())
       .sort((a, b) => b.plays - a.plays || b.seconds - a.seconds)
       .slice(0, 6);
-  }, [catalog, userPlayCounts, userArtistListenSeconds]);
+  }, [catalog, userPlayCounts, userArtistListenSeconds, artistProfiles, getArtistProfile]);
 
   const recentPlays = useMemo(
     () =>

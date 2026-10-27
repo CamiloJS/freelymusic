@@ -9,7 +9,6 @@ import Repeat from 'lucide-react/dist/esm/icons/repeat.mjs';
 import Repeat1 from 'lucide-react/dist/esm/icons/repeat-1.mjs';
 import Minimize2 from 'lucide-react/dist/esm/icons/minimize-2.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
-import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
 import Video from 'lucide-react/dist/esm/icons/video.mjs';
 import ChevronDown from 'lucide-react/dist/esm/icons/chevron-down.mjs';

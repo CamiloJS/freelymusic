@@ -4,6 +4,7 @@ import {
   saveRecentSearch,
   removeRecentSearch,
   clearRecentSearches,
+  normalizeUserData,
 } from './storage';
 
 // In-memory mock for localStorage in node test environment
@@ -74,5 +75,37 @@ describe('recent searches storage', () => {
 
     clearRecentSearches();
     expect(getRecentSearches()).toEqual([]);
+  });
+});
+
+describe('user library normalization', () => {
+  const playlist = (id: string) => ({
+    id,
+    name: id,
+    userId: 'user-1',
+    songIds: [],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  });
+
+  it('normalizes followed artists and removes duplicates', () => {
+    const data = normalizeUserData({
+      followedArtists: [' Aitana ', 'aitana', 'MARINA', ''],
+    });
+    expect(data.followedArtists).toEqual(['aitana', 'marina']);
+  });
+
+  it('keeps only pinned playlists that still exist', () => {
+    const data = normalizeUserData({
+      playlists: [playlist('pl-1'), playlist('pl-2')],
+      pinnedPlaylistIds: ['pl-1', 'pl-1', 'pl-deleted', 'favorites'],
+    });
+    expect(data.pinnedPlaylistIds).toEqual(['pl-1']);
+  });
+
+  it('defaults the new fields to empty arrays', () => {
+    const data = normalizeUserData({ favoriteSongIds: [], playlists: [] });
+    expect(data.followedArtists).toEqual([]);
+    expect(data.pinnedPlaylistIds).toEqual([]);
   });
 });

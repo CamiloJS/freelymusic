@@ -3,7 +3,7 @@ import HardDriveDownload from 'lucide-react/dist/esm/icons/hard-drive-download.m
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Trash2 from 'lucide-react/dist/esm/icons/trash.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
-import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import { DownloadedIcon } from '../components/DownloadedIcon';
 import WifiOff from 'lucide-react/dist/esm/icons/wifi-off.mjs';
 import Music from 'lucide-react/dist/esm/icons/eighth-notes.mjs';
 import { useMusic } from '../context/MusicContext';
@@ -92,7 +92,7 @@ export const OfflineView: React.FC = () => {
                       >
                         {song.title}
                       </span>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                      <DownloadedIcon size={14} />
                     </div>
                     <span className="block text-xs text-neutral-400 truncate mt-0.5">
                       {song.artist} • {song.album || 'Sonora Audio'}

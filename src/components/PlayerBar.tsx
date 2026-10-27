@@ -11,7 +11,7 @@ import VolumeX from 'lucide-react/dist/esm/icons/volume-x.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
 import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
-import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import { DownloadedIcon } from './DownloadedIcon';
 import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 import AlertCircle from 'lucide-react/dist/esm/icons/circle-alert.mjs';
@@ -161,7 +161,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
             </span>
             {downloaded && (
               <span title="Descargado en tu dispositivo">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                <DownloadedIcon size={14} />
               </span>
             )}
           </div>

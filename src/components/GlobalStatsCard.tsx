@@ -87,12 +87,10 @@ export const GlobalStatsCard: React.FC<GlobalStatsCardProps> = ({
   }
 
   return (
-    <div className={`rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4 ${className}`}>
-      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-emerald-400">
-        <Chart className="w-4 h-4" />
-        {label}
-      </div>
-      <p className="mt-1 text-3xl font-black text-white">{formatNumber(value)}</p>
+    <div className={`inline-flex items-center gap-2 ${className}`}>
+      <Chart className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+      <span className="text-xl font-black text-white">{formatNumber(value)}</span>
+      <span className="text-xs font-semibold text-neutral-400">{label}</span>
     </div>
   );
 };

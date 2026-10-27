@@ -6,7 +6,7 @@ import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
 import Download from 'lucide-react/dist/esm/icons/download.mjs';
-import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import { DownloadedIcon } from '../components/DownloadedIcon';
 import Music from 'lucide-react/dist/esm/icons/music.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
@@ -274,8 +274,8 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                               {song.title}
                             </span>
                             {downloaded && (
-                              <span title="Descargado" className="flex-shrink-0">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="flex-shrink-0">
+                                <DownloadedIcon size={14} />
                               </span>
                             )}
                           </div>
@@ -363,7 +363,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                             title={downloaded ? 'Descargado sin conexión' : 'Guardar en caché local'}
                           >
                             {downloaded ? (
-                              <CheckCircle2 className="w-4 h-4" />
+                              <DownloadedIcon size={16} />
                             ) : (
                               <Download className="w-4 h-4" />
                             )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import Home from 'lucide-react/dist/esm/icons/house.mjs';
 import Compass from 'lucide-react/dist/esm/icons/compass.mjs';
 import Library from 'lucide-react/dist/esm/icons/library.mjs';
@@ -9,9 +9,11 @@ import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import Search from 'lucide-react/dist/esm/icons/search.mjs';
 import Settings from 'lucide-react/dist/esm/icons/settings.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
-import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import Pin from 'lucide-react/dist/esm/icons/pin.mjs';
 import WifiOff from 'lucide-react/dist/esm/icons/wifi-off.mjs';
 import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
+import { DownloadedIcon } from './DownloadedIcon';
+import { PlaylistContextMenu, PlaylistMenuState } from './PlaylistContextMenu';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -46,10 +48,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const {
+    catalog,
     playlists,
     userFavoriteSongs,
     isDownloaded,
     librarySongs,
+    followedArtists,
+    artistProfiles,
+    getArtistProfile,
+    pinnedPlaylistIds,
+    togglePlaylistPin,
   } = useMusic();
   const { setIsCenterLyricsOpen } = useAudio();
 
@@ -58,6 +66,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   >('all');
   const [isLibrarySearchOpen, setIsLibrarySearchOpen] = useState(false);
   const [librarySearch, setLibrarySearch] = useState('');
+  const [playlistMenu, setPlaylistMenu] = useState<PlaylistMenuState | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressPlaylistClickRef = useRef(false);
 
   const navItems = [
     { id: 'home', label: 'Inicio', icon: Home },
@@ -69,21 +81,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
     [librarySongs]
   );
 
+  // The Artists tab mirrors Spotify's followed artists: only artists the user
+  // explicitly follows are listed, never the whole catalog.
   const libraryArtists = React.useMemo(() => {
-    const map = new Map<string, { name: string; coverUrl?: string; songs: number }>();
-    librarySongs.forEach((song) => {
-      const name = primaryArtist(song.artist);
-      const existing = map.get(name) || {
-        name,
-        coverUrl: song.coverUrl,
-        songs: 0,
-      };
-      existing.songs += 1;
-      if (!existing.coverUrl) existing.coverUrl = song.coverUrl;
-      map.set(name, existing);
-    });
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [librarySongs]);
+    return followedArtists
+      .map((key) => {
+        const profile = getArtistProfile(key);
+        const songs = catalog.filter((song) => {
+          const parts = song.artist
+            .split(/[,&/]|feat\.|ft\./i)
+            .map((p) => p.trim().toLowerCase());
+          return parts.includes(key) || song.artist.toLowerCase().includes(key);
+        });
+        const fallback = songs.find((song) => Boolean(song.coverUrl));
+        const catalogName = fallback
+          ? fallback.artist.split(/[,&/]|feat\.|ft\./i)[0].trim()
+          : '';
+        return {
+          key,
+          name: profile?.name || catalogName || (key.charAt(0).toUpperCase() + key.slice(1)),
+          coverUrl: profile?.avatarUrl || fallback?.coverUrl || '',
+          songs: songs.length,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [catalog, followedArtists, artistProfiles, getArtistProfile]);
 
   const areFavoritesDownloaded =
     userFavoriteSongs.length > 0 && userFavoriteSongs.every((song) => isDownloaded(song.id));
@@ -93,6 +115,72 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const filteredPlaylists = playlists.filter(
     (playlist) => !search || playlist.name.toLowerCase().includes(search)
   );
+
+  const orderedPlaylists = [...filteredPlaylists].sort((a, b) => {
+    const aPinned = pinnedPlaylistIds.includes(a.id) ? 0 : 1;
+    const bPinned = pinnedPlaylistIds.includes(b.id) ? 0 : 1;
+    return aPinned - bPinned;
+  });
+
+  const navigateToPlaylist = (playlist: Playlist) => {
+    setIsCenterLyricsOpen(false);
+    onSelectPlaylist(playlist);
+    setCurrentTab('library');
+  };
+
+  const openPlaylistMenu = (
+    event: React.MouseEvent | React.PointerEvent,
+    playlist: Playlist
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    suppressPlaylistClickRef.current = true;
+    window.setTimeout(() => {
+      suppressPlaylistClickRef.current = false;
+    }, 1000);
+    setPlaylistMenu({ playlist, x: event.clientX, y: event.clientY });
+  };
+
+  const clearLongPress = () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
+  };
+
+  const handlePlaylistPointerDown = (
+    event: React.PointerEvent,
+    playlist: Playlist
+  ) => {
+    if (event.pointerType === 'mouse') return;
+    longPressStartRef.current = { x: event.clientX, y: event.clientY };
+    longPressTimerRef.current = window.setTimeout(() => {
+      openPlaylistMenu(event, playlist);
+      longPressTimerRef.current = null;
+    }, 550);
+  };
+
+  const handlePlaylistPointerMove = (event: React.PointerEvent) => {
+    const start = longPressStartRef.current;
+    if (!start) return;
+    if (
+      Math.abs(event.clientX - start.x) > 10 ||
+      Math.abs(event.clientY - start.y) > 10
+    ) {
+      clearLongPress();
+    }
+  };
+
+  const handlePlaylistClick = (playlist: Playlist) => {
+    if (suppressPlaylistClickRef.current) {
+      suppressPlaylistClickRef.current = false;
+      return;
+    }
+    navigateToPlaylist(playlist);
+  };
+
+  React.useEffect(() => () => clearLongPress(), []);
 
   const filteredAlbums = uniqueAlbums.filter(
     (album) =>
@@ -113,7 +201,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-68 lg:w-76 bg-black text-neutral-300 flex flex-col h-full select-none flex-shrink-0">
+    <>
+      <aside className="w-68 lg:w-76 bg-black text-neutral-300 flex flex-col h-full select-none flex-shrink-0">
       {/* Top navigation: only Inicio and Buscar, like Spotify */}
       <div className="px-3 pt-3 pb-2 space-y-1">
         {navItems.map((item) => {
@@ -234,29 +323,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <Heart className="w-5 h-5 text-white fill-white" />
               </div>
               <div className="truncate flex-1">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span
-                    className={`block font-bold text-xs truncate ${
-                      selectedPlaylist === 'favorites' ? 'text-emerald-400' : 'text-white'
-                    }`}
-                  >
-                    Tus me gusta
-                  </span>
-                  {areFavoritesDownloaded && (
-                    <span title="Descargado" className="flex-shrink-0">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    </span>
-                  )}
-                </div>
-                <span className="block text-[11px] text-neutral-400 truncate mt-0.5">
-                  Playlist • {currentUser?.displayName || 'Tú'}
+                <span
+                  className={`block font-bold text-xs truncate ${
+                    selectedPlaylist === 'favorites' ? 'text-emerald-400' : 'text-white'
+                  }`}
+                >
+                  Tus me gusta
                 </span>
+                <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 truncate mt-0.5">
+                  <Pin className="w-3 h-3 text-emerald-400 fill-emerald-400 rotate-45 flex-shrink-0" />
+                  {areFavoritesDownloaded && (
+                    <DownloadedIcon size={12} className="flex-shrink-0" />
+                  )}
+                  <span className="truncate">Playlist • {currentUser?.displayName || 'Tú'}</span>
+                </div>
               </div>
             </div>
           )}
 
           {(libraryFilter === 'all' || libraryFilter === 'playlists') &&
-            filteredPlaylists.map((playlist) => {
+            orderedPlaylists.map((playlist) => {
               const isSelected =
                 selectedPlaylist !== 'favorites' &&
                 selectedPlaylist &&
@@ -266,18 +352,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
               const allDownloaded =
                 playlist.songIds.length > 0 &&
                 playlist.songIds.every((songId) => isDownloaded(songId));
+              const isPinned = pinnedPlaylistIds.includes(playlist.id);
 
               return (
                 <div
                   key={playlist.id}
-                  onClick={() => {
-                    setIsCenterLyricsOpen(false);
-                    onSelectPlaylist(playlist);
-                    setCurrentTab('library');
-                  }}
+                  onClick={() => handlePlaylistClick(playlist)}
+                  onContextMenu={(event) => openPlaylistMenu(event, playlist)}
+                  onPointerDown={(event) => handlePlaylistPointerDown(event, playlist)}
+                  onPointerMove={handlePlaylistPointerMove}
+                  onPointerUp={clearLongPress}
+                  onPointerLeave={clearLongPress}
+                  onPointerCancel={clearLongPress}
                   className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer transition-colors group ${
                     isSelected ? 'bg-neutral-850 text-white' : 'hover:bg-neutral-900/70'
                   }`}
+                  title="Clic derecho o mantener presionado para fijar"
                 >
                   <div className="w-12 h-12 rounded-lg overflow-hidden bg-neutral-900 flex-shrink-0 shadow flex items-center justify-center">
                     {playlist.coverUrl ? (
@@ -292,23 +382,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     )}
                   </div>
                   <div className="truncate flex-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className={`block font-bold text-xs truncate ${
-                          isSelected ? 'text-emerald-400' : 'text-white'
-                        }`}
-                      >
-                        {playlist.name}
-                      </span>
-                      {allDownloaded && (
-                        <span title="Descargado" className="flex-shrink-0">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                        </span>
-                      )}
-                    </div>
-                    <span className="block text-[11px] text-neutral-400 truncate mt-0.5">
-                      Playlist • {currentUser?.displayName || 'Tú'}
+                    <span
+                      className={`block font-bold text-xs truncate ${
+                        isSelected ? 'text-emerald-400' : 'text-white'
+                      }`}
+                    >
+                      {playlist.name}
                     </span>
+                    <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 truncate mt-0.5">
+                      {isPinned && (
+                        <Pin className="w-3 h-3 text-emerald-400 fill-emerald-400 rotate-45 flex-shrink-0" />
+                      )}
+                      {allDownloaded && (
+                        <DownloadedIcon size={12} className="flex-shrink-0" />
+                      )}
+                      <span className="truncate">Playlist • {currentUser?.displayName || 'Tú'}</span>
+                    </div>
                   </div>
                 </div>
               );
@@ -351,23 +440,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     )}
                   </div>
                   <div className="truncate flex-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className={`block font-bold text-xs truncate ${
-                          isSelected ? 'text-emerald-400' : 'text-white'
-                        }`}
-                      >
-                        {album.name}
-                      </span>
-                      {allDownloaded && (
-                        <span title="Descargado" className="flex-shrink-0">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                        </span>
-                      )}
-                    </div>
-                    <span className="block text-[11px] text-neutral-400 truncate mt-0.5">
-                      Álbum • {album.artist}
+                    <span
+                      className={`block font-bold text-xs truncate ${
+                        isSelected ? 'text-emerald-400' : 'text-white'
+                      }`}
+                    >
+                      {album.name}
                     </span>
+                    <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 truncate mt-0.5">
+                      {allDownloaded && (
+                        <DownloadedIcon size={12} className="flex-shrink-0" />
+                      )}
+                      <span className="truncate">Álbum • {album.artist}</span>
+                    </div>
                   </div>
                 </div>
               );
@@ -406,7 +491,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             ))}
 
-          {librarySongs.length === 0 && (
+          {libraryFilter === 'artists' && filteredArtists.length === 0 && (
+            <div className="px-3 py-6 text-center">
+              <p className="text-xs font-bold text-neutral-400">Aún no sigues artistas</p>
+              <p className="text-[10px] text-neutral-500 mt-1">
+                Abre el perfil de un artista y pulsa Seguir para verlo aquí.
+              </p>
+            </div>
+          )}
+
+          {librarySongs.length === 0 && libraryFilter !== 'artists' && (
             <div className="px-3 py-6 text-center">
               <p className="text-xs font-bold text-neutral-400">Tu biblioteca está vacía</p>
               <p className="text-[10px] text-neutral-500 mt-1">
@@ -450,6 +544,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Settings className="w-4 h-4 text-neutral-500 group-hover:text-white transition-colors flex-shrink-0" />
         </button>
       </div>
-    </aside>
+      </aside>
+
+      <PlaylistContextMenu
+        state={playlistMenu}
+        pinned={
+          playlistMenu
+            ? pinnedPlaylistIds.includes(playlistMenu.playlist.id)
+            : false
+        }
+        onClose={() => setPlaylistMenu(null)}
+        onTogglePin={togglePlaylistPin}
+        onPlay={navigateToPlaylist}
+      />
+    </>
   );
 };

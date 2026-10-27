@@ -8,6 +8,8 @@ import Clock from 'lucide-react/dist/esm/icons/clock.mjs';
 import Pencil from 'lucide-react/dist/esm/icons/pencil.mjs';
 import Upload from 'lucide-react/dist/esm/icons/upload.mjs';
 import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import UserPlus from 'lucide-react/dist/esm/icons/user-plus.mjs';
+import UserCheck from 'lucide-react/dist/esm/icons/user-check.mjs';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
 import Flame from 'lucide-react/dist/esm/icons/flame.mjs';
@@ -20,7 +22,7 @@ import { formatTime } from '../utils/lyrics';
 import { getAlbumsFromCatalog } from '../utils/albums';
 import { compressImage } from '../utils/imageCompressor';
 import { ArtistLinks } from '../components/ArtistLinks';
-import { GlobalStatsCard } from '../components/GlobalStatsCard';
+import { DownloadedIcon } from '../components/DownloadedIcon';
 
 interface ArtistProfileViewProps {
   artistName: string;
@@ -47,6 +49,8 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
     isDownloaded,
     toggleDownloadSong,
     getUserSongPlayCount,
+    isFollowingArtist,
+    toggleFollowArtist,
   } = useMusic();
 
   const { playSong, currentSong, isPlaying, togglePlayPause } = useAudio();
@@ -146,6 +150,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
   };
 
   const displayAvatar = profile?.avatarUrl || fallbackCover;
+  const following = isFollowingArtist(artistName);
   const isThisArtistPlaying =
     artistSongs.length > 0 && artistSongs.some((s) => s.id === currentSong?.id) && isPlaying;
 
@@ -221,11 +226,28 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
 
           {/* Artist Info */}
           <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[11px] font-bold">
                 <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 fill-blue-400 text-black" />
                 <span>Artista Verificado</span>
               </span>
+
+              <button
+                onClick={() => toggleFollowArtist(artistName)}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold border transition-colors active:scale-95 ${
+                  following
+                    ? 'bg-white/10 border-white/25 text-white hover:bg-white/15'
+                    : 'bg-emerald-500 border-emerald-500 text-black hover:bg-emerald-400'
+                }`}
+                title={following ? 'Dejar de seguir artista' : 'Seguir artista'}
+              >
+                {following ? (
+                  <UserCheck className="w-3.5 h-3.5" />
+                ) : (
+                  <UserPlus className="w-3.5 h-3.5" />
+                )}
+                <span>{following ? 'Siguiendo' : 'Seguir'}</span>
+              </button>
 
               {/* Subtle Admin Edit Button */}
               {isAdmin && (
@@ -276,8 +298,6 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
             )}
           </button>
         </div>
-
-        <GlobalStatsCard type="artist" name={artistName} />
 
         {/* Section 1: Canciones Populares / Repertorio */}
         <div className="space-y-4">
@@ -368,7 +388,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                       </span>
 
                       {downloaded && (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                        <DownloadedIcon size={14} />
                       )}
 
                       <button
