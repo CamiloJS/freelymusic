@@ -229,7 +229,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       );
     });
 
-    const sortedAndFilteredSongs = useMemo(() => {
+    const sortedAndFilteredSongs = (() => {
       if (isAlbum) return filteredSongs;
 
       const items = [...filteredSongs];
@@ -256,7 +256,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       }
 
       return items;
-    }, [filteredSongs, isAlbum, playlistSortBy, playlistSortDir]);
+    })();
 
     const sortLabels: Record<'custom' | 'title' | 'artist' | 'album', string> = {
       custom: 'Agregado recientemente',
