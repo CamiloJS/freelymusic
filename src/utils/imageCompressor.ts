@@ -50,3 +50,56 @@ export async function compressImage(file: File, maxDimension = 400, quality = 0.
     reader.readAsDataURL(file);
   });
 }
+
+/**
+ * Compresses an existing base64 / data URL image to avoid quota errors in Firestore / localStorage.
+ */
+export async function compressDataUrl(
+  dataUrl: string,
+  maxDimension = 360,
+  quality = 0.75
+): Promise<string> {
+  if (!dataUrl || !dataUrl.startsWith('data:image/') || dataUrl.length < 40000) {
+    return dataUrl;
+  }
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return dataUrl;
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onerror = () => resolve(dataUrl);
+    img.onload = () => {
+      try {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const webp = canvas.toDataURL('image/webp', quality);
+        if (webp.startsWith('data:image/webp') && webp.length < dataUrl.length) {
+          resolve(webp);
+          return;
+        }
+        const jpeg = canvas.toDataURL('image/jpeg', quality);
+        resolve(jpeg.length < dataUrl.length ? jpeg : dataUrl);
+      } catch {
+        resolve(dataUrl);
+      }
+    };
+    img.src = dataUrl;
+  });
+}

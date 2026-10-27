@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { Song } from '../types';
 import { cleanArtistSeparators, splitArtistNames, parseAudioUrlMetadata } from './urlMetadataParser';
 import { extractMetadataFromAudioSource, autoDetectOnlineMetadata } from './audioCoverExtractor';
+import { compressDataUrl } from './imageCompressor';
 import { searchLyrics, searchCover } from '../services/metadataEnrichment';
 import { detectAudioDuration } from './audioDuration';
 
@@ -297,7 +298,9 @@ export async function organizeFolderMusic(
           if (extracted.year) year = extracted.year;
           if (extracted.genre) genre = extracted.genre;
           if (extracted.isExplicit !== undefined) isExplicit = Boolean(extracted.isExplicit);
-          if (extracted.coverUrl) coverUrl = extracted.coverUrl;
+          if (extracted.coverUrl) {
+            coverUrl = await compressDataUrl(extracted.coverUrl);
+          }
           if (extracted.lyrics) lyricsLrc = extracted.lyrics;
         }
       }

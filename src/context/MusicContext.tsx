@@ -274,16 +274,12 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (!deletedIds.has(song.id)) map.set(song.id, song);
       });
 
-      // Preserve recent locally added songs (created within the last 3 minutes)
-      // so a lagging cloud snapshot NEVER deletes a song the user just added!
       setCatalog((currentCatalog) => {
-        const now = Date.now();
+        // Any local song in current catalog that the user hasn't explicitly deleted
+        // MUST be preserved! Never drop user's songs on page reload or cloud lagging!
         currentCatalog.forEach((localSong) => {
           if (!map.has(localSong.id) && !deletedIds.has(localSong.id)) {
-            const age = now - new Date(localSong.createdAt).getTime();
-            if (age < 180000) {
-              map.set(localSong.id, localSong);
-            }
+            map.set(localSong.id, localSong);
           }
         });
 
@@ -295,19 +291,26 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsCatalogReady(true);
       clearTimeout(readyTimer);
 
-      // Retry the outbox outside of the state updater.
-      pendingSongs.forEach((song) => {
-        if (deletedIds.has(song.id)) {
-          removeStoredPendingSong(song.id);
-          return;
-        }
+      // Retry syncing any pending songs or local songs not yet in cloud!
+      const cloudIds = new Set(cloudSongs.map((s) => s.id));
+      const songsToSync = [
+        ...pendingSongs.filter((s) => !deletedIds.has(s.id)),
+        ...getStoredCatalog().filter((s) => !cloudIds.has(s.id) && !deletedIds.has(s.id)),
+      ];
+
+      // Deduplicate by ID
+      const uniqueToSync = Array.from(new Map(songsToSync.map((s) => [s.id, s])).values());
+
+      if (uniqueToSync.length > 0) {
         void loadFirebaseService()
-          .then((firebase) => firebase.saveSongToFirestore(song))
+          .then((firebase) => firebase.saveSongsToFirestore(uniqueToSync))
           .then((ok) => {
-            if (ok) removeStoredPendingSong(song.id);
+            if (ok) {
+              uniqueToSync.forEach((song) => removeStoredPendingSong(song.id));
+            }
           })
-          .catch((err) => console.warn('No se pudo reintentar una canción pendiente:', err));
-      });
+          .catch((err) => console.warn('No se pudieron sincronizar canciones locales a la nube:', err));
+      }
     };
 
     loadFirebaseService()
@@ -511,10 +514,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const firebase = await loadFirebaseService();
       if (firebase) {
-        const saved = await firebase.saveSongsToFirestore(newSongs);
-        if (saved) {
-          newSongs.forEach((song) => removeStoredPendingSong(song.id));
-        }
+        void firebase.saveSongsToFirestore(newSongs).then((saved) => {
+          if (saved) {
+            newSongs.forEach((song) => removeStoredPendingSong(song.id));
+          }
+        });
       }
     } catch (err) {
       console.warn('El lote quedó guardado localmente y pendiente de sincronizar en la nube:', err);

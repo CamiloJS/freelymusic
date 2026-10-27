@@ -394,7 +394,7 @@ export function subscribeToCatalogUpdates(
       (snapshot) => {
         const songs: Song[] = [];
         snapshot.forEach((d) => {
-          const song = normalizeSong(d.data() as Partial<Song>);
+          const song = normalizeSong({ ...d.data(), id: d.id } as Partial<Song>);
           if (song) songs.push(song);
         });
         onUpdate(songs);

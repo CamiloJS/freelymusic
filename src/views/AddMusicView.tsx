@@ -1321,8 +1321,8 @@ https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
         });
       }
 
-      // Batch save in progressive chunks of 25 tracks with visible real-time progress
-      const CHUNK_SIZE = 25;
+      // Batch save in progressive chunks of 20 tracks with visible real-time progress
+      const CHUNK_SIZE = 20;
       const createdSongs: Song[] = [];
 
       for (let i = 0; i < songsToCreate.length; i += CHUNK_SIZE) {
@@ -1331,12 +1331,11 @@ https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
         createdSongs.push(...createdChunk);
 
         // Store local audio blobs if present
-        const chunkBlobs = localBlobsToStore.slice(i, i + CHUNK_SIZE);
-        for (let j = 0; j < chunkBlobs.length; j++) {
-          const item = chunkBlobs[j];
-          if (item?.blob && createdChunk[j]) {
+        for (const created of createdChunk) {
+          const matchBlob = localBlobsToStore.find((b) => b.id === created.id);
+          if (matchBlob?.blob) {
             try {
-              await storeSongBlob(createdChunk[j].id, item.blob);
+              await storeSongBlob(created.id, matchBlob.blob);
             } catch {
               // ignore local blob error
             }
@@ -1346,7 +1345,7 @@ https://file.garden/auDUHr1kjXjsgmOB/Yonaguni.mp3`;
         const countNow = Math.min(i + chunk.length, songsToCreate.length);
         setImportProgress({ current: countNow, total: songsToCreate.length });
         // Allow UI to repaint smooth progress
-        await new Promise((r) => setTimeout(r, 20));
+        await new Promise((r) => setTimeout(r, 30));
       }
 
       await refreshDownloadedIds();
