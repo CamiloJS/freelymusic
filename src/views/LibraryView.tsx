@@ -24,6 +24,7 @@ import { formatTime } from '../utils/lyrics';
 import { getAlbumsFromCatalog } from '../utils/albums';
 import { ArtistLinks } from '../components/ArtistLinks';
 import { DownloadedIcon } from '../components/DownloadedIcon';
+import { SavedCheckIcon } from '../components/SavedCheckIcon';
 import { PlaylistContextMenu, PlaylistMenuState } from '../components/PlaylistContextMenu';
 
 function primaryArtistKey(artist: string): string {
@@ -64,6 +65,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     deletePlaylist,
     toggleFavorite,
     isFavorite,
+    isSongInLibrary,
     isDownloaded,
     downloadFullPlaylistZip,
     downloadSongsBatch,
@@ -385,11 +387,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               {isAlbum && albumObj && (
                 <button
                   onClick={() => toggleSaveAlbum(albumObj)}
-                  className={`p-1 rounded-full transition-transform active:scale-90 ${
-                    isAlbumSaved(albumObj.name)
-                      ? 'text-emerald-400 hover:text-emerald-300'
-                      : 'text-neutral-400 hover:text-white'
-                  }`}
+                  className="transition-transform active:scale-90"
                   title={
                     isAlbumSaved(albumObj.name)
                       ? 'Guardado en tu biblioteca (clic para quitar)'
@@ -397,27 +395,52 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   }
                 >
                   {isAlbumSaved(albumObj.name) ? (
-                    <CheckCircle2 className="w-8 h-8 fill-emerald-400 text-black" />
+                    <SavedCheckIcon size={32} />
                   ) : (
-                    <PlusCircle className="w-8 h-8 hover:scale-105" />
+                    <svg
+                      width="32"
+                      height="32"
+                      viewBox="0 0 32 32"
+                      fill="none"
+                      className="text-neutral-400 hover:text-white hover:scale-105 transition-all"
+                    >
+                      <circle cx="16" cy="16" r="14.5" stroke="currentColor" strokeWidth="1.8" />
+                      <path
+                        d="M16 10v12M10 16h12"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      />
+                    </svg>
                   )}
                 </button>
               )}
 
-              {/* Download All Button */}
+              {/* Download All Button (Spotify Style 32px circle) */}
               <button
                 onClick={handleDownloadAll}
-                className={`p-1.5 rounded-full transition-all ${
-                  areAllDownloaded
-                    ? 'text-emerald-400 hover:text-emerald-300'
-                    : 'text-neutral-400 hover:text-white'
-                }`}
+                className="transition-transform active:scale-90"
                 title={areAllDownloaded ? 'Descargado en tu dispositivo' : 'Descargar para escuchar sin conexión'}
               >
                 {areAllDownloaded ? (
                   <DownloadedIcon size={32} />
                 ) : (
-                  <ArrowDownCircle className="w-8 h-8 hover:scale-105 active:scale-95" />
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 32 32"
+                    fill="none"
+                    className="text-neutral-400 hover:text-white hover:scale-105 transition-all"
+                  >
+                    <circle cx="16" cy="16" r="14.5" stroke="currentColor" strokeWidth="1.8" />
+                    <path
+                      d="M16 9v11M11.5 15.5 16 20l4.5-4.5M11 23h10"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 )}
               </button>
 
@@ -508,7 +531,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 filteredSongs.map((song, idx) => {
                   const isCurrent = currentSong?.id === song.id;
                   const downloaded = isDownloaded(song.id);
-                  const liked = isFavorite(song.id);
+                  const isSaved = isFavorite(song.id) || isSongInLibrary(song.id);
                   const playCount = getUserSongPlayCount(song.id);
 
                   return (
@@ -610,21 +633,21 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
                       {/* Actions & Duration */}
                       <div className="col-span-4 sm:col-span-2 md:col-span-1 flex items-center justify-end gap-2.5 text-xs font-mono text-neutral-400">
-                        {/* Chulito verde if liked, or plus icon on hover */}
+                        {/* Spotify Saved Chulito Verde or Plus */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleFavorite(song.id);
                           }}
                           className={`p-1 rounded-full transition-transform active:scale-90 ${
-                            liked
-                              ? 'text-emerald-400 hover:scale-110'
+                            isSaved
+                              ? 'hover:scale-110'
                               : 'opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-white hover:scale-110'
                           }`}
-                          title={liked ? 'Guardada en Tus me gusta (clic para quitar)' : 'Añadir a Tus me gusta'}
+                          title={isSaved ? 'Guardada en tu biblioteca / favoritos (clic para quitar)' : 'Añadir a Tus me gusta'}
                         >
-                          {liked ? (
-                            <CheckCircle2 className="w-4 h-4 fill-emerald-400 text-black" />
+                          {isSaved ? (
+                            <SavedCheckIcon size={16} />
                           ) : (
                             <Plus className="w-4 h-4" />
                           )}

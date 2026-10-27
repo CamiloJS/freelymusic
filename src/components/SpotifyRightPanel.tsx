@@ -17,6 +17,7 @@ import { formatTime } from '../utils/lyrics';
 import { Song, Album } from '../types';
 import { getAlbumsFromCatalog } from '../utils/albums';
 import { ArtistLinks } from './ArtistLinks';
+import { SavedCheckIcon } from './SavedCheckIcon';
 import { SongVersionSelector } from './SongVersionSelector';
 import { GlobalStatsCard } from './GlobalStatsCard';
 
@@ -191,15 +192,27 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
                 )}
                 <button
                   onClick={() => toggleFavorite(currentSong.id)}
-                  className={`p-1.5 rounded-full transition-transform active:scale-90 ${
-                    liked ? 'text-emerald-400 hover:scale-110' : 'text-neutral-400 hover:text-white hover:scale-110'
-                  }`}
+                  className="p-1.5 rounded-full transition-transform active:scale-90 hover:scale-105"
                   title={liked ? 'Guardada en Tus me gusta (clic para quitar)' : 'Añadir a Tus me gusta'}
                 >
                   {liked ? (
-                    <CheckCircle2 className="w-5 h-5 fill-emerald-400 text-black" />
+                    <SavedCheckIcon size={20} />
                   ) : (
-                    <PlusCircle className="w-5 h-5" />
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="text-neutral-400 hover:text-white transition-colors"
+                    >
+                      <circle cx="12" cy="12" r="10.5" stroke="currentColor" strokeWidth="1.8" />
+                      <path
+                        d="M12 7.5v9M7.5 12h9"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      />
+                    </svg>
                   )}
                 </button>
               </div>

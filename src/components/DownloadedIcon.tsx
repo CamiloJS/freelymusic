@@ -27,10 +27,10 @@ export const DownloadedIcon: React.FC<DownloadedIconProps> = ({
     <title>{title}</title>
     <circle cx="12" cy="12" r="12" fill="#1ed760" />
     <path
-      d="M12 5.5v8M8.5 10l3.5 3.5 3.5-3.5M8 17h8"
+      d="M12 5.5v8.5M8 10.5l4 4 4-4M7.5 17.5h9"
       fill="none"
       stroke="#000000"
-      strokeWidth="2.2"
+      strokeWidth="2.4"
       strokeLinecap="round"
       strokeLinejoin="round"
     />

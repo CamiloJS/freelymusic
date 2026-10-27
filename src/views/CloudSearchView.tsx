@@ -8,6 +8,7 @@ import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
 import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import Download from 'lucide-react/dist/esm/icons/download.mjs';
 import { DownloadedIcon } from '../components/DownloadedIcon';
+import { SavedCheckIcon } from '../components/SavedCheckIcon';
 import Music from 'lucide-react/dist/esm/icons/music.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
@@ -334,12 +335,12 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                               toggleFavorite(song.id);
                             }}
                             className={`p-1.5 sm:p-2 rounded-full transition-transform active:scale-90 ${
-                              liked ? 'text-emerald-400 hover:scale-110' : 'text-neutral-400 hover:text-white hover:scale-110'
+                              liked ? 'hover:scale-110' : 'text-neutral-400 hover:text-white hover:scale-110'
                             }`}
                             title={liked ? 'Guardada en tus favoritos (clic para quitar)' : 'Añadir a tus favoritos'}
                           >
                             {liked ? (
-                              <CheckCircle2 className="w-4 h-4 fill-emerald-400 text-black" />
+                              <SavedCheckIcon size={16} />
                             ) : (
                               <Plus className="w-4 h-4" />
                             )}

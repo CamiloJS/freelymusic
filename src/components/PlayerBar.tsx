@@ -14,6 +14,7 @@ import PlusCircle from 'lucide-react/dist/esm/icons/circle-plus.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
 import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
 import { DownloadedIcon } from './DownloadedIcon';
+import { SavedCheckIcon } from './SavedCheckIcon';
 import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 import AlertCircle from 'lucide-react/dist/esm/icons/circle-alert.mjs';
@@ -173,18 +174,30 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
           <SongVersionSelector compact className="mt-1" />
         </div>
 
-        {/* Favorite button (Spotify Style: green CheckCircle2 when saved, PlusCircle when not) */}
+        {/* Favorite button (Spotify Style: green SavedCheckIcon when saved, subtle plus circle when not) */}
         <button
           onClick={() => toggleFavorite(currentSong.id)}
-          className={`p-1.5 rounded-full transition-transform active:scale-90 flex-shrink-0 ${
-            liked ? 'text-emerald-400 hover:scale-110' : 'text-neutral-400 hover:text-white hover:scale-110'
-          }`}
+          className="p-1 rounded-full transition-transform active:scale-90 hover:scale-105 flex-shrink-0"
           title={liked ? 'Guardada en Tus me gusta (clic para quitar)' : 'Añadir a Tus me gusta'}
         >
           {liked ? (
-            <CheckCircle2 className="w-5 h-5 fill-emerald-400 text-black" />
+            <SavedCheckIcon size={20} />
           ) : (
-            <PlusCircle className="w-5 h-5" />
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              className="text-neutral-400 hover:text-white transition-colors"
+            >
+              <circle cx="12" cy="12" r="10.5" stroke="currentColor" strokeWidth="1.8" />
+              <path
+                d="M12 7.5v9M7.5 12h9"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
           )}
         </button>
       </div>

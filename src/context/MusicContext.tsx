@@ -51,6 +51,7 @@ interface MusicContextType {
   favoriteSongIds: string[];
   toggleFavorite: (songId: string) => void;
   isFavorite: (songId: string) => boolean;
+  isSongInLibrary: (songId: string) => boolean;
   userFavoriteSongs: Song[];
 
   playlists: Playlist[];
@@ -513,6 +514,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [catalog, librarySongIds]
   );
 
+  const isSongInLibrary = useCallback(
+    (songId: string) => librarySongIds.has(songId),
+    [librarySongIds]
+  );
+
   // User Playlists
   const createPlaylist = (name: string, description = '', coverUrl = ''): Playlist => {
     const defaultCovers = [
@@ -925,6 +931,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         favoriteSongIds: userData.favoriteSongIds,
         toggleFavorite,
         isFavorite,
+        isSongInLibrary,
         userFavoriteSongs,
         playlists: userData.playlists,
         pinnedPlaylistIds: userData.pinnedPlaylistIds || [],

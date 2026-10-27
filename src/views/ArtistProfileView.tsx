@@ -24,6 +24,7 @@ import { getAlbumsFromCatalog } from '../utils/albums';
 import { compressImage } from '../utils/imageCompressor';
 import { ArtistLinks } from '../components/ArtistLinks';
 import { DownloadedIcon } from '../components/DownloadedIcon';
+import { SavedCheckIcon } from '../components/SavedCheckIcon';
 
 interface ArtistProfileViewProps {
   artistName: string;
@@ -401,13 +402,13 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                         }}
                         className={`p-1 rounded-full transition-transform active:scale-90 ${
                           liked
-                            ? 'text-emerald-400 hover:scale-110'
+                            ? 'hover:scale-110'
                             : 'opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-white hover:scale-110'
                         }`}
                         title={liked ? 'Guardada en Tus me gusta (clic para quitar)' : 'Añadir a Tus me gusta'}
                       >
                         {liked ? (
-                          <CheckCircle2 className="w-4 h-4 fill-emerald-400 text-black" />
+                          <SavedCheckIcon size={16} />
                         ) : (
                           <Plus className="w-4 h-4" />
                         )}
