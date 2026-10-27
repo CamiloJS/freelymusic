@@ -63,7 +63,12 @@ interface MusicContextType {
   savedAlbumNames: string[];
   isAlbumSaved: (albumName: string) => boolean;
   toggleSaveAlbum: (album: Album) => void;
-  createPlaylist: (name: string, description?: string, coverUrl?: string) => Playlist;
+  createPlaylist: (
+    name: string,
+    description?: string,
+    coverUrl?: string,
+    isPublic?: boolean
+  ) => Playlist;
   importPlaylist: (
     name: string,
     description: string,
@@ -573,11 +578,15 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
-  const userFavoriteSongs = useMemo(
-    () =>
-      (catalog || []).filter((song) => (userData?.favoriteSongIds || []).includes(song.id)),
-    [catalog, userData?.favoriteSongIds]
-  );
+  const userFavoriteSongs = useMemo(() => {
+    const songMap = new Map((catalog || []).map((s) => [s.id, s]));
+    const favIds = userData?.favoriteSongIds || [];
+    // Las canciones que te gustan se muestran en orden cronológico inverso (la más reciente arriba, estilo Spotify)
+    return [...favIds]
+      .reverse()
+      .map((id) => songMap.get(id))
+      .filter((s): s is Song => Boolean(s));
+  }, [catalog, userData?.favoriteSongIds]);
 
   // The personal library is what the user explicitly saved: favorites,
   // playlists, and saved albums. The global catalog stays hidden in search.
@@ -610,18 +619,18 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   // User Playlists
-  const createPlaylist = (name: string, description = '', coverUrl = ''): Playlist => {
-    const defaultCovers = [
-      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
-    ];
-
+  const createPlaylist = (
+    name: string,
+    description = '',
+    coverUrl = '',
+    isPublic = false
+  ): Playlist => {
     const newPlaylist: Playlist = {
       id: `pl-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       name,
       description,
-      coverUrl: coverUrl || defaultCovers[Math.floor(Math.random() * defaultCovers.length)],
+      coverUrl: coverUrl || '',
+      isPublic,
       userId: currentUser.id,
       songIds: [],
       createdAt: new Date().toISOString(),

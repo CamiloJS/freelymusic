@@ -19,6 +19,7 @@ import PlusCircle from 'lucide-react/dist/esm/icons/circle-plus.mjs';
 import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import UserRound from 'lucide-react/dist/esm/icons/user-round.mjs';
+import Share2 from 'lucide-react/dist/esm/icons/share-2.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -100,6 +101,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   }, [isSortMenuOpen]);
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; status: string } | null>(null);
   const [downloadMessage, setDownloadMessage] = useState('');
+  const [copySuccess, setCopySuccess] = useState(false);
   const [playlistMenu, setPlaylistMenu] = useState<PlaylistMenuState | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -377,7 +379,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           {/* Details */}
           <div className="relative z-10 flex-1 min-w-0 space-y-2">
             <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider text-white">
-              {isFavorites ? 'Colección privada' : isAlbum ? 'Álbum' : 'Playlist pública'}
+              {isFavorites
+                ? 'Colección privada'
+                : isAlbum
+                ? 'Álbum'
+                : playlistObj?.isPublic
+                ? 'Playlist pública'
+                : 'Playlist privada'}
             </span>
             <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-white tracking-tight leading-none py-1 break-words">
               {sourceName}
@@ -518,6 +526,25 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 title="Descargar paquete completo (.ZIP) para tu computador"
               >
                 <FolderDown className="w-4 h-4" />
+              </button>
+
+              {/* Share Direct Link */}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href).then(() => {
+                    setCopySuccess(true);
+                    setTimeout(() => setCopySuccess(false), 2500);
+                  });
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white border border-neutral-700/80 hover:border-neutral-400 bg-neutral-900/60 hover:bg-neutral-800 transition-all hover:scale-105 active:scale-90 relative"
+                title="Copiar enlace para compartir"
+              >
+                <Share2 className="w-4 h-4" />
+                {copySuccess && (
+                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-md bg-emerald-500 text-black text-[10px] font-bold whitespace-nowrap shadow-xl">
+                    ¡Copiado!
+                  </span>
+                )}
               </button>
 
               {/* Delete Playlist (only if custom playlist) */}
@@ -677,7 +704,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       {/* # or Play button */}
                       <div className="col-span-1 flex items-center justify-center">
                         <span className="text-xs font-mono text-neutral-500 group-hover:hidden">
-                          {song.trackNumber || idx + 1}
+                          {isAlbum ? (song.trackNumber || idx + 1) : idx + 1}
                         </span>
                         <button className="hidden group-hover:block text-white">
                           {isCurrent && isPlaying ? (
@@ -715,7 +742,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                             )}
                             {song.isExplicit && (
                               <span
-                                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-black text-[9px] font-black flex-shrink-0 select-none leading-none"
+                                className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-white text-[9px] font-black flex-shrink-0 select-none leading-none"
                                 title="Contenido explícito"
                               >
                                 E

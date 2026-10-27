@@ -6,9 +6,10 @@ import {
   setCustomAppIcon,
   removeCustomAppIcon,
   applyAppIcon,
+  cachePwaIcons,
 } from '../utils/appIcon';
 
-export type ThemeMode = 'dark' | 'light';
+export type ThemeMode = 'dark' | 'light' | 'system';
 
 export interface AccentColorPreset {
   id: string;
@@ -56,15 +57,44 @@ interface CustomizationContextType {
 const CustomizationContext = createContext<CustomizationContextType | undefined>(undefined);
 
 export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // 1. Theme Mode (Dark vs Light)
+  // 1. Theme Mode (Dark vs Light vs System, default 'dark')
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
     try {
       const saved = localStorage.getItem(THEME_STORAGE_KEY);
-      return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+      return (saved === 'light' || saved === 'dark' || saved === 'system') ? (saved as ThemeMode) : 'dark';
     } catch {
       return 'dark';
     }
   });
+
+  const [systemIsDark, setSystemIsDark] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => {
+      setSystemIsDark(e.matches);
+    };
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
+  const effectiveTheme = themeMode === 'system' ? (systemIsDark ? 'dark' : 'light') : themeMode;
+
+  // Apply theme to DOM
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', effectiveTheme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+    } catch {
+      // ignore
+    }
+  }, [themeMode, effectiveTheme]);
 
   // 2. Accent Color
   const [accentColor, setAccentColor] = useState<string>(() => {
@@ -104,12 +134,6 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   });
 
-  // Apply theme & accent to DOM
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', themeMode);
-    localStorage.setItem(THEME_STORAGE_KEY, themeMode);
-  }, [themeMode]);
-
   useEffect(() => {
     document.documentElement.style.setProperty('--brand-color', accentColor);
     document.documentElement.style.setProperty('--brand-hover', accentHover);
@@ -138,8 +162,14 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     const applyGlobalSettings = (settings: GlobalAppSettings) => {
       if (cancelled) return;
 
-      if (settings.globalIcons) {
+      if (settings.globalIcons && settings.globalIcons.length > 0) {
         setGlobalIcons(settings.globalIcons);
+        const currentIcon = getCustomAppIcon();
+        if (!currentIcon) {
+          // Default to the first Spotify icon set by admin globally
+          applyAppIcon(settings.globalIcons[0]);
+          cachePwaIcons(settings.globalIcons[0]).catch(() => {});
+        }
       }
 
       if (settings.globalAppName) {

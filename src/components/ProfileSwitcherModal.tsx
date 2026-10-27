@@ -14,6 +14,7 @@ import UploadCloud from 'lucide-react/dist/esm/icons/cloud-upload.mjs';
 import LogOut from 'lucide-react/dist/esm/icons/log-out.mjs';
 import Sun from 'lucide-react/dist/esm/icons/sun.mjs';
 import Moon from 'lucide-react/dist/esm/icons/moon.mjs';
+import Laptop from 'lucide-react/dist/esm/icons/laptop.mjs';
 import Layers from 'lucide-react/dist/esm/icons/layers.mjs';
 import ImageIcon from 'lucide-react/dist/esm/icons/image.mjs';
 import { useAuth } from '../context/AuthContext';
@@ -560,31 +561,45 @@ export const ProfileSwitcherModal: React.FC<ProfileSwitcherModalProps> = ({
                 <label className="block text-xs font-black uppercase tracking-wider text-emerald-400">
                   Modo de Visualización
                 </label>
-                <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="grid grid-cols-3 gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => setThemeMode('dark')}
-                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                    className={`p-2.5 rounded-xl border flex flex-col sm:flex-row items-center justify-center gap-1.5 font-bold text-xs transition-all ${
                       themeMode === 'dark'
                         ? 'bg-neutral-800 text-white border-emerald-500 shadow-md ring-1 ring-emerald-500/40'
                         : 'bg-neutral-900/60 text-neutral-400 border-neutral-800 hover:text-white'
                     }`}
                   >
                     <Moon className="w-4 h-4" />
-                    <span>Modo Oscuro</span>
+                    <span>Oscuro</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setThemeMode('light')}
-                    className={`p-3 rounded-xl border flex items-center justify-center gap-2 font-bold text-xs transition-all ${
+                    className={`p-2.5 rounded-xl border flex flex-col sm:flex-row items-center justify-center gap-1.5 font-bold text-xs transition-all ${
                       themeMode === 'light'
                         ? 'bg-neutral-800 text-white border-emerald-500 shadow-md ring-1 ring-emerald-500/40'
                         : 'bg-neutral-900/60 text-neutral-400 border-neutral-800 hover:text-white'
                     }`}
                   >
                     <Sun className="w-4 h-4" />
-                    <span>Modo Claro</span>
+                    <span>Claro</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setThemeMode('system')}
+                    className={`p-2.5 rounded-xl border flex flex-col sm:flex-row items-center justify-center gap-1.5 font-bold text-xs transition-all ${
+                      themeMode === 'system'
+                        ? 'bg-neutral-800 text-white border-emerald-500 shadow-md ring-1 ring-emerald-500/40'
+                        : 'bg-neutral-900/60 text-neutral-400 border-neutral-800 hover:text-white'
+                    }`}
+                    title="Predeterminado del sistema"
+                  >
+                    <Laptop className="w-4 h-4" />
+                    <span>Sistema</span>
                   </button>
                 </div>
               </div>

@@ -98,6 +98,7 @@ export interface Playlist {
   name: string;
   description?: string;
   coverUrl?: string;
+  isPublic?: boolean;
   userId: string;
   songIds: string[];
   createdAt: string;

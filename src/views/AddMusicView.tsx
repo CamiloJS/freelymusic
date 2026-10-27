@@ -1568,7 +1568,7 @@ export const AddMusicView: React.FC<AddMusicViewProps> = ({ onNavigate }) => {
                           <div className="flex items-center gap-1.5">
                             {song.isExplicit && (
                               <span
-                                className="inline-flex items-center justify-center w-3 h-3 rounded bg-neutral-600/80 text-black text-[8px] font-black flex-shrink-0 select-none leading-none"
+                                className="inline-flex items-center justify-center w-3 h-3 rounded bg-neutral-600/80 text-white text-[8px] font-black flex-shrink-0 select-none leading-none"
                                 title="Contenido explícito"
                               >
                                 E

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { MusicProvider, useMusic } from './context/MusicContext';
 import { AudioProvider, useAudio } from './context/AudioContext';
@@ -10,6 +10,7 @@ import { MobileNav } from './components/MobileNav';
 import { SpotifyRightPanel } from './components/SpotifyRightPanel';
 import { InstallPrompt } from './components/InstallPrompt';
 import { Playlist, Song, Album } from './types';
+import { getAlbumsFromCatalog } from './utils/albums';
 import { getCustomAppIcon, applyAppIcon } from './utils/appIcon';
 import { DEFAULT_AVATAR } from './services/storage';
 import Home from 'lucide-react/dist/esm/icons/house.mjs';
@@ -108,7 +109,7 @@ const MainLayout: React.FC = () => {
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
   const { currentUser } = useAuth();
-  const { downloadingState } = useMusic();
+  const { downloadingState, catalog, playlists } = useMusic();
   const {
     isCenterLyricsOpen,
     setIsCenterLyricsOpen,
@@ -118,6 +119,131 @@ const MainLayout: React.FC = () => {
     isVideoMode,
   } = useAudio();
   const { appName, appIcon } = useCustomization();
+
+  // Hash-based URL router for shareable direct links & browser history
+  const isSyncingHashRef = useRef(false);
+
+  const syncRouteFromHash = useCallback(() => {
+    isSyncingHashRef.current = true;
+    const rawHash = window.location.hash.replace(/^#\/?/, '').trim();
+    if (!rawHash) {
+      setCurrentTab('home');
+      setSelectedPlaylist(null);
+      setSelectedArtist(null);
+      isSyncingHashRef.current = false;
+      return;
+    }
+
+    const [segment, ...rest] = rawHash.split('/');
+    const param = decodeURIComponent(rest.join('/'));
+
+    switch (segment) {
+      case 'search':
+      case 'cloud':
+        setCurrentTab('cloud');
+        setSelectedPlaylist(null);
+        setSelectedArtist(null);
+        break;
+      case 'library':
+        setCurrentTab('library');
+        setSelectedPlaylist(null);
+        setSelectedArtist(null);
+        break;
+      case 'favorites':
+        setCurrentTab('library');
+        setSelectedPlaylist('favorites');
+        setSelectedArtist(null);
+        break;
+      case 'playlist':
+        if (param) {
+          const pl = playlists.find(
+            (p) => p.id === param || p.name.trim().toLowerCase() === param.trim().toLowerCase()
+          );
+          if (pl) {
+            setSelectedPlaylist(pl);
+          } else {
+            setSelectedPlaylist({
+              id: param,
+              name: param,
+              userId: '',
+              songIds: [],
+              createdAt: '',
+              updatedAt: '',
+            });
+          }
+          setCurrentTab('library');
+          setSelectedArtist(null);
+        } else {
+          setCurrentTab('library');
+        }
+        break;
+      case 'album':
+        if (param) {
+          const allAlbums = getAlbumsFromCatalog(catalog);
+          const found = allAlbums.find(
+            (a) => a.name.trim().toLowerCase() === param.trim().toLowerCase()
+          );
+          if (found) {
+            setSelectedPlaylist(found);
+          } else {
+            const matchingSongs = catalog.filter(
+              (s) => s.album && s.album.trim().toLowerCase() === param.trim().toLowerCase()
+            );
+            setSelectedPlaylist({
+              name: param,
+              artist: matchingSongs[0]?.artist || '',
+              coverUrl: matchingSongs[0]?.coverUrl || '',
+              songs: matchingSongs,
+            });
+          }
+          setCurrentTab('library');
+          setSelectedArtist(null);
+        } else {
+          setCurrentTab('library');
+        }
+        break;
+      case 'artist':
+        if (param) {
+          setSelectedArtist(param);
+          setCurrentTab('artist');
+          setSelectedPlaylist(null);
+        } else {
+          setCurrentTab('home');
+        }
+        break;
+      case 'profile':
+        setCurrentTab('profile');
+        setSelectedPlaylist(null);
+        setSelectedArtist(null);
+        break;
+      case 'offline':
+        setCurrentTab('offline');
+        setSelectedPlaylist(null);
+        setSelectedArtist(null);
+        break;
+      case 'add-music':
+        setCurrentTab('add-music');
+        setSelectedPlaylist(null);
+        setSelectedArtist(null);
+        break;
+      case 'admin':
+        setCurrentTab('admin');
+        setSelectedPlaylist(null);
+        setSelectedArtist(null);
+        break;
+      default:
+        setCurrentTab('home');
+        setSelectedPlaylist(null);
+        setSelectedArtist(null);
+    }
+    isSyncingHashRef.current = false;
+  }, [catalog, playlists]);
+
+  useEffect(() => {
+    syncRouteFromHash();
+    window.addEventListener('hashchange', syncRouteFromHash);
+    return () => window.removeEventListener('hashchange', syncRouteFromHash);
+  }, [syncRouteFromHash]);
 
   // Listen to network status & initialize custom app icon
   useEffect(() => {
@@ -181,6 +307,14 @@ const MainLayout: React.FC = () => {
     setSelectedPlaylist(playlist);
     setCurrentTab('library');
     setIsCenterLyricsOpen(false);
+
+    if (playlist === 'favorites') {
+      window.location.hash = '#/favorites';
+    } else if ('songs' in playlist) {
+      window.location.hash = `#/album/${encodeURIComponent(playlist.name)}`;
+    } else {
+      window.location.hash = `#/playlist/${encodeURIComponent(playlist.id)}`;
+    }
   };
 
   const handleSelectArtist = (artistName: string) => {
@@ -190,16 +324,38 @@ const MainLayout: React.FC = () => {
     setSelectedArtist(artistName);
     setCurrentTab('artist');
     setIsCenterLyricsOpen(false);
+    window.location.hash = `#/artist/${encodeURIComponent(artistName)}`;
   };
 
   const handleBackFromArtist = () => {
-    setCurrentTab(previousTabRef.current || 'home');
+    window.history.back();
   };
 
   const handleSelectAlbum = (album: Album) => {
     setSelectedPlaylist(album);
     setCurrentTab('library');
     setIsCenterLyricsOpen(false);
+    window.location.hash = `#/album/${encodeURIComponent(album.name)}`;
+  };
+
+  const handleNavigateTab = (tab: string) => {
+    setIsCenterLyricsOpen(false);
+    setIsFullscreenNowPlaying(false);
+    if (tab === 'home') {
+      setSelectedPlaylist(null);
+      setSelectedArtist(null);
+      window.location.hash = '#/';
+    } else if (tab === 'cloud' || tab === 'search') {
+      setSelectedPlaylist(null);
+      setSelectedArtist(null);
+      window.location.hash = '#/search';
+    } else if (tab === 'library') {
+      window.location.hash = '#/library';
+    } else {
+      setSelectedPlaylist(null);
+      setSelectedArtist(null);
+      window.location.hash = `#/${tab}`;
+    }
   };
 
   // On mobile, the bottom nav handles the root sections. The header back arrow
@@ -213,12 +369,7 @@ const MainLayout: React.FC = () => {
     (currentTab === 'library' && Boolean(selectedPlaylist));
 
   const handleMobileTab = (tab: 'home' | 'cloud' | 'library') => {
-    setCurrentTab(tab);
-    if (tab !== 'cloud') setSearchQuery('');
-    setSelectedPlaylist(null);
-    setSelectedArtist(null);
-    setIsCenterLyricsOpen(false);
-    setIsFullscreenNowPlaying(false);
+    handleNavigateTab(tab);
   };
 
   return (
@@ -263,11 +414,7 @@ const MainLayout: React.FC = () => {
           </div>
 
           <button
-            onClick={() => {
-              setIsCenterLyricsOpen(false);
-              setCurrentTab('home');
-              setSelectedPlaylist(null);
-            }}
+            onClick={() => handleNavigateTab('home')}
             className="hidden md:flex w-9 h-9 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white items-center justify-center transition-colors ml-1"
             title="Inicio"
           >
@@ -283,15 +430,11 @@ const MainLayout: React.FC = () => {
               type="text"
               value={searchQuery}
               onFocus={() => {
-                setIsCenterLyricsOpen(false);
-                setCurrentTab('cloud');
-                setSelectedPlaylist(null);
+                if (currentTab !== 'cloud') handleNavigateTab('cloud');
               }}
               onChange={(event) => {
                 setSearchQuery(event.target.value);
-                setIsCenterLyricsOpen(false);
-                setCurrentTab('cloud');
-                setSelectedPlaylist(null);
+                if (currentTab !== 'cloud') handleNavigateTab('cloud');
               }}
               placeholder="¿Qué quieres reproducir?"
               aria-label="Buscar música"
@@ -336,10 +479,7 @@ const MainLayout: React.FC = () => {
         <div className="hidden md:flex flex-shrink-0 h-full">
           <Sidebar
             currentTab={currentTab}
-            setCurrentTab={(tab) => {
-              setCurrentTab(tab);
-              if (tab !== 'library') setSelectedPlaylist(null);
-            }}
+            setCurrentTab={handleNavigateTab}
             onSelectPlaylist={handleSelectPlaylist}
             selectedPlaylist={selectedPlaylist}
             onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
@@ -362,10 +502,7 @@ const MainLayout: React.FC = () => {
               <Suspense fallback={<ViewLoader />}>
                 {currentTab === 'home' && (
                   <HomeView
-                    onNavigate={(tab) => {
-                      setCurrentTab(tab);
-                      if (tab !== 'library') setSelectedPlaylist(null);
-                    }}
+                    onNavigate={handleNavigateTab}
                     onSelectPlaylist={handleSelectPlaylist}
                     onOpenAddToPlaylist={handleOpenAddToPlaylist}
                     onSelectArtist={handleSelectArtist}
@@ -383,7 +520,7 @@ const MainLayout: React.FC = () => {
                 )}
 
                 {currentTab === 'add-music' && (
-                  <AddMusicView onNavigate={setCurrentTab} />
+                  <AddMusicView onNavigate={handleNavigateTab} />
                 )}
 
                 {currentTab === 'library' && (
@@ -413,10 +550,7 @@ const MainLayout: React.FC = () => {
                     onSelectArtist={handleSelectArtist}
                     onOpenCreatePlaylist={() => setIsCreatePlaylistOpen(true)}
                     onOpenImportPlaylist={() => setIsImportPlaylistOpen(true)}
-                    onNavigate={(tab) => {
-                      setCurrentTab(tab);
-                      if (tab !== 'library') setSelectedPlaylist(null);
-                    }}
+                    onNavigate={handleNavigateTab}
                   />
                 )}
 
@@ -505,18 +639,16 @@ const MainLayout: React.FC = () => {
             isOpen={isProfileSwitcherOpen}
             onClose={() => setIsProfileSwitcherOpen(false)}
             onOpenCreateProfile={() => {
-              setCurrentTab('admin');
+              handleNavigateTab('admin');
             }}
             onNavigateAddMusic={() => {
-              setCurrentTab('add-music');
+              handleNavigateTab('add-music');
             }}
             onOpenProfileView={() => {
-              setSelectedPlaylist(null);
-              setCurrentTab('profile');
+              handleNavigateTab('profile');
             }}
             onOpenAdminPanel={() => {
-              setSelectedPlaylist(null);
-              setCurrentTab('admin');
+              handleNavigateTab('admin');
             }}
           />
         </Suspense>
@@ -548,8 +680,7 @@ const MainLayout: React.FC = () => {
             isOpen={isImportPlaylistOpen}
             onClose={() => setIsImportPlaylistOpen(false)}
             onCreated={(playlist) => {
-              setSelectedPlaylist(playlist);
-              setCurrentTab('library');
+              handleSelectPlaylist(playlist);
               setIsImportPlaylistOpen(false);
             }}
           />

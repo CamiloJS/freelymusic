@@ -345,7 +345,7 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                       <div className="truncate">
                         <div className="flex items-center gap-1.5">
                           {song.isExplicit && (
-                            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-black text-[9px] font-black flex-shrink-0">
+                            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-white text-[9px] font-black flex-shrink-0">
                               E
                             </span>
                           )}

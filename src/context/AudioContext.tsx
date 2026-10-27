@@ -7,6 +7,16 @@ import { useMusic } from './MusicContext';
 import { useAuth } from './AuthContext';
 
 const VOLUME_STORAGE_KEY = 'musica_volume';
+const LAST_PLAYBACK_KEY = 'musica_last_playback_state';
+
+interface LastPlaybackState {
+  songId: string;
+  currentTime: number;
+  playbackSource?: PlaybackSource | null;
+  queueIds?: string[];
+  activeVersionId?: string | null;
+  isKaraoke?: boolean;
+}
 
 function getInitialVolume(): number {
   try {
@@ -120,7 +130,7 @@ const AudioContext = createContext<AudioContextType | undefined>(undefined);
 const AudioTimeContext = createContext<AudioTimeState | undefined>(undefined);
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { recordSongPlay, recordListeningTime, isDownloaded, updateCatalogTrack } = useMusic();
+  const { catalog, recordSongPlay, recordListeningTime, isDownloaded, updateCatalogTrack } = useMusic();
   const { isAuthenticated, currentUser } = useAuth();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -309,6 +319,84 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // ignore
     }
   }, [volume]);
+
+  // Restore last played song & playback time on startup
+  const restoredPlaybackRef = useRef(false);
+
+  useEffect(() => {
+    if (restoredPlaybackRef.current || !catalog || catalog.length === 0) return;
+    try {
+      const raw = localStorage.getItem(LAST_PLAYBACK_KEY);
+      if (!raw) return;
+      const state: LastPlaybackState = JSON.parse(raw);
+      if (!state?.songId) return;
+
+      const targetSong = catalog.find((s) => s.id === state.songId);
+      if (!targetSong) return;
+
+      restoredPlaybackRef.current = true;
+      setCurrentSong(targetSong);
+      if (state.playbackSource) setPlaybackSource(state.playbackSource);
+      if (state.queueIds && state.queueIds.length > 0) {
+        const restoredQueue = state.queueIds
+          .map((id) => catalog.find((s) => s.id === id))
+          .filter((s): s is Song => Boolean(s));
+        if (restoredQueue.length > 0) setQueue(restoredQueue);
+      }
+      if (state.activeVersionId) setActiveVersionIdState(state.activeVersionId);
+      if (state.isKaraoke) setIsKaraoke(true);
+
+      const targetTime =
+        typeof state.currentTime === 'number' && Number.isFinite(state.currentTime)
+          ? state.currentTime
+          : 0;
+      setCurrentTime(targetTime);
+      setDuration(targetSong.duration || 0);
+
+      const audio = audioRef.current;
+      if (audio) {
+        audio.src = targetSong.audioUrl;
+        audio.preload = 'metadata';
+        try {
+          audio.currentTime = targetTime;
+        } catch {
+          // ignore
+        }
+      }
+    } catch (err) {
+      console.warn('Error al restaurar la última reproducción:', err);
+    }
+  }, [catalog]);
+
+  // Persist current playback state (debounced)
+  useEffect(() => {
+    if (!currentSong) return;
+    const saveState = () => {
+      try {
+        const state: LastPlaybackState = {
+          songId: currentSong.id,
+          currentTime,
+          playbackSource,
+          queueIds: queue.map((s) => s.id),
+          activeVersionId,
+          isKaraoke,
+        };
+        localStorage.setItem(LAST_PLAYBACK_KEY, JSON.stringify(state));
+      } catch {
+        // ignore
+      }
+    };
+
+    const timer = setTimeout(saveState, 1200);
+    return () => clearTimeout(timer);
+  }, [
+    currentSong?.id,
+    Math.floor(currentTime),
+    playbackSource,
+    queue,
+    activeVersionId,
+    isKaraoke,
+  ]);
 
   // Logging out must stop playback immediately (otherwise the previous
   // session's music keeps playing on the lock screen / another profile).

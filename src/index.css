@@ -65,26 +65,12 @@ input[type="range"] {
   color: #0f172a !important;
 }
 
+/* Backgrounds */
 [data-theme="light"] .bg-black {
   background-color: #ffffff !important;
 }
 
-[data-theme="light"] .bg-neutral-950 {
-  background-color: #f8fafc !important;
-}
-
-[data-theme="light"] .bg-neutral-900 {
-  background-color: #f1f5f9 !important;
-}
-
-[data-theme="light"] .bg-neutral-900\/50,
-[data-theme="light"] .bg-neutral-900\/60,
-[data-theme="light"] .bg-neutral-900\/70,
-[data-theme="light"] .bg-neutral-900\/80,
-[data-theme="light"] .bg-neutral-900\/90 {
-  background-color: #ffffff !important;
-}
-
+[data-theme="light"] .bg-neutral-950,
 [data-theme="light"] .bg-neutral-950\/60,
 [data-theme="light"] .bg-neutral-950\/70,
 [data-theme="light"] .bg-neutral-950\/80,
@@ -92,14 +78,53 @@ input[type="range"] {
   background-color: #f8fafc !important;
 }
 
+[data-theme="light"] .bg-neutral-900,
+[data-theme="light"] .bg-neutral-900\/50,
+[data-theme="light"] .bg-neutral-900\/60,
+[data-theme="light"] .bg-neutral-900\/70,
+[data-theme="light"] .bg-neutral-900\/80,
+[data-theme="light"] .bg-neutral-900\/90 {
+  background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .bg-neutral-850,
+[data-theme="light"] .bg-neutral-850\/80,
+[data-theme="light"] .bg-neutral-850\/90,
+[data-theme="light"] .bg-neutral-800,
+[data-theme="light"] .bg-neutral-800\/40,
+[data-theme="light"] .bg-neutral-800\/50,
+[data-theme="light"] .bg-neutral-800\/60,
+[data-theme="light"] .bg-neutral-800\/70,
+[data-theme="light"] .bg-neutral-800\/80,
+[data-theme="light"] .bg-neutral-800\/90,
+[data-theme="light"] .bg-neutral-700,
+[data-theme="light"] .bg-neutral-700\/50,
+[data-theme="light"] .bg-neutral-700\/80 {
+  background-color: #e2e8f0 !important;
+}
+
+/* Translucent surfaces */
+[data-theme="light"] .bg-white\/5,
+[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+[data-theme="light"] .bg-white\/15,
+[data-theme="light"] .bg-white\/20 {
+  background-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Borders */
 [data-theme="light"] .border-neutral-900,
 [data-theme="light"] .border-neutral-900\/80,
+[data-theme="light"] .border-neutral-900\/90,
 [data-theme="light"] .border-neutral-800,
 [data-theme="light"] .border-neutral-800\/80,
-[data-theme="light"] .border-neutral-800\/60 {
+[data-theme="light"] .border-neutral-800\/60,
+[data-theme="light"] .border-neutral-700 {
   border-color: #e2e8f0 !important;
 }
 
+/* Typography */
 [data-theme="light"] .text-white {
   color: #0f172a !important;
 }
@@ -117,21 +142,64 @@ input[type="range"] {
   color: #94a3b8 !important;
 }
 
+/* Protect white text on buttons, badges, gradients & active elements */
+[data-theme="light"] .bg-emerald-500,
+[data-theme="light"] .bg-emerald-600,
+[data-theme="light"] .bg-emerald-500 .text-white,
+[data-theme="light"] .bg-emerald-600 .text-white,
+[data-theme="light"] button.bg-emerald-500,
+[data-theme="light"] button.bg-emerald-600,
+[data-theme="light"] .bg-gradient-to-br .text-white,
+[data-theme="light"] .bg-gradient-to-r .text-white,
+[data-theme="light"] span[title*="xplícito"],
+[data-theme="light"] .lyric-active {
+  color: #ffffff !important;
+}
+
+[data-theme="light"] span[title*="xplícito"] {
+  background-color: #475569 !important;
+  color: #ffffff !important;
+}
+
+/* Hovers */
 [data-theme="light"] .hover\:bg-neutral-900:hover,
+[data-theme="light"] .hover\:bg-neutral-850:hover,
 [data-theme="light"] .hover\:bg-neutral-800:hover,
-[data-theme="light"] .hover\:bg-neutral-850:hover {
+[data-theme="light"] .hover\:bg-neutral-700:hover {
   background-color: #e2e8f0 !important;
 }
 
+[data-theme="light"] .hover\:bg-white\/5:hover,
+[data-theme="light"] .hover\:bg-white\/10:hover {
+  background-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+/* Form inputs */
 [data-theme="light"] input,
-[data-theme="light"] textarea {
+[data-theme="light"] textarea,
+[data-theme="light"] select {
   background-color: #ffffff !important;
   color: #0f172a !important;
   border-color: #cbd5e1 !important;
 }
 
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Glass panel & overlays */
 [data-theme="light"] .glass-panel {
-  background: rgba(255, 255, 255, 0.9) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(16px);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
 }
 
 /* Custom scrollbars */
