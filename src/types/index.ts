@@ -117,6 +117,8 @@ export interface UserLibraryData {
   followedArtists?: string[];
   /** Custom playlists pinned at the top of the library. */
   pinnedPlaylistIds?: string[];
+  /** Saved albums in user's library. */
+  savedAlbumNames?: string[];
   playCounts?: Record<string, number>; // songId -> user play count
   playHistory?: PlayEvent[]; // user play history for Top tracks / Wrapped
   totalListenSeconds?: number; // accumulated listening time

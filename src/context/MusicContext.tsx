@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import { Song, Playlist, UserLibraryData, ArtistProfile, PlayEvent } from '../types';
+import { Song, Playlist, Album, UserLibraryData, ArtistProfile, PlayEvent } from '../types';
 import { useAuth } from './AuthContext';
 import {
   getStoredCatalog,
@@ -57,6 +57,9 @@ interface MusicContextType {
   pinnedPlaylistIds: string[];
   isPlaylistPinned: (playlistId: string) => boolean;
   togglePlaylistPin: (playlistId: string) => void;
+  savedAlbumNames: string[];
+  isAlbumSaved: (albumName: string) => boolean;
+  toggleSaveAlbum: (album: Album) => void;
   createPlaylist: (name: string, description?: string, coverUrl?: string) => Playlist;
   importPlaylist: (
     name: string,
@@ -485,15 +488,25 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     [catalog, userData?.favoriteSongIds]
   );
 
-  // The personal library is what the user explicitly saved: favorites plus
-  // songs inside playlists. The global catalog stays hidden in search.
+  // The personal library is what the user explicitly saved: favorites,
+  // playlists, and saved albums. The global catalog stays hidden in search.
   const librarySongIds = useMemo(() => {
     const ids = new Set<string>(userData.favoriteSongIds || []);
     (userData.playlists || []).forEach((playlist) => {
       playlist.songIds.forEach((songId) => ids.add(songId));
     });
+    const savedAlbums = new Set(
+      (userData.savedAlbumNames || []).map((n) => n.trim().toLowerCase())
+    );
+    if (savedAlbums.size > 0) {
+      catalog.forEach((song) => {
+        if (song.album && savedAlbums.has(song.album.trim().toLowerCase())) {
+          ids.add(song.id);
+        }
+      });
+    }
     return ids;
-  }, [userData.favoriteSongIds, userData.playlists]);
+  }, [userData.favoriteSongIds, userData.playlists, userData.savedAlbumNames, catalog]);
 
   const librarySongs = useMemo(
     () => catalog.filter((song) => librarySongIds.has(song.id)),
@@ -790,6 +803,37 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
+  const isAlbumSaved = useCallback(
+    (albumName: string) => {
+      const norm = albumName.trim().toLowerCase();
+      if (!norm) return false;
+      const isExplicitlySaved = (userData?.savedAlbumNames || []).includes(norm);
+      if (isExplicitlySaved) return true;
+      const albumSongs = catalog.filter(
+        (s) => s.album && s.album.trim().toLowerCase() === norm
+      );
+      if (albumSongs.length === 0) return false;
+      return albumSongs.every((s) => librarySongIds.has(s.id));
+    },
+    [userData?.savedAlbumNames, catalog, librarySongIds]
+  );
+
+  const toggleSaveAlbum = (album: Album) => {
+    const norm = album.name.trim().toLowerCase();
+    if (!norm) return;
+    const currentlySaved = (userData?.savedAlbumNames || []).includes(norm);
+    mutateUserData((previous) => {
+      const current = previous.savedAlbumNames || [];
+      const updated = currentlySaved
+        ? current.filter((item) => item !== norm)
+        : [...current, norm];
+      return {
+        ...previous,
+        savedAlbumNames: updated,
+      };
+    });
+  };
+
   const updateArtistProfile = async (artist: ArtistProfile) => {
     const norm = artist.id || artist.name.trim().toLowerCase();
     const updated: ArtistProfile = {
@@ -886,6 +930,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         pinnedPlaylistIds: userData.pinnedPlaylistIds || [],
         isPlaylistPinned,
         togglePlaylistPin,
+        savedAlbumNames: userData.savedAlbumNames || [],
+        isAlbumSaved,
+        toggleSaveAlbum,
         createPlaylist,
         importPlaylist,
         updatePlaylist,

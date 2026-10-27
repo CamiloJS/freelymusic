@@ -12,6 +12,8 @@ import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
 import Shuffle from 'lucide-react/dist/esm/icons/shuffle.mjs';
 import Search from 'lucide-react/dist/esm/icons/search.mjs';
 import ArrowDownCircle from 'lucide-react/dist/esm/icons/circle-arrow-down.mjs';
+import PlusCircle from 'lucide-react/dist/esm/icons/circle-plus.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import UserRound from 'lucide-react/dist/esm/icons/user-round.mjs';
 import { useAuth } from '../context/AuthContext';
@@ -66,6 +68,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     downloadFullPlaylistZip,
     downloadSongsBatch,
     getUserSongPlayCount,
+    isAlbumSaved,
+    toggleSaveAlbum,
   } = useMusic();
 
   const { playSong, currentSong, isPlaying, togglePlayPause, isShuffle, toggleShuffle } = useAudio();
@@ -315,8 +319,24 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               </p>
             )}
 
-            <div className="flex items-center gap-1.5 text-xs text-neutral-300 font-semibold pt-1">
-              <span className="text-white font-extrabold">
+            <div className="flex items-center gap-2 text-xs text-neutral-300 font-semibold pt-1">
+              {isAlbum && albumObj && (
+                (() => {
+                  const artistProfile = getArtistProfile(albumObj.artist);
+                  const artistAvatar = artistProfile?.avatarUrl;
+                  return artistAvatar ? (
+                    <img
+                      src={artistAvatar}
+                      alt={albumObj.artist}
+                      className="w-6 h-6 rounded-full object-cover shadow"
+                    />
+                  ) : null;
+                })()
+              )}
+              <span
+                onClick={() => onSelectArtist?.(isAlbum ? albumObj?.artist || '' : currentUser?.displayName || '')}
+                className="text-white font-extrabold hover:underline cursor-pointer"
+              >
                 {isAlbum ? albumObj?.artist : currentUser?.displayName || 'Tú'}
               </span>
               {isAlbum && albumObj?.year && (
@@ -360,6 +380,29 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               >
                 <Shuffle className="w-6 h-6" />
               </button>
+
+              {/* Add Album to Library Button (Exact Spotify Style) */}
+              {isAlbum && albumObj && (
+                <button
+                  onClick={() => toggleSaveAlbum(albumObj)}
+                  className={`p-1 rounded-full transition-transform active:scale-90 ${
+                    isAlbumSaved(albumObj.name)
+                      ? 'text-emerald-400 hover:text-emerald-300'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                  title={
+                    isAlbumSaved(albumObj.name)
+                      ? 'Guardado en tu biblioteca (clic para quitar)'
+                      : 'Guardar álbum en tu biblioteca'
+                  }
+                >
+                  {isAlbumSaved(albumObj.name) ? (
+                    <CheckCircle2 className="w-8 h-8 fill-emerald-400 text-black" />
+                  ) : (
+                    <PlusCircle className="w-8 h-8 hover:scale-105" />
+                  )}
+                </button>
+              )}
 
               {/* Download All Button */}
               <button
@@ -505,7 +548,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                           />
                         )}
                         <div className="min-w-0 flex-1 truncate">
-                          <div className="flex items-center gap-1.5 min-w-0">
+                          <span
+                            className={`block font-bold text-sm truncate ${
+                              isCurrent ? 'text-emerald-400' : 'text-white'
+                            }`}
+                          >
+                            {song.title}
+                          </span>
+                          <div className="flex items-center gap-1.5 text-xs text-neutral-400 truncate mt-0.5">
+                            {downloaded && (
+                              <span title="Descargado" className="flex-shrink-0">
+                                <DownloadedIcon size={12} />
+                              </span>
+                            )}
                             {song.isExplicit && (
                               <span
                                 className="inline-flex items-center justify-center w-3.5 h-3.5 rounded bg-neutral-600/80 text-black text-[9px] font-black flex-shrink-0 select-none leading-none"
@@ -514,30 +569,21 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 E
                               </span>
                             )}
-                            <span
-                              className={`block font-bold text-sm truncate ${
-                                isCurrent ? 'text-emerald-400' : 'text-white'
-                              }`}
-                            >
-                              {song.title}
-                            </span>
-                          </div>
-                          <span className="block text-xs text-neutral-400 truncate mt-0.5">
                             <ArtistLinks artists={song.artist} onSelectArtist={onSelectArtist} />
-                          </span>
+                          </div>
                         </div>
                       </div>
 
                       {/* Album / Reproducciones */}
-                      <div className="col-span-4 md:col-span-4 hidden sm:block truncate text-xs text-neutral-400">
+                      <div className="col-span-4 md:col-span-4 hidden sm:block truncate text-xs text-neutral-400 font-mono">
                         {isAlbum ? (
                           <span
                             className="font-medium text-neutral-300"
                             title="Tus reproducciones para esta pista"
                           >
                             {playCount > 0
-                              ? `${playCount} ${playCount === 1 ? 'reproducción' : 'reproducciones'}`
-                              : '0 reproducciones'}
+                              ? new Intl.NumberFormat('es-CO').format(playCount)
+                              : '0'}
                           </span>
                         ) : (
                           <span
@@ -552,8 +598,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                             }}
                             className={
                               song.album && song.album.trim().toLowerCase() !== 'sencillo'
-                                ? 'hover:underline hover:text-white cursor-pointer'
-                                : ''
+                                ? 'hover:underline hover:text-white cursor-pointer font-sans'
+                                : 'font-sans'
                             }
                             title={song.album ? `Abrir álbum ${song.album}` : undefined}
                           >
@@ -563,22 +609,27 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                       </div>
 
                       {/* Actions & Duration */}
-                      <div className="col-span-4 sm:col-span-2 md:col-span-1 flex items-center justify-end gap-1.5 sm:gap-2 text-xs font-mono text-neutral-400">
-                        {downloaded && (
-                          <span title="Descargado">
-                            <DownloadedIcon size={14} />
-                          </span>
-                        )}
+                      <div className="col-span-4 sm:col-span-2 md:col-span-1 flex items-center justify-end gap-2.5 text-xs font-mono text-neutral-400">
+                        {/* Chulito verde if liked, or plus icon on hover */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleFavorite(song.id);
                           }}
-                          className={`p-1 rounded-full ${liked ? 'text-emerald-400' : 'opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-white'}`}
+                          className={`p-1 rounded-full transition-transform active:scale-90 ${
+                            liked
+                              ? 'text-emerald-400 hover:scale-110'
+                              : 'opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-white hover:scale-110'
+                          }`}
+                          title={liked ? 'Guardada en Tus me gusta (clic para quitar)' : 'Añadir a Tus me gusta'}
                         >
-                          <Heart className={`w-3.5 h-3.5 ${liked ? 'fill-emerald-400' : ''}`} />
+                          {liked ? (
+                            <CheckCircle2 className="w-4 h-4 fill-emerald-400 text-black" />
+                          ) : (
+                            <Plus className="w-4 h-4" />
+                          )}
                         </button>
-                        <span>{formatTime(song.duration)}</span>
+                        <span className="min-w-[36px] text-right">{formatTime(song.duration)}</span>
                       </div>
                     </div>
                   );

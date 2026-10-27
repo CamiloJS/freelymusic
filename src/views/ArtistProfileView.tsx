@@ -14,6 +14,7 @@ import X from 'lucide-react/dist/esm/icons/x.mjs';
 import Sparkles from 'lucide-react/dist/esm/icons/sparkles.mjs';
 import Flame from 'lucide-react/dist/esm/icons/flame.mjs';
 import ArrowLeft from 'lucide-react/dist/esm/icons/arrow-left.mjs';
+import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio } from '../context/AudioContext';
@@ -350,7 +351,12 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                             {song.title}
                           </span>
                         </div>
-                        <div className="text-xs text-neutral-400 truncate">
+                        <div className="flex items-center gap-1.5 text-xs text-neutral-400 truncate mt-0.5">
+                          {downloaded && (
+                            <span title="Descargado" className="flex-shrink-0">
+                              <DownloadedIcon size={12} />
+                            </span>
+                          )}
                           <ArtistLinks artists={song.artist} onSelectArtist={onSelectArtist} />
                         </div>
                       </div>
@@ -387,21 +393,24 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                         {personalPlayCount > 0 ? `${personalPlayCount} repros` : '—'}
                       </span>
 
-                      {downloaded && (
-                        <DownloadedIcon size={14} />
-                      )}
-
+                      {/* Chulito verde if liked, or plus icon on hover */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleFavorite(song.id);
                         }}
                         className={`p-1 rounded-full transition-transform active:scale-90 ${
-                          liked ? 'text-emerald-400' : 'opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-white'
+                          liked
+                            ? 'text-emerald-400 hover:scale-110'
+                            : 'opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-white hover:scale-110'
                         }`}
-                        title={liked ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+                        title={liked ? 'Guardada en Tus me gusta (clic para quitar)' : 'Añadir a Tus me gusta'}
                       >
-                        <Heart className={`w-3.5 h-3.5 ${liked ? 'fill-emerald-400' : ''}`} />
+                        {liked ? (
+                          <CheckCircle2 className="w-4 h-4 fill-emerald-400 text-black" />
+                        ) : (
+                          <Plus className="w-4 h-4" />
+                        )}
                       </button>
 
                       <span>{formatTime(song.duration)}</span>

@@ -465,6 +465,17 @@ export function normalizeUserData(raw: Partial<UserLibraryData> | null | undefin
       )
     : [];
 
+  const savedAlbumNames = Array.isArray(source.savedAlbumNames)
+    ? Array.from(
+        new Set(
+          source.savedAlbumNames
+            .filter((name): name is string => typeof name === 'string')
+            .map((name) => name.trim().toLowerCase())
+            .filter(Boolean)
+        )
+      )
+    : [];
+
   const playCounts: Record<string, number> = {};
   if (source.playCounts && typeof source.playCounts === 'object') {
     Object.entries(source.playCounts).forEach(([songId, value]) => {
@@ -508,6 +519,7 @@ export function normalizeUserData(raw: Partial<UserLibraryData> | null | undefin
     playlists,
     followedArtists,
     pinnedPlaylistIds,
+    savedAlbumNames,
     playCounts,
     playHistory,
     totalListenSeconds:
@@ -697,6 +709,7 @@ export function createDefaultUserData(userId: string): UserLibraryData {
     historySongIds: [],
     followedArtists: [],
     pinnedPlaylistIds: [],
+    savedAlbumNames: [],
     playlists: [
       {
         id: `pl-${userId}-1`,

@@ -9,6 +9,8 @@ import Repeat1 from 'lucide-react/dist/esm/icons/repeat-1.mjs';
 import Volume2 from 'lucide-react/dist/esm/icons/volume-2.mjs';
 import VolumeX from 'lucide-react/dist/esm/icons/volume-x.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import PlusCircle from 'lucide-react/dist/esm/icons/circle-plus.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
 import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
 import { DownloadedIcon } from './DownloadedIcon';
@@ -171,15 +173,19 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
           <SongVersionSelector compact className="mt-1" />
         </div>
 
-        {/* Favorite button */}
+        {/* Favorite button (Spotify Style: green CheckCircle2 when saved, PlusCircle when not) */}
         <button
           onClick={() => toggleFavorite(currentSong.id)}
           className={`p-1.5 rounded-full transition-transform active:scale-90 flex-shrink-0 ${
-            liked ? 'text-emerald-400' : 'text-neutral-500 hover:text-white'
+            liked ? 'text-emerald-400 hover:scale-110' : 'text-neutral-400 hover:text-white hover:scale-110'
           }`}
-          title={liked ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+          title={liked ? 'Guardada en Tus me gusta (clic para quitar)' : 'Añadir a Tus me gusta'}
         >
-          <Heart className={`w-4 h-4 ${liked ? 'fill-emerald-400' : ''}`} />
+          {liked ? (
+            <CheckCircle2 className="w-5 h-5 fill-emerald-400 text-black" />
+          ) : (
+            <PlusCircle className="w-5 h-5" />
+          )}
         </button>
       </div>
 

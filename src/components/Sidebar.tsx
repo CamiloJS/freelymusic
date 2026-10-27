@@ -511,39 +511,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Profile / settings footer */}
-      <div className="p-3">
-        <button
-          onClick={onOpenProfileSwitcher}
-          className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-neutral-900 transition-colors text-left group"
-          title="Ajustes, preferencias y perfiles"
-        >
-          <div className="relative flex-shrink-0">
-            <img
-              src={currentUser?.avatarUrl || DEFAULT_AVATAR}
-              alt={currentUser?.displayName || 'Usuario'}
-              className="w-8 h-8 rounded-xl object-cover ring-2 ring-emerald-500/30"
-            />
-            {!isOnline && (
-              <span
-                className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-neutral-950 flex items-center justify-center"
-                title="Sin conexión"
-              >
-                <WifiOff className="w-3 h-3 text-amber-400" />
-              </span>
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <span className="text-xs font-bold text-white truncate block">
-              {currentUser?.displayName || 'Usuario'}
-            </span>
-            <span className="text-[10px] text-neutral-500 block truncate">
-              Ajustes y cuenta
-            </span>
-          </div>
-          <Settings className="w-4 h-4 text-neutral-500 group-hover:text-white transition-colors flex-shrink-0" />
-        </button>
-      </div>
       </aside>
 
       <PlaylistContextMenu

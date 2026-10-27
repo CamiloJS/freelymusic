@@ -5,6 +5,7 @@ import X from 'lucide-react/dist/esm/icons/x.mjs';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
 import Plus from 'lucide-react/dist/esm/icons/plus.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
 import Download from 'lucide-react/dist/esm/icons/download.mjs';
 import { DownloadedIcon } from '../components/DownloadedIcon';
 import Music from 'lucide-react/dist/esm/icons/music.mjs';
@@ -273,13 +274,13 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                             >
                               {song.title}
                             </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs text-neutral-400 truncate mt-0.5">
                             {downloaded && (
-                              <span className="flex-shrink-0">
-                                <DownloadedIcon size={14} />
+                              <span className="flex-shrink-0" title="Descargado">
+                                <DownloadedIcon size={12} />
                               </span>
                             )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1 text-xs text-neutral-400 truncate mt-0.5">
                             <ArtistLinks
                               artists={song.artist}
                               onSelectArtist={onSelectArtist || selectRecent}
@@ -326,17 +327,22 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                         </span>
 
                         <div className="flex items-center gap-0.5 sm:gap-1">
+                          {/* Chulito verde if liked, plus if not */}
                           <button
                             onClick={(event) => {
                               event.stopPropagation();
                               toggleFavorite(song.id);
                             }}
-                            className={`p-1.5 sm:p-2 rounded-full transition-colors active:scale-90 ${
-                              liked ? 'text-emerald-400' : 'text-neutral-500 hover:text-white'
+                            className={`p-1.5 sm:p-2 rounded-full transition-transform active:scale-90 ${
+                              liked ? 'text-emerald-400 hover:scale-110' : 'text-neutral-400 hover:text-white hover:scale-110'
                             }`}
-                            title={liked ? 'Quitar de favoritos' : 'Añadir a mis favoritos'}
+                            title={liked ? 'Guardada en tus favoritos (clic para quitar)' : 'Añadir a tus favoritos'}
                           >
-                            <Heart className={`w-4 h-4 ${liked ? 'fill-emerald-400' : ''}`} />
+                            {liked ? (
+                              <CheckCircle2 className="w-4 h-4 fill-emerald-400 text-black" />
+                            ) : (
+                              <Plus className="w-4 h-4" />
+                            )}
                           </button>
 
                           <button

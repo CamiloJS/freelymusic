@@ -2,6 +2,8 @@ import React from 'react';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
 import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import CheckCircle2 from 'lucide-react/dist/esm/icons/circle-check.mjs';
+import PlusCircle from 'lucide-react/dist/esm/icons/circle-plus.mjs';
 import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
@@ -61,7 +63,22 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
     ? parsedLyrics.slice(startLyricIndex, startLyricIndex + 6)
     : [];
 
-  const sourceName = playbackSource?.name || 'Tus me gusta';
+  const displayOrigin = React.useMemo(() => {
+    if (!playbackSource?.name) {
+      return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
+        ? currentSong.album
+        : null;
+    }
+    // If it says "Artista: ...", remove it as requested (redundant)
+    if (/^artista:/i.test(playbackSource.name.trim())) {
+      return currentSong.album && currentSong.album.toLowerCase() !== 'sencillo'
+        ? currentSong.album
+        : null;
+    }
+    return playbackSource.name;
+  }, [playbackSource?.name, currentSong.album]);
+
+  const sourceName = displayOrigin || playbackSource?.name || 'Tus me gusta';
 
   return (
     <aside className="w-80 lg:w-88 bg-neutral-950 border-l border-neutral-900/90 flex flex-col h-full flex-shrink-0 select-none overflow-hidden animate-in slide-in-from-right-4 duration-200">
@@ -105,11 +122,13 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
           /* TAB: VISTA ACTUAL (Spotify Image 5) */
           <div className="space-y-5">
             {/* Source Origin Title */}
-            <div>
-              <span className="text-[11px] font-black uppercase tracking-wider text-neutral-400 block truncate">
-                {sourceName}
-              </span>
-            </div>
+            {displayOrigin && (
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-wider text-neutral-400 block truncate">
+                  {displayOrigin}
+                </span>
+              </div>
+            )}
 
             {/* High-res Cover Art */}
             <div className="aspect-square w-full rounded-2xl overflow-hidden bg-neutral-900 shadow-2xl relative group">
@@ -173,11 +192,15 @@ export const SpotifyRightPanel: React.FC<SpotifyRightPanelProps> = ({
                 <button
                   onClick={() => toggleFavorite(currentSong.id)}
                   className={`p-1.5 rounded-full transition-transform active:scale-90 ${
-                    liked ? 'text-emerald-400' : 'text-neutral-500 hover:text-white'
+                    liked ? 'text-emerald-400 hover:scale-110' : 'text-neutral-400 hover:text-white hover:scale-110'
                   }`}
-                  title={liked ? 'Guardado en favoritos' : 'Añadir a favoritos'}
+                  title={liked ? 'Guardada en Tus me gusta (clic para quitar)' : 'Añadir a Tus me gusta'}
                 >
-                  <Heart className={`w-5 h-5 ${liked ? 'fill-emerald-400 text-emerald-400' : ''}`} />
+                  {liked ? (
+                    <CheckCircle2 className="w-5 h-5 fill-emerald-400 text-black" />
+                  ) : (
+                    <PlusCircle className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
