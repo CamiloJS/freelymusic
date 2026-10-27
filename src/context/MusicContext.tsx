@@ -33,6 +33,7 @@ import {
 import { loadFirebaseService } from '../services/firebaseLoader';
 import { detectAudioDuration } from '../utils/audioDuration';
 import { searchLyrics, searchArtistAvatar } from '../services/metadataEnrichment';
+import { cleanArtistSeparators } from '../utils/urlMetadataParser';
 
 export interface DownloadingState {
   isDownloading: boolean;
@@ -526,6 +527,32 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       clearTimeout(timer);
     };
   }, [catalog, isCatalogReady, updateCatalogTrack]);
+
+  // Background auto-repair for songs whose artists still contain slashes ('/')
+  const repairedSlashSongIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!catalog.length) return;
+
+    const songsWithSlash = catalog.filter(
+      (s) =>
+        ((s.artist && s.artist.includes('/')) ||
+          (s.albumArtist && s.albumArtist.includes('/'))) &&
+        !repairedSlashSongIdsRef.current.has(s.id)
+    );
+
+    if (songsWithSlash.length === 0) return;
+
+    songsWithSlash.forEach((song) => {
+      repairedSlashSongIdsRef.current.add(song.id);
+      const cleanedSong: Song = {
+        ...song,
+        artist: cleanArtistSeparators(song.artist),
+        albumArtist: song.albumArtist ? cleanArtistSeparators(song.albumArtist) : undefined,
+      };
+      updateCatalogTrack(cleanedSong);
+    });
+  }, [catalog, updateCatalogTrack]);
 
   const deleteCatalogTrack = (songId: string) => {
     addStoredDeletedSongId(songId);

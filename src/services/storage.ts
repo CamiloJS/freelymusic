@@ -10,6 +10,7 @@ import {
   DirectMessage,
   ChatThread,
 } from '../types';
+import { cleanArtistSeparators } from '../utils/urlMetadataParser';
 
 const DB_NAME = 'sonora-audio-cache';
 const DB_VERSION = 1;
@@ -449,12 +450,12 @@ export function normalizeSong(raw: Partial<Song> | null | undefined): Song | nul
     title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : 'Sin título',
     artist:
       typeof raw.artist === 'string' && raw.artist.trim()
-        ? raw.artist.trim()
+        ? cleanArtistSeparators(raw.artist.trim())
         : 'Artista desconocido',
     album: typeof raw.album === 'string' && raw.album.trim() ? raw.album.trim() : 'Sencillo',
     albumArtist:
       typeof raw.albumArtist === 'string' && raw.albumArtist.trim()
-        ? raw.albumArtist.trim()
+        ? cleanArtistSeparators(raw.albumArtist.trim())
         : undefined,
     coverUrl: typeof raw.coverUrl === 'string' ? raw.coverUrl : '',
     audioUrl: typeof raw.audioUrl === 'string' ? raw.audioUrl : '',

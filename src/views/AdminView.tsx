@@ -25,7 +25,7 @@ import { saveStoredFirebaseConfig, getStoredFirebaseConfig } from '../services/s
 import { isFirebaseConnected } from '../services/firebase';
 import { compressImage } from '../utils/imageCompressor';
 import { detectAudioDuration } from '../utils/audioDuration';
-import { parseAudioUrlMetadata } from '../utils/urlMetadataParser';
+import { parseAudioUrlMetadata, cleanArtistSeparators, splitArtistNames } from '../utils/urlMetadataParser';
 import { SongMediaEditor, SongMediaValue, EMPTY_SONG_MEDIA } from '../components/SongMediaEditor';
 import { MetadataEnrichmentModal } from '../components/MetadataEnrichmentModal';
 
@@ -102,7 +102,7 @@ export const AdminView: React.FC = () => {
   const handleOpenEditSong = (song: Song) => {
     setEditingSong(song);
     setEditTitle(song.title);
-    const split = song.artist ? song.artist.split(',').map((a) => a.trim()).filter(Boolean) : [''];
+    const split = song.artist ? splitArtistNames(cleanArtistSeparators(song.artist)) : [''];
     setEditArtistList(split.length > 0 ? split : ['']);
     setEditAlbum(song.album || '');
     setEditAlbumArtist(song.albumArtist || '');
@@ -133,7 +133,12 @@ export const AdminView: React.FC = () => {
     e.preventDefault();
     if (!editingSong) return;
 
-    const finalArtist = editArtistList.map((a) => a.trim()).filter(Boolean).join(', ');
+    const finalArtist = editArtistList
+      .map(cleanArtistSeparators)
+      .flatMap(splitArtistNames)
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .join(', ');
     if (!editTitle.trim() || !finalArtist || !editAudioUrl.trim()) {
       alert('El título, al menos un artista y el enlace de audio son requeridos.');
       return;
@@ -144,7 +149,7 @@ export const AdminView: React.FC = () => {
       title: editTitle.trim(),
       artist: finalArtist,
       album: editAlbum.trim() || 'Sencillo',
-      albumArtist: editAlbumArtist.trim() || undefined,
+      albumArtist: editAlbumArtist.trim() ? cleanArtistSeparators(editAlbumArtist.trim()) : undefined,
       trackNumber: editTrackNumber ? Number(editTrackNumber) : undefined,
       genre: editGenre.trim() || 'General',
       year: editYear.trim() || '2026',
@@ -271,7 +276,12 @@ export const AdminView: React.FC = () => {
   // Save Track to Catalog
   const handleSaveTrack = (e: React.FormEvent) => {
     e.preventDefault();
-    const finalArtist = artistList.map((a) => a.trim()).filter(Boolean).join(', ');
+    const finalArtist = artistList
+      .map(cleanArtistSeparators)
+      .flatMap(splitArtistNames)
+      .map((a) => a.trim())
+      .filter(Boolean)
+      .join(', ');
     if (!audioUrl || !title || !finalArtist) return;
 
     addTrackToCatalog({

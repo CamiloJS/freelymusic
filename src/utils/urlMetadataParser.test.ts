@@ -20,6 +20,8 @@ describe('parseAudioUrlMetadata', () => {
   it('replaces slashes with commas in artist collaborations', () => {
     expect(cleanArtistSeparators('J Balvin/Bad Bunny')).toBe('J Balvin, Bad Bunny');
     expect(cleanArtistSeparators('J Balvin / Bad Bunny / Chencho')).toBe('J Balvin, Bad Bunny, Chencho');
+    expect(cleanArtistSeparators('J. Balvin/Bad Bunny/Marciano Cantero')).toBe('J. Balvin, Bad Bunny, Marciano Cantero');
+    expect(cleanArtistSeparators('J Balvin / Bad Bunny, Rosalía')).toBe('J Balvin, Bad Bunny, Rosalía');
     const res = parseAudioUrlMetadata('https://example.com/music/J%20Balvin%2FBad%20Bunny%20-%20LA%20CANCION.mp3');
     expect(res.artists).toEqual(['J Balvin', 'Bad Bunny']);
   });

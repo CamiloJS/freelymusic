@@ -19,6 +19,7 @@ export function cleanArtistSeparators(artistStr: string): string {
   if (!artistStr || typeof artistStr !== 'string') return '';
   return artistStr
     .split(/\s*[\/\\]+\s*/)
+    .flatMap((part) => part.split(/\s*,\s*/))
     .map((a) => a.trim())
     .filter(Boolean)
     .join(', ');

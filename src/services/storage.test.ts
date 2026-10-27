@@ -8,6 +8,7 @@ import {
   getStoredChatThreads,
   getStoredDirectMessages,
   getStoredProfiles,
+  normalizeSong,
 } from './storage';
 
 // In-memory mock for localStorage in node test environment
@@ -153,5 +154,16 @@ describe('chat threads and mock profiles cleanup', () => {
     expect(profiles.some((p) => p.id === 'luis-david-user')).toBe(false);
     expect(profiles.some((p) => p.id === 'geraldine-user')).toBe(false);
     expect(profiles.some((p) => p.id === 'camilo-admin')).toBe(true);
+  });
+
+  it('normalizes songs by converting slashes in artist names to commas', () => {
+    const song = normalizeSong({
+      id: 'test-song-1',
+      title: 'LA CANCION',
+      artist: 'J. Balvin/Bad Bunny',
+      albumArtist: 'J. Balvin/Bad Bunny',
+    });
+    expect(song?.artist).toBe('J. Balvin, Bad Bunny');
+    expect(song?.albumArtist).toBe('J. Balvin, Bad Bunny');
   });
 });
