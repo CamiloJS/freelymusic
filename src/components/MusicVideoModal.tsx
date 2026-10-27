@@ -153,6 +153,11 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
     };
   }, []);
 
+  const displayLyrics = useMemo(
+    () => buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode),
+    [parsedLyrics, translatedLyrics, lyricsDisplayMode]
+  );
+
   if (!currentSong || !videoUrl) return null;
 
   const handleTimeUpdate = () => {
@@ -180,11 +185,6 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
 
   const liked = isFavorite(currentSong.id);
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-
-  const displayLyrics = useMemo(
-    () => buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode),
-    [parsedLyrics, translatedLyrics, lyricsDisplayMode]
-  );
 
   const isBeforeFirstLyric = parsedLyrics.length > 0 && currentTime < parsedLyrics[0].time - 0.2;
   const isAfterLastLyric =

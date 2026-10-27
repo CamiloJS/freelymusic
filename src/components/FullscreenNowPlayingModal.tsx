@@ -129,6 +129,24 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
     scrollInContainer(desktopLyricsScrollRef.current);
   }, [activeLyricIndex]);
 
+  const albums = useMemo(() => getAlbumsFromCatalog(catalog), [catalog]);
+
+  const sourceSubtitle = useMemo(() => {
+    if (playbackSource?.type === 'playlist') return 'DE LA PLAYLIST';
+    if (playbackSource?.type === 'album') return 'DEL ÁLBUM';
+    if (playbackSource?.type === 'artist') return 'DEL ARTISTA';
+    if (playbackSource?.type === 'favorites') return 'DE TUS ME GUSTA';
+    return 'REPRODUCIENDO';
+  }, [playbackSource]);
+
+  const sourceTitle = useMemo(() => {
+    if (playbackSource?.name) return playbackSource.name;
+    if (currentSong?.album && currentSong.album.toLowerCase() !== 'sencillo') {
+      return currentSong.album;
+    }
+    return 'Tus me gusta';
+  }, [playbackSource, currentSong]);
+
   if (!isFullscreenNowPlaying || !currentSong) return null;
 
   const handleOriginClick = () => {
@@ -235,23 +253,6 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
 
   const liked = isFavorite(currentSong.id);
   const progressPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
-  const albums = useMemo(() => getAlbumsFromCatalog(catalog), [catalog]);
-
-  const sourceSubtitle = useMemo(() => {
-    if (playbackSource?.type === 'playlist') return 'DE LA PLAYLIST';
-    if (playbackSource?.type === 'album') return 'DEL ÁLBUM';
-    if (playbackSource?.type === 'artist') return 'DEL ARTISTA';
-    if (playbackSource?.type === 'favorites') return 'DE TUS ME GUSTA';
-    return 'REPRODUCIENDO';
-  }, [playbackSource]);
-
-  const sourceTitle = useMemo(() => {
-    if (playbackSource?.name) return playbackSource.name;
-    if (currentSong?.album && currentSong.album.toLowerCase() !== 'sencillo') {
-      return currentSong.album;
-    }
-    return 'Tus me gusta';
-  }, [playbackSource, currentSong]);
 
   return (
     <div className="fullscreen-now-playing-container fixed inset-0 z-50 bg-[#121212] flex flex-col justify-between select-none overflow-y-auto overflow-x-hidden text-white font-sans antialiased animate-in fade-in duration-300">

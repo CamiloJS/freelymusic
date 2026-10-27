@@ -41,13 +41,14 @@ export const CenterLyricsView: React.FC = () => {
     }
   }, [activeLyricIndex]);
 
-  if (!currentSong) return null;
-
-  const sourceName = playbackSource?.name || 'Tus me gusta';
   const displayLyrics = useMemo(
     () => buildDisplayLyrics(parsedLyrics, translatedLyrics, lyricsDisplayMode),
     [parsedLyrics, translatedLyrics, lyricsDisplayMode]
   );
+
+  if (!currentSong) return null;
+
+  const sourceName = playbackSource?.name || 'Tus me gusta';
 
   return (
     <div className="center-lyrics-container flex-1 flex flex-col h-full bg-neutral-950 relative overflow-hidden select-none animate-in fade-in duration-300">

@@ -392,7 +392,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newSong: Song = {
       ...songData,
       id: `song-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      addedBy: currentUser.id,
+      addedBy: currentUser?.id || 'user',
       createdAt: new Date().toISOString(),
     };
 
@@ -427,7 +427,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const song: Song = {
           ...songData,
           id: `song-${now}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
-          addedBy: currentUser.id,
+          addedBy: currentUser?.id || 'user',
           createdAt: new Date(now + idx).toISOString(),
         };
         return normalizeSong(song);

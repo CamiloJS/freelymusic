@@ -87,13 +87,23 @@ export function parseAudioUrlMetadata(urlOrPath: string): ParsedUrlMetadata {
   let discNumber: number | undefined;
   let trackNumber: number | undefined;
 
-  const discTrackMatch = raw.match(/^(?:cd|disc|disco)?\s*([1-9])[-.](\d{1,3})(?:[.\s-]+)\s*(.+)$/i);
-  if (discTrackMatch) {
-    discNumber = parseInt(discTrackMatch[1], 10);
-    trackNumber = parseInt(discTrackMatch[2], 10);
-    raw = discTrackMatch[3].trim();
+  const explicitDiscMatch = raw.match(/^(?:cd|disc|disco)\s*([1-9])[-.]?(\d{1,3})?(?:[.\s-]+)\s*(.+)$/i);
+  const implicitDiscMatch = raw.match(/^([1-9])[-.](\d{1,2})(?:[.\s-]+)\s*(.+)$/i);
+
+  if (explicitDiscMatch) {
+    discNumber = parseInt(explicitDiscMatch[1], 10);
+    if (explicitDiscMatch[2]) {
+      trackNumber = parseInt(explicitDiscMatch[2], 10);
+    }
+    raw = explicitDiscMatch[3].trim();
+  } else if (implicitDiscMatch && !/^\d+-\d{3,}/.test(raw)) {
+    discNumber = parseInt(implicitDiscMatch[1], 10);
+    trackNumber = parseInt(implicitDiscMatch[2], 10);
+    raw = implicitDiscMatch[3].trim();
   } else {
-    const trackNumMatch = raw.match(/^(?:track\s*)?(\d{1,3})(?:[.\s-]+)\s*(.+)$/i);
+    const trackNumMatch = !/^\d+-\d{3,}/.test(raw)
+      ? raw.match(/^(?:track\s*)?(\d{1,3})(?:[.\s-]+)\s*(.+)$/i)
+      : null;
     if (trackNumMatch) {
       trackNumber = parseInt(trackNumMatch[1], 10);
       raw = trackNumMatch[2].trim();

@@ -161,6 +161,11 @@ async function subscribeWhenReady(
   return null;
 }
 
+function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) return data;
+  return JSON.parse(JSON.stringify(data));
+}
+
 // Firestore operations for Songs Catalog
 export async function syncCatalogFromFirestore(): Promise<Song[] | null> {
   if (!db) return null;
@@ -186,7 +191,7 @@ export async function saveSongToFirestore(song: Song): Promise<boolean> {
 
   try {
     await ensureAuth();
-    await setDoc(doc(db, ...BASE_PATH, 'catalog', cleanSong.id), cleanSong, { merge: true });
+    await setDoc(doc(db, ...BASE_PATH, 'catalog', cleanSong.id), sanitizeForFirestore(cleanSong), { merge: true });
     return true;
   } catch (err) {
     console.warn('Error saving song to Firestore:', err);
@@ -212,7 +217,7 @@ export async function saveSongsToFirestore(songs: Song[]): Promise<boolean> {
       const chunk = cleanSongs.slice(i, i + BATCH_SIZE);
       const batch = writeBatch(db);
       chunk.forEach((song) => {
-        batch.set(doc(db!, ...BASE_PATH, 'catalog', song.id), song, { merge: true });
+        batch.set(doc(db!, ...BASE_PATH, 'catalog', song.id), sanitizeForFirestore(song), { merge: true });
       });
 
       // Avoid hanging indefinitely if network is sluggish or offline
@@ -276,7 +281,7 @@ export async function saveProfileToFirestore(profile: UserProfile): Promise<void
 
   try {
     await ensureAuth();
-    await setDoc(doc(db, ...BASE_PATH, 'profiles', cleanProfile.id), cleanProfile, { merge: true });
+    await setDoc(doc(db, ...BASE_PATH, 'profiles', cleanProfile.id), sanitizeForFirestore(cleanProfile), { merge: true });
   } catch (err) {
     console.warn('Error saving profile to Firestore:', err);
   }
@@ -353,7 +358,7 @@ export async function saveUserDataToFirestore(userId: string, data: UserLibraryD
   try {
     await ensureAuth();
     const cleanData = normalizeUserData(data);
-    await setDoc(doc(db, ...BASE_PATH, 'usersData', userId), cleanData, { merge: true });
+    await setDoc(doc(db, ...BASE_PATH, 'usersData', userId), sanitizeForFirestore(cleanData), { merge: true });
   } catch (err) {
     console.warn('Error saving user data to Firestore:', err);
   }
@@ -452,7 +457,7 @@ export async function saveLyricsTranslation(
     await ensureAuth();
     await setDoc(
       doc(db, ...BASE_PATH, 'translations', translation.id),
-      translation,
+      sanitizeForFirestore(translation),
       { merge: true }
     );
   } catch (err) {
@@ -480,7 +485,7 @@ export async function saveCachedGlobalStats(entry: GlobalStatsCacheEntry): Promi
   if (!db) return;
   try {
     await ensureAuth();
-    await setDoc(doc(db, ...BASE_PATH, 'statsCache', entry.key), entry, { merge: true });
+    await setDoc(doc(db, ...BASE_PATH, 'statsCache', entry.key), sanitizeForFirestore(entry), { merge: true });
   } catch (err) {
     console.warn('Error saving global stats cache:', err);
   }
@@ -513,7 +518,7 @@ export async function saveGlobalSettingsToFirestore(settings: GlobalAppSettings)
   if (!db) return;
   try {
     await ensureAuth();
-    await setDoc(doc(db, ...BASE_PATH, 'appSettings', 'global'), settings, { merge: true });
+    await setDoc(doc(db, ...BASE_PATH, 'appSettings', 'global'), sanitizeForFirestore(settings), { merge: true });
   } catch (err) {
     console.warn('Error saving global settings to Firestore:', err);
   }
@@ -559,7 +564,7 @@ export async function saveArtistProfileToFirestore(artist: ArtistProfile): Promi
   try {
     await ensureAuth();
     const artistId = artist.id || artist.name.trim().toLowerCase();
-    await setDoc(doc(db, ...BASE_PATH, 'artists', artistId), { ...artist, id: artistId }, { merge: true });
+    await setDoc(doc(db, ...BASE_PATH, 'artists', artistId), sanitizeForFirestore({ ...artist, id: artistId }), { merge: true });
   } catch (err) {
     console.warn('Error saving artist profile to Firestore:', err);
   }

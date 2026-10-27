@@ -82,4 +82,11 @@ describe('parseAudioUrlMetadata', () => {
     expect(res3.trackNumber).toBe(3);
     expect(res3.title).toBe('Turn Me On');
   });
+
+  it('does not mistakenly parse phone-like numbers as disc or track numbers', () => {
+    const res = parseAudioUrlMetadata('https://example.com/audio/Logic%20-%201-800-273-8255.mp3');
+    expect(res.discNumber).toBeUndefined();
+    expect(res.trackNumber).toBeUndefined();
+    expect(res.title).toBe('1-800-273-8255');
+  });
 });
