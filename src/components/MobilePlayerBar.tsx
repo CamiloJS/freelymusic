@@ -144,17 +144,14 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
                 e.stopPropagation();
                 toggleFavorite(currentSong.id);
               }}
-              className="p-1.5 text-neutral-400 hover:text-white transition-transform active:scale-90"
+              className="p-1.5 transition-transform active:scale-90"
               title={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
               aria-label={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
             >
               {liked ? (
-                <SavedCheckIcon size={19} />
+                <SavedCheckIcon size={19} filled={true} />
               ) : (
-                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" className="text-neutral-400 hover:text-white">
-                  <circle cx="12" cy="12" r="10.5" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M12 7.5v9M7.5 12h9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
+                <SavedCheckIcon size={19} filled={false} className="text-neutral-400 hover:text-white transition-colors" />
               )}
             </button>
 

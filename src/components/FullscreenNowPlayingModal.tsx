@@ -478,7 +478,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
                 </div>
               </div>
 
-              {/* Green Saved Check Icon / Like Button */}
+              {/* Heart / Like Button */}
               <button
                 type="button"
                 onClick={() => toggleFavorite(currentSong.id)}
@@ -487,23 +487,9 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
                 aria-label={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
               >
                 {liked ? (
-                  <SavedCheckIcon size={26} />
+                  <SavedCheckIcon size={26} filled={true} />
                 ) : (
-                  <svg
-                    width="26"
-                    height="26"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    className="text-neutral-400 hover:text-white transition-colors"
-                  >
-                    <circle cx="12" cy="12" r="10.5" stroke="currentColor" strokeWidth="1.8" />
-                    <path
-                      d="M12 7.5v9M7.5 12h9"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    />
-                  </svg>
+                  <SavedCheckIcon size={26} filled={false} className="text-neutral-400 hover:text-white transition-colors" />
                 )}
               </button>
             </div>
@@ -816,23 +802,9 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
                   title={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
                 >
                   {liked ? (
-                    <SavedCheckIcon size={26} />
+                    <SavedCheckIcon size={26} filled={true} />
                   ) : (
-                    <svg
-                      width="26"
-                      height="26"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      className="text-neutral-400 hover:text-white transition-colors"
-                    >
-                      <circle cx="12" cy="12" r="10.5" stroke="currentColor" strokeWidth="1.8" />
-                      <path
-                        d="M12 7.5v9M7.5 12h9"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                      />
-                    </svg>
+                    <SavedCheckIcon size={26} filled={false} className="text-neutral-400 hover:text-white transition-colors" />
                   )}
                 </button>
               </div>

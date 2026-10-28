@@ -4,7 +4,7 @@
  * Full offline compatibility for iOS Safari (WebKit Standalone), Android Chrome, and Windows Edge.
  */
 
-const CACHE_NAME = 'spotifree-cache-v23';
+const CACHE_NAME = 'spotifree-cache-v24';
 const PWA_ICON_CACHE = 'spotifree-pwa-icons-v3';
 const IMAGE_CACHE = 'spotifree-images-v1';
 

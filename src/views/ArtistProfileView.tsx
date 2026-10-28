@@ -619,9 +619,9 @@ export const ArtistProfileView: React.FC<ArtistProfileViewProps> = ({
                         title={liked ? 'Guardada en Tus me gusta (clic para quitar)' : 'Añadir a Tus me gusta'}
                       >
                         {liked ? (
-                          <SavedCheckIcon size={16} />
+                          <SavedCheckIcon size={16} filled={true} />
                         ) : (
-                          <Plus className="w-4 h-4" />
+                          <SavedCheckIcon size={16} filled={false} />
                         )}
                       </button>
 

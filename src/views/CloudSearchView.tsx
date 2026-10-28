@@ -751,7 +751,7 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                         </span>
 
                         <div className="flex items-center gap-0.5 sm:gap-1">
-                          {/* Chulito verde if liked, plus if not */}
+                          {/* Heart icon if liked or unliked */}
                           <button
                             onClick={(event) => {
                               event.stopPropagation();
@@ -763,9 +763,9 @@ export const CloudSearchView: React.FC<CloudSearchViewProps> = ({
                             title={liked ? 'Guardada en tus favoritos (clic para quitar)' : 'Añadir a tus favoritos'}
                           >
                             {liked ? (
-                              <SavedCheckIcon size={16} />
+                              <SavedCheckIcon size={16} filled={true} />
                             ) : (
-                              <Plus className="w-4 h-4" />
+                              <SavedCheckIcon size={16} filled={false} />
                             )}
                           </button>
 

@@ -478,12 +478,9 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
               title={liked ? 'Guardada en Tus me gusta' : 'Añadir a Tus me gusta'}
             >
               {liked ? (
-                <SavedCheckIcon size={20} />
+                <SavedCheckIcon size={20} filled={true} />
               ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-neutral-400 hover:text-white">
-                  <circle cx="12" cy="12" r="10.5" stroke="currentColor" strokeWidth="1.8" />
-                  <path d="M12 7.5v9M7.5 12h9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
+                <SavedCheckIcon size={20} filled={false} className="text-neutral-400 hover:text-white transition-colors" />
               )}
             </button>
           </div>

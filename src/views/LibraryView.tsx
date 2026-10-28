@@ -655,9 +655,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   }
                 >
                   {isAlbumSaved(albumObj.name) ? (
-                    <SavedCheckIcon size={28} />
+                    <SavedCheckIcon size={28} filled={true} />
                   ) : (
-                    <PlusCircle className="w-7 h-7" />
+                    <SavedCheckIcon size={28} filled={false} />
                   )}
                 </button>
               ) : !isFavorites && playlistObj ? (
@@ -1032,7 +1032,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                         }`}
                         title={isSaved ? 'Guardada en tus me gusta' : 'Añadir a tus me gusta'}
                       >
-                        {isSaved ? <SavedCheckIcon size={18} /> : <Plus className="w-4 h-4" />}
+                        {isSaved ? <SavedCheckIcon size={18} filled={true} /> : <SavedCheckIcon size={18} filled={false} />}
                       </button>
 
                       {/* Three Dots Context Menu Button */}
