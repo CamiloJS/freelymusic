@@ -29,6 +29,8 @@ export type ConnectActionType =
   | 'next'
   | 'prev'
   | 'volume'
+  | 'repeat'
+  | 'shuffle'
   | 'playSong'
   | 'transfer';
 

@@ -134,6 +134,7 @@ interface AudioContextType {
   sleepTimerOption: string | null;
   sleepTimerRemainingSeconds: number | null;
   setSleepTimer: (option: string | null) => void;
+  transferToThisDevice: () => Promise<void>;
 }
 
 interface AudioTimeState {
@@ -155,6 +156,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const connectRef = useRef(connect);
   connectRef.current = connect;
   const [remoteCurrentTime, setRemoteCurrentTime] = useState<number>(0);
+  const lastRemoteVolumeTimeRef = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
   const hasRecordedPlayRef = useRef<string | null>(null);
@@ -989,9 +991,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Play a specific song and optionally update queue and source
   const playSong = useCallback(
     (song: Song, newQueue?: Song[], source?: PlaybackSource) => {
-      if (connect.isRemoteControl) {
+      if (connectRef.current.isRemoteControl) {
         setCurrentSong(song);
-        void connect.sendCommand('playSong', { songId: song.id });
+        void connectRef.current.sendCommand('playSong', { songId: song.id });
         return;
       }
       stopAllVideos();
@@ -1281,8 +1283,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const togglePlayPause = useCallback(() => {
     if (!currentSong) return;
-    if (connect.isRemoteControl) {
-      void connect.sendCommand(isPlaying ? 'pause' : 'play');
+    if (connectRef.current.isRemoteControl) {
+      void connectRef.current.sendCommand(isPlaying ? 'pause' : 'play');
       return;
     }
     if (isVideoMode) {
@@ -1326,13 +1328,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
     const clamped = Math.max(0, seconds);
-    if (connect.isRemoteControl) {
+    if (connectRef.current.isRemoteControl) {
       setRemoteCurrentTime(clamped);
-      void connect.sendCommand('seek', clamped);
+      void connectRef.current.sendCommand('seek', clamped);
       return;
     }
-    if (connect.isCurrentDeviceActive) {
-      void connect.publishPlaybackState({ positionSec: clamped });
+    if (connectRef.current.isCurrentDeviceActive) {
+      void connectRef.current.publishPlaybackState({ positionSec: clamped });
     }
     if (audio) {
       const maxDur = audio.duration || seconds;
@@ -1343,8 +1345,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const nextTrack = useCallback(() => {
     if (!currentSong) return;
-    if (connect.isRemoteControl) {
-      void connect.sendCommand('next');
+    if (connectRef.current.isRemoteControl) {
+      void connectRef.current.sendCommand('next');
       return;
     }
     if (queue.length === 0) return;
@@ -1370,8 +1372,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const prevTrack = useCallback(() => {
     if (!currentSong) return;
-    if (connect.isRemoteControl) {
-      void connect.sendCommand('prev');
+    if (connectRef.current.isRemoteControl) {
+      void connectRef.current.sendCommand('prev');
       return;
     }
     const audio = audioRef.current;
@@ -1478,8 +1480,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     (val: number) => {
       const clamped = Math.max(0, Math.min(1, val));
       setVolumeState(clamped);
-      if (connect.isRemoteControl) {
-        void connect.sendCommand('volume', clamped);
+      if (connectRef.current.isRemoteControl) {
+        const now = Date.now();
+        if (now - lastRemoteVolumeTimeRef.current > 120) {
+          lastRemoteVolumeTimeRef.current = now;
+          void connectRef.current.sendCommand('volume', clamped);
+        }
         return;
       }
       if (audioRef.current) {
@@ -1506,14 +1512,26 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const toggleRepeat = useCallback(() => {
     setRepeatMode((prev) => {
-      if (prev === 'off') return 'all';
-      if (prev === 'all') return 'one';
-      return 'off';
+      const next = prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off';
+      if (connectRef.current.isRemoteControl) {
+        void connectRef.current.sendCommand('repeat', next);
+      } else if (connectRef.current.isCurrentDeviceActive) {
+        void connectRef.current.publishPlaybackState({ repeatMode: next });
+      }
+      return next;
     });
   }, []);
 
   const toggleShuffle = useCallback(() => {
-    setIsShuffle((prev) => !prev);
+    setIsShuffle((prev) => {
+      const next = !prev;
+      if (connectRef.current.isRemoteControl) {
+        void connectRef.current.sendCommand('shuffle', next);
+      } else if (connectRef.current.isCurrentDeviceActive) {
+        void connectRef.current.publishPlaybackState({ isShuffle: next });
+      }
+      return next;
+    });
   }, []);
 
   // Handle incoming remote commands on the active playback host
@@ -1557,6 +1575,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (s) playSong(s);
         }
         break;
+      case 'repeat':
+        if (param === 'off' || param === 'all' || param === 'one') {
+          setRepeatMode(param);
+        }
+        break;
+      case 'shuffle':
+        if (typeof param === 'boolean') {
+          setIsShuffle(param);
+        }
+        break;
       case 'transfer':
         if (connect.remotePlayback?.songId && !isPlaying) {
           const s = catalog.find((item) => item.id === connect.remotePlayback?.songId);
@@ -1584,6 +1612,42 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     loadAndPlaySong,
     catalog,
   ]);
+
+
+  const transferToThisDevice = useCallback(async () => {
+    const audio = audioRef.current;
+    if (audio) {
+      (audio as unknown as { playsInline?: boolean; webkitPlaysInline?: boolean }).playsInline = true;
+      audio.muted = false;
+      const isMobile =
+        typeof navigator !== 'undefined' &&
+        (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+          (typeof window !== 'undefined' && window.innerWidth < 768));
+      if (isMobile) {
+        audio.volume = 1.0;
+      }
+    }
+
+    const playback = connectRef.current.remotePlayback;
+    const targetSongId = playback?.songId || currentSongRef.current?.id;
+    const targetSong = targetSongId ? catalog.find((s) => s.id === targetSongId) : currentSongRef.current;
+
+    if (targetSong) {
+      const elapsed =
+        playback?.isPlaying && playback.timestampMs
+          ? (Date.now() - playback.timestampMs) / 1000
+          : 0;
+      const startAt = Math.max(0, (playback?.positionSec || 0) + elapsed);
+
+      void loadAndPlaySong(targetSong, {
+        versionId: playback?.versionId,
+        karaoke: playback?.isKaraoke,
+        startAt,
+      });
+    }
+
+    await connectRef.current.transferPlaybackToHere();
+  }, [catalog, loadAndPlaySong]);
 
   // MediaSession API Integration (Lock Screen, Notification Controls, Car Bluetooth)
   useEffect(() => {
@@ -1719,6 +1783,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       sleepTimerOption,
       sleepTimerRemainingSeconds,
       setSleepTimer,
+      transferToThisDevice,
     }),
     [
       currentSong,
@@ -1774,6 +1839,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       sleepTimerOption,
       sleepTimerRemainingSeconds,
       setSleepTimer,
+      transferToThisDevice,
     ]
   );
 

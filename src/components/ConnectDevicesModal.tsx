@@ -10,6 +10,7 @@ import Check from 'lucide-react/dist/esm/icons/check.mjs';
 import Edit2 from 'lucide-react/dist/esm/icons/edit-2.mjs';
 import Radio from 'lucide-react/dist/esm/icons/radio.mjs';
 import { useConnect } from '../context/ConnectContext';
+import { useAudio } from '../context/AudioContext';
 import { ConnectDeviceType } from '../types';
 
 interface ConnectDevicesModalProps {
@@ -29,6 +30,7 @@ export const ConnectDevicesModal: React.FC<ConnectDevicesModalProps> = ({ isOpen
     transferPlaybackToHere,
     renameCurrentDevice,
   } = useConnect();
+  const { transferToThisDevice } = useAudio();
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(currentDeviceName);
@@ -123,7 +125,8 @@ export const ConnectDevicesModal: React.FC<ConnectDevicesModalProps> = ({ isOpen
                 key={device.id}
                 onClick={async () => {
                   if (isThis) {
-                    await transferPlaybackToHere();
+                    await transferToThisDevice();
+                    onClose();
                   } else {
                     await transferPlaybackTo(device.id);
                   }
@@ -179,7 +182,7 @@ export const ConnectDevicesModal: React.FC<ConnectDevicesModalProps> = ({ isOpen
           {!isCurrentDeviceActive && (
             <button
               onClick={async () => {
-                await transferPlaybackToHere();
+                await transferToThisDevice();
                 onClose();
               }}
               className="w-full py-2.5 px-4 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-sm flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-98"

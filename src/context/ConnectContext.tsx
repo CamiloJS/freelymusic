@@ -139,11 +139,13 @@ export const ConnectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             void registerHeartbeat(remoteSession);
           }
 
-          // Check if there is an incoming command for this device
+          // Check if there is an incoming command for this device (only if issued in the last 15 seconds)
           if (
             remoteSession?.command &&
             remoteSession.command.targetDeviceId === currentDeviceId &&
-            remoteSession.command.id !== lastProcessedCommandIdRef.current
+            remoteSession.command.id !== lastProcessedCommandIdRef.current &&
+            typeof remoteSession.command.timestampMs === 'number' &&
+            Date.now() - remoteSession.command.timestampMs < 15000
           ) {
             lastProcessedCommandIdRef.current = remoteSession.command.id;
             setIncomingCommand(remoteSession.command);
