@@ -71,17 +71,16 @@ export function getStoredTvMode(): boolean {
       return true;
     }
 
-    // 2. Real Smart TV user agent detection (VIDAA OS, WebOS, Tizen, etc.)
+    // 2. Explicit user preference
+    const stored = localStorage.getItem(TV_MODE_STORAGE_KEY);
+    if (stored === 'false') return false;
+    if (stored === 'true') return true;
+
+    // 3. Real Smart TV user agent detection (VIDAA OS, WebOS, Tizen, etc.)
     if (isUserAgentSmartTV()) {
-      const stored = localStorage.getItem(TV_MODE_STORAGE_KEY);
-      if (stored === 'false') return false;
       return true;
     }
 
-    // 3. Regular PC/Mobile: NEVER trap in TV mode. Clear any stale key and return false.
-    try {
-      localStorage.removeItem(TV_MODE_STORAGE_KEY);
-    } catch {}
     return false;
   } catch {
     return false;
@@ -94,7 +93,7 @@ export function setStoredTvMode(enabled: boolean): void {
       if (enabled) {
         localStorage.setItem(TV_MODE_STORAGE_KEY, 'true');
       } else {
-        localStorage.removeItem(TV_MODE_STORAGE_KEY);
+        localStorage.setItem(TV_MODE_STORAGE_KEY, 'false');
       }
     }
   } catch {

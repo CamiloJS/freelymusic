@@ -100,8 +100,46 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   const [trackMenuSong, setTrackMenuSong] = useState<Song | null>(null);
   const [isPlaylistOptionsOpen, setIsPlaylistOptionsOpen] = useState(false);
   const [playlistSearch, setPlaylistSearch] = useState('');
-  const [playlistSortBy, setPlaylistSortBy] = useState<'custom' | 'title' | 'artist' | 'album'>('custom');
-  const [playlistSortDir, setPlaylistSortDir] = useState<'asc' | 'desc'>('desc');
+  const [playlistSortBy, setPlaylistSortBy] = useState<'custom' | 'title' | 'artist' | 'album'>(() => {
+    if (selectedPlaylist === 'favorites') {
+      return (
+        favoritesSortBy ||
+        (localStorage.getItem('sonora_sort_favorites_by') as 'custom' | 'title' | 'artist' | 'album' | null) ||
+        'custom'
+      );
+    }
+    if (typeof selectedPlaylist === 'object' && selectedPlaylist && 'id' in selectedPlaylist) {
+      const pl = selectedPlaylist as Playlist;
+      const pref = playlistSortPreferences?.[pl.id];
+      return (
+        pl.sortBy ||
+        pref?.sortBy ||
+        (localStorage.getItem(`sonora_sort_${pl.id}_by`) as 'custom' | 'title' | 'artist' | 'album' | null) ||
+        'custom'
+      );
+    }
+    return 'custom';
+  });
+  const [playlistSortDir, setPlaylistSortDir] = useState<'asc' | 'desc'>(() => {
+    if (selectedPlaylist === 'favorites') {
+      return (
+        favoritesSortDir ||
+        (localStorage.getItem('sonora_sort_favorites_dir') as 'asc' | 'desc' | null) ||
+        'desc'
+      );
+    }
+    if (typeof selectedPlaylist === 'object' && selectedPlaylist && 'id' in selectedPlaylist) {
+      const pl = selectedPlaylist as Playlist;
+      const pref = playlistSortPreferences?.[pl.id];
+      return (
+        pl.sortDir ||
+        pref?.sortDir ||
+        (localStorage.getItem(`sonora_sort_${pl.id}_dir`) as 'asc' | 'desc' | null) ||
+        'desc'
+      );
+    }
+    return 'desc';
+  });
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -176,7 +214,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   >('all');
   const [isLibrarySearchOpen, setIsLibrarySearchOpen] = useState(false);
   const [librarySearchQuery, setLibrarySearchQuery] = useState('');
-  const [librarySortBy, setLibrarySortBy] = useState<'recent' | 'az' | 'creator'>('recent');
+  const [librarySortBy, setLibrarySortBy] = useState<'recent' | 'az' | 'creator'>(() => {
+    try {
+      const saved = localStorage.getItem('sonora_library_sort_by');
+      if (saved === 'az' || saved === 'creator' || saved === 'recent') return saved;
+    } catch {}
+    return 'recent';
+  });
 
   const toggleViewMode = () => {
     setViewMode((prev) => {
@@ -190,9 +234,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
   const cycleLibrarySort = () => {
     setLibrarySortBy((prev) => {
-      if (prev === 'recent') return 'az';
-      if (prev === 'az') return 'creator';
-      return 'recent';
+      const next = prev === 'recent' ? 'az' : prev === 'az' ? 'creator' : 'recent';
+      try {
+        localStorage.setItem('sonora_library_sort_by', next);
+      } catch {}
+      return next;
     });
   };
 
@@ -530,16 +576,16 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             {(() => {
               const len = sourceName.length;
               let titleSizeClass = 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl';
-              if (len > 55) {
+              if (len > 70) {
+                titleSizeClass = 'text-lg sm:text-xl md:text-2xl lg:text-3xl';
+              } else if (len > 45) {
                 titleSizeClass = 'text-xl sm:text-2xl md:text-3xl lg:text-4xl';
-              } else if (len > 35) {
+              } else if (len > 25) {
                 titleSizeClass = 'text-2xl sm:text-3xl md:text-4xl lg:text-5xl';
-              } else if (len > 20) {
-                titleSizeClass = 'text-2xl sm:text-3xl md:text-5xl lg:text-5xl';
               }
               return (
                 <h1
-                  className={`${titleSizeClass} font-black text-white tracking-tight leading-tight py-0.5 break-words line-clamp-2 sm:line-clamp-3`}
+                  className={`${titleSizeClass} font-black text-white tracking-tight leading-tight py-0.5 break-words line-clamp-2 max-w-full`}
                   title={sourceName}
                 >
                   {sourceName}

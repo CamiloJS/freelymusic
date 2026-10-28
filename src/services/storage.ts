@@ -961,7 +961,14 @@ export function saveStoredArtistProfiles(artists: ArtistProfile[]): void {
 export function getStoredArtistProfile(artistName: string): ArtistProfile | null {
   const norm = artistName.trim().toLowerCase().replace(/[\/\\]/g, '_');
   const list = getStoredArtistProfiles();
-  return list.find((a) => a.id === norm || a.name.trim().toLowerCase() === artistName.trim().toLowerCase()) || null;
+  return (
+    list.find((a) => {
+      if (!a) return false;
+      const aId = (a.id || '').trim().toLowerCase().replace(/[\/\\]/g, '_');
+      const aName = (a.name || '').trim().toLowerCase().replace(/[\/\\]/g, '_');
+      return aId === norm || aName === norm;
+    }) || null
+  );
 }
 
 export function saveStoredArtistProfile(artist: ArtistProfile): void {
@@ -973,7 +980,12 @@ export function saveStoredArtistProfile(artist: ArtistProfile): void {
     id: norm,
     updatedAt: new Date().toISOString(),
   };
-  const filtered = list.filter((a) => a.id !== norm);
+  const filtered = list.filter((a) => {
+    if (!a) return false;
+    const aId = (a.id || '').trim().toLowerCase().replace(/[\/\\]/g, '_');
+    const aName = (a.name || '').trim().toLowerCase().replace(/[\/\\]/g, '_');
+    return aId !== norm && aName !== norm;
+  });
   const updatedList = [...filtered, updatedArtist];
   saveStoredArtistProfiles(updatedList);
 }

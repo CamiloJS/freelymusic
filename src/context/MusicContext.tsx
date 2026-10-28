@@ -368,16 +368,34 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 if (!local) {
                   map.set(k, { ...c, id: c.id || k, name: c.name || k });
                 } else {
-                  // If local has customAvatar and cloud does not, preserve local
-                  if (local.customAvatar && !c.customAvatar) {
-                    map.set(k, { ...c, id: c.id || k, name: c.name || k, avatarUrl: local.avatarUrl, customAvatar: true });
-                  } else {
-                    const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
-                    const cloudTime = c.updatedAt ? new Date(c.updatedAt).getTime() : 0;
-                    if (cloudTime >= localTime) {
-                      map.set(k, { ...c, id: c.id || k, name: c.name || k });
+                  const localHasAvatar = Boolean(local.avatarUrl && local.avatarUrl.trim());
+                  const cloudHasAvatar = Boolean(c.avatarUrl && c.avatarUrl.trim());
+                  const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+                  const cloudTime = c.updatedAt ? new Date(c.updatedAt).getTime() : 0;
+
+                  let chosenAvatar = local.avatarUrl;
+                  let chosenCustomAvatar = local.customAvatar;
+
+                  if (cloudHasAvatar) {
+                    if (!localHasAvatar) {
+                      chosenAvatar = c.avatarUrl;
+                      chosenCustomAvatar = c.customAvatar;
+                    } else if (c.customAvatar && cloudTime > localTime) {
+                      chosenAvatar = c.avatarUrl;
+                      chosenCustomAvatar = true;
                     }
                   }
+
+                  const mergedItem: ArtistProfile = {
+                    ...local,
+                    ...c,
+                    id: c.id || local.id || k,
+                    name: c.name || local.name || k,
+                    avatarUrl: chosenAvatar,
+                    customAvatar: chosenCustomAvatar,
+                    updatedAt: cloudTime >= localTime ? c.updatedAt : local.updatedAt,
+                  };
+                  map.set(k, mergedItem);
                 }
               });
               const merged = Array.from(map.values());
@@ -1104,17 +1122,21 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const fuzzy = norm.replace(/[\s._-]+/g, '');
 
       // 1. Direct match by id or name
-      const direct = artistProfiles.find(
-        (artist) =>
-          artist &&
-          (artist.id === norm || (artist.name && artist.name.trim().toLowerCase() === norm))
-      );
+      const direct = artistProfiles.find((artist) => {
+        if (!artist) return false;
+        const artId = (artist.id || '').trim().toLowerCase().replace(/[\/\\]/g, '_');
+        const artName = (artist.name || '').trim().toLowerCase().replace(/[\/\\]/g, '_');
+        return artId === norm || artName === norm;
+      });
       if (direct) {
         if (direct.mergedInto) {
-          const targetNorm = direct.mergedInto.trim().toLowerCase();
-          const target = artistProfiles.find(
-            (a) => a && (a.id === targetNorm || (a.name && a.name.trim().toLowerCase() === targetNorm))
-          );
+          const targetNorm = direct.mergedInto.trim().toLowerCase().replace(/[\/\\]/g, '_');
+          const target = artistProfiles.find((a) => {
+            if (!a) return false;
+            const aId = (a.id || '').trim().toLowerCase().replace(/[\/\\]/g, '_');
+            const aName = (a.name || '').trim().toLowerCase().replace(/[\/\\]/g, '_');
+            return aId === targetNorm || aName === targetNorm;
+          });
           if (target) return target;
         }
         return direct;
@@ -1226,9 +1248,12 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     setArtistProfiles((previous) => {
-      const filtered = previous.filter(
-        (item) => item.id !== norm && item.id.replace(/[\/\\]/g, '_') !== norm
-      );
+      const filtered = (previous || []).filter((item) => {
+        if (!item) return false;
+        const itemId = (item.id || item.name || '').trim().toLowerCase().replace(/[\/\\]/g, '_');
+        const itemName = (item.name || '').trim().toLowerCase().replace(/[\/\\]/g, '_');
+        return itemId !== norm && itemName !== norm;
+      });
       const next = [...filtered, updated];
       saveStoredArtistProfiles(next);
       return next;

@@ -76,6 +76,7 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
   const [selectedDetail, setSelectedDetail] = useState<
     | { type: 'playlist'; playlist: Playlist; songs: Song[] }
     | { type: 'album'; album: Album; songs: Song[] }
+    | { type: 'artist'; name: string; coverUrl?: string; songs: Song[] }
     | { type: 'favorites'; title: string; songs: Song[] }
     | null
   >(null);
@@ -145,14 +146,24 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
 
   useEffect(() => {
     if (isVideoActive && videoRef.current) {
-      try {
-        videoRef.current.currentTime = currentTime;
-        if (isPlaying) {
-          videoRef.current.play().catch(() => {});
+      const v = videoRef.current;
+      const applySync = () => {
+        if (Number.isFinite(currentTime) && currentTime > 0) {
+          try {
+            v.currentTime = currentTime;
+          } catch {}
         }
-      } catch {}
+        if (isPlaying && v.paused) {
+          v.play().catch(() => {});
+        }
+      };
+      if (v.readyState >= 1) {
+        applySync();
+      } else {
+        v.addEventListener('loadedmetadata', applySync, { once: true });
+      }
     }
-  }, [isVideoActive]);
+  }, [isVideoActive, isPlaying]);
 
   // TV Inactivity controls auto-dimming during playback
   useEffect(() => {
@@ -405,6 +416,12 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
             type: 'playlist' as const,
             name: selectedDetail.playlist.name,
             id: selectedDetail.playlist.id,
+          }
+        : selectedDetail?.type === 'artist'
+        ? {
+            type: 'artist' as const,
+            name: selectedDetail.name,
+            id: selectedDetail.name,
           }
         : { type: 'favorites' as const, name: 'Canciones que te gustan' };
     playSong(songs[startIndex], songs, source);
@@ -834,8 +851,9 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
                           s.artist.toLowerCase().includes(art.name.toLowerCase())
                         );
                         setSelectedDetail({
-                          type: 'favorites',
-                          title: `Música de ${art.name}`,
+                          type: 'artist',
+                          name: art.name,
+                          coverUrl: art.coverUrl,
                           songs: artistSongs,
                         });
                       }}
@@ -907,8 +925,9 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
                         tabIndex={0}
                         onClick={() => {
                           setSelectedDetail({
-                            type: 'favorites',
-                            title: `Música de ${art.name}`,
+                            type: 'artist',
+                            name: art.name,
+                            coverUrl: art.coverUrl,
                             songs: art.songs,
                           });
                         }}
@@ -992,7 +1011,11 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
                       data-tv-focus="true"
                       tabIndex={0}
                       onClick={() => {
-                        playSong(song, searchResults.songs, { type: 'catalog', name: 'Búsqueda TV' });
+                        playSong(song, searchResults.songs, {
+                          type: 'search',
+                          name: searchQuery.trim() ? `Buscar "${searchQuery.trim()}"` : `Buscar "${song.title}"`,
+                          id: searchQuery.trim() || song.id,
+                        });
                       }}
                       className="flex items-center gap-3.5 p-3 rounded-2xl bg-white/5 hover:bg-white/15 focus:bg-white/20 focus:ring-4 focus:ring-white focus:outline-none transition-all text-left border border-white/5 shadow"
                     >
@@ -1146,6 +1169,18 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
                   <div className="w-full h-full bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-600 flex items-center justify-center">
                     <Heart className="w-16 h-16 fill-white text-white" />
                   </div>
+                ) : selectedDetail.type === 'artist' ? (
+                  selectedDetail.coverUrl ? (
+                    <img
+                      src={selectedDetail.coverUrl}
+                      alt={selectedDetail.name}
+                      className="w-full h-full object-cover rounded-2xl"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-neutral-500 font-black text-4xl">
+                      {selectedDetail.name.charAt(0)}
+                    </div>
+                  )
                 ) : selectedDetail.type === 'album' && selectedDetail.album.coverUrl ? (
                   <img
                     src={selectedDetail.album.coverUrl}
@@ -1171,6 +1206,8 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
                     ? 'Lista Favorita'
                     : selectedDetail.type === 'album'
                     ? 'Álbum'
+                    : selectedDetail.type === 'artist'
+                    ? 'Artista'
                     : 'Playlist'}
                 </span>
                 <h1 className="text-3xl md:text-4xl font-black text-white truncate">
@@ -1178,11 +1215,17 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
                     ? selectedDetail.title
                     : selectedDetail.type === 'album'
                     ? selectedDetail.album.name
+                    : selectedDetail.type === 'artist'
+                    ? selectedDetail.name
                     : selectedDetail.playlist.name}
                 </h1>
                 <p className="text-sm font-semibold text-neutral-300">
-                  {selectedDetail.type === 'album' ? selectedDetail.album.artist : 'Sonora'} •{' '}
-                  {selectedDetail.songs.length} canciones
+                  {selectedDetail.type === 'album'
+                    ? selectedDetail.album.artist
+                    : selectedDetail.type === 'artist'
+                    ? 'Artista'
+                    : 'Sonora'}{' '}
+                  • {selectedDetail.songs.length} canciones
                 </p>
 
                 {/* Actions */}
@@ -1409,6 +1452,16 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
                     controls
                     autoPlay
                     playsInline
+                    onLoadedMetadata={(e) => {
+                      if (Number.isFinite(currentTime) && currentTime > 0) {
+                        try {
+                          e.currentTarget.currentTime = currentTime;
+                        } catch {}
+                      }
+                      if (isPlaying && e.currentTarget.paused) {
+                        e.currentTarget.play().catch(() => {});
+                      }
+                    }}
                     onTimeUpdate={(e) => syncMediaTime(e.currentTarget.currentTime)}
                     onPlay={() => !isPlaying && togglePlayPause()}
                     onPause={() => isPlaying && togglePlayPause()}
@@ -1528,7 +1581,13 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
                 onClick={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const pct = (e.clientX - rect.left) / rect.width;
-                  seek(pct * duration);
+                  const targetTime = pct * duration;
+                  seek(targetTime);
+                  if (isVideoActive && videoRef.current) {
+                    try {
+                      videoRef.current.currentTime = targetTime;
+                    } catch {}
+                  }
                 }}
               >
                 <div
