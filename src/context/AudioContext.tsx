@@ -586,6 +586,35 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const videoUrl = offlineVideoUrl || playbackTrack?.videoUrl || null;
 
+  // Background preloader for music video so it buffers seamlessly while audio plays
+  const bgVideoPreloadRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    if (!videoUrl || isVideoMode || !isPlaying) return;
+
+    // Buffer video in background after audio has streamed safely for 2.5 seconds
+    const timer = setTimeout(() => {
+      try {
+        if (!bgVideoPreloadRef.current) {
+          const v = document.createElement('video');
+          v.preload = 'auto';
+          v.muted = true;
+          v.playsInline = true;
+          bgVideoPreloadRef.current = v;
+        }
+        const preloader = bgVideoPreloadRef.current;
+        if (preloader.src !== videoUrl) {
+          preloader.src = videoUrl;
+          preloader.load();
+        }
+      } catch (err) {
+        console.warn('Background video preload error:', err);
+      }
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [videoUrl, isVideoMode, isPlaying]);
+
   // Karaoke can have its own LRC with different timings. Prefer it when present.
   const effectiveLyricsLrc =
     isKaraoke && playbackTrack?.instrumentalLyricsLrc

@@ -95,11 +95,25 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
   const [showControls, setShowControls] = useState<boolean>(true);
   const [showSubtitles, setShowSubtitles] = useState<boolean>(true);
   const [isHoveringProgress, setIsHoveringProgress] = useState<boolean>(false);
+  const [needsUserUnmute, setNeedsUserUnmute] = useState<boolean>(false);
+
+  const handleUnmute = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      video.muted = false;
+      video.volume = volume > 0 ? volume : 1;
+      setNeedsUserUnmute(false);
+      if (isMuted) {
+        toggleMute();
+      }
+    }
+  }, [volume, isMuted, toggleMute]);
 
   // Sync video time on mount / change
   useEffect(() => {
     lastTrackedRef.current = 0;
     setVideoError(null);
+    setNeedsUserUnmute(false);
     const video = videoRef.current;
     if (video) {
       if (Math.abs(video.currentTime - currentTime) > 1) {
@@ -109,8 +123,21 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
           // ignore
         }
       }
+
+      // Explicitly set audio volume & muted state for Android / iOS
+      video.muted = isMuted;
+      video.volume = isMuted ? 0 : (volume ?? 1);
+
       if (isPlaying) {
-        video.play().catch(() => {});
+        video.play().catch((err: unknown) => {
+          console.warn('Playback with sound restricted by mobile browser, starting muted with banner:', err);
+          // On mobile Android/iOS, if unmuted playback is restricted by autoplay policy,
+          // play muted and surface an unmute banner so 1 touch turns on full audio
+          video.muted = true;
+          video.play().then(() => {
+            setNeedsUserUnmute(true);
+          }).catch(() => {});
+        });
       } else {
         video.pause();
       }
@@ -132,7 +159,8 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
   useEffect(() => {
     const video = videoRef.current;
     if (video) {
-      video.volume = isMuted ? 0 : volume;
+      video.muted = isMuted;
+      video.volume = isMuted ? 0 : (volume ?? 1);
     }
   }, [volume, isMuted]);
 
@@ -246,23 +274,43 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
             </button>
           </div>
         ) : (
-          <video
-            ref={setVideoRef}
-            src={videoUrl}
-            poster={currentSong.coverUrl}
-            autoPlay={isPlaying}
-            playsInline
-            preload="metadata"
-            onTimeUpdate={handleTimeUpdate}
-            onError={() =>
-              setVideoError(
-                'El navegador no pudo reproducir este archivo de video. Revisa el enlace o descárgalo para uso offline.'
-              )
-            }
-            onEnded={() => handleSwitchToAudio()}
-            onClick={togglePlayPause}
-            className="w-full h-full object-contain cursor-pointer"
-          />
+          <>
+            <video
+              ref={setVideoRef}
+              src={videoUrl}
+              poster={currentSong.coverUrl}
+              autoPlay={isPlaying}
+              playsInline
+              preload="auto"
+              onTimeUpdate={handleTimeUpdate}
+              onError={() =>
+                setVideoError(
+                  'El navegador no pudo reproducir este archivo de video. Revisa el enlace o descárgalo para uso offline.'
+                )
+              }
+              onEnded={() => handleSwitchToAudio()}
+              onClick={() => {
+                if (needsUserUnmute) {
+                  handleUnmute();
+                } else {
+                  togglePlayPause();
+                }
+              }}
+              className="w-full h-full object-contain cursor-pointer"
+            />
+
+            {/* Mobile Unmute Alert Pill if Autoplay started muted on Android/iOS */}
+            {needsUserUnmute && (
+              <button
+                type="button"
+                onClick={handleUnmute}
+                className="absolute top-24 z-40 flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-emerald-500 text-black font-black text-xs md:text-sm shadow-2xl animate-bounce hover:scale-105 active:scale-95 transition-all"
+              >
+                <VolumeX className="w-4 h-4 md:w-5 md:h-5 text-black" />
+                <span>Toca aquí para activar el sonido</span>
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -498,15 +546,25 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
 
           {/* Right: Volume & Fullscreen controls */}
           <div className="flex items-center justify-end gap-2 sm:gap-3 sm:w-1/4">
-            <div className="hidden sm:flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={toggleMute}
-                className="text-neutral-400 hover:text-white transition-colors p-1"
-                title={isMuted ? 'Activar sonido' : 'Silenciar'}
+                onClick={() => {
+                  if (needsUserUnmute) {
+                    handleUnmute();
+                  } else {
+                    toggleMute();
+                  }
+                }}
+                className={`p-1.5 rounded-full transition-colors ${
+                  isMuted || needsUserUnmute
+                    ? 'text-red-400 bg-red-500/10 hover:bg-red-500/20'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+                title={isMuted || needsUserUnmute ? 'Activar sonido' : 'Silenciar'}
               >
-                {isMuted || volume === 0 ? (
-                  <VolumeX className="w-4 h-4 text-red-400" />
+                {isMuted || volume === 0 || needsUserUnmute ? (
+                  <VolumeX className="w-4 h-4" />
                 ) : (
                   <Volume2 className="w-4 h-4" />
                 )}
@@ -516,11 +574,14 @@ export const MusicVideoModal: React.FC<MusicVideoModalProps> = ({
                 min="0"
                 max="1"
                 step="0.01"
-                value={isMuted ? 0 : volume}
-                onChange={(e) => setVolume(parseFloat(e.target.value))}
+                value={isMuted || needsUserUnmute ? 0 : volume}
+                onChange={(e) => {
+                  setVolume(parseFloat(e.target.value));
+                  if (needsUserUnmute) setNeedsUserUnmute(false);
+                }}
                 aria-label="Volumen"
                 title="Volumen"
-                className="w-20 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                className="w-20 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 hidden sm:block"
               />
             </div>
 

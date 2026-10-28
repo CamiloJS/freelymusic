@@ -71,7 +71,8 @@ export async function getSongBlob(songId: string): Promise<Blob | null> {
       const result = request.result;
       if (result instanceof Blob) {
         if (!result.type || result.type === 'application/octet-stream') {
-          resolve(new Blob([result], { type: 'audio/mpeg' }));
+          const isVideo = songId.includes('-video');
+          resolve(new Blob([result], { type: isVideo ? 'video/mp4' : 'audio/mpeg' }));
           return;
         }
         resolve(result);
@@ -137,11 +138,21 @@ export async function getInstrumentalBlob(songId: string, versionId?: string | n
 }
 
 export async function getVideoBlob(songId: string, versionId?: string | null): Promise<Blob | null> {
+  let blob: Blob | null = null;
   if (versionId) {
-    const vBlob = await getSongBlob(`${songId}-version-${versionId}-video`);
-    if (vBlob) return vBlob;
+    blob = await getSongBlob(`${songId}-version-${versionId}-video`);
   }
-  return getSongBlob(`${songId}-video`);
+  if (!blob) {
+    blob = await getSongBlob(`${songId}-video`);
+  }
+  if (!blob) return null;
+
+  // Crucial for Android / iOS: video element must receive video/mp4 MIME type,
+  // never audio/mpeg or generic octet-stream, otherwise Android mobile decoder silences or drops playback
+  if (!blob.type || blob.type.startsWith('audio/') || blob.type === 'application/octet-stream') {
+    return new Blob([blob], { type: 'video/mp4' });
+  }
+  return blob;
 }
 
 const CATALOG_CACHE_KEY = 'sonora_indexeddb_full_catalog';
@@ -199,7 +210,7 @@ export async function getCatalogFromIndexedDB(): Promise<Song[] | null> {
   }
 }
 
-async function fetchMediaBlob(url: string, timeoutMs = 120000): Promise<Blob | null> {
+async function fetchMediaBlob(url: string, timeoutMs = 120000, isVideo = false): Promise<Blob | null> {
   if (!url) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -207,13 +218,17 @@ async function fetchMediaBlob(url: string, timeoutMs = 120000): Promise<Blob | n
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) return null;
     const blob = await res.blob();
-    if (!blob.type || blob.type === 'application/octet-stream') {
+    if (!blob.type || blob.type === 'application/octet-stream' || (isVideo && blob.type.startsWith('audio/'))) {
+      if (isVideo) {
+        return new Blob([blob], { type: 'video/mp4' });
+      }
       let mime = 'audio/mpeg';
       const lower = url.toLowerCase();
       if (lower.includes('.ogg')) mime = 'audio/ogg';
       else if (lower.includes('.wav')) mime = 'audio/wav';
       else if (lower.includes('.flac')) mime = 'audio/flac';
-      else if (lower.includes('.m4a') || lower.includes('.mp4')) mime = 'audio/mp4';
+      else if (lower.includes('.m4a')) mime = 'audio/mp4';
+      else if (lower.includes('.mp4')) mime = isVideo ? 'video/mp4' : 'audio/mp4';
       return new Blob([blob], { type: mime });
     }
     return blob;
@@ -246,11 +261,19 @@ export async function cacheSongOffline(song: Song): Promise<boolean> {
       }
     }
 
-    // 3. Videoclip si existe
-    if (song.videoUrl) {
-      const vidBlob = await fetchMediaBlob(song.videoUrl, 180000);
-      if (vidBlob) {
-        await storeSongBlob(`${song.id}-video`, vidBlob);
+    // 3. Videoclip musical si existe (en la canción principal o en sus versiones)
+    const targetVideoUrl =
+      song.videoUrl ||
+      song.versions?.find((v) => Boolean(v.videoUrl))?.videoUrl;
+
+    if (targetVideoUrl) {
+      try {
+        const vidBlob = await fetchMediaBlob(targetVideoUrl, 240000, true);
+        if (vidBlob) {
+          await storeSongBlob(`${song.id}-video`, vidBlob);
+        }
+      } catch (vidErr) {
+        console.warn(`No se pudo descargar video de ${song.title} para offline:`, vidErr);
       }
     }
 
@@ -266,7 +289,7 @@ export async function cacheSongOffline(song: Song): Promise<boolean> {
           if (vInstBlob) await storeSongBlob(`${song.id}-version-${v.id}-instrumental`, vInstBlob);
         }
         if (v.videoUrl) {
-          const vVidBlob = await fetchMediaBlob(v.videoUrl, 180000);
+          const vVidBlob = await fetchMediaBlob(v.videoUrl, 240000, true);
           if (vVidBlob) await storeSongBlob(`${song.id}-version-${v.id}-video`, vVidBlob);
         }
       }
