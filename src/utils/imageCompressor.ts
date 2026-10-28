@@ -59,7 +59,7 @@ export async function compressDataUrl(
   maxDimension = 360,
   quality = 0.75
 ): Promise<string> {
-  if (!dataUrl || !dataUrl.startsWith('data:image/') || dataUrl.length < 40000) {
+  if (!dataUrl || !dataUrl.startsWith('data:') || dataUrl.length < 20000) {
     return dataUrl;
   }
   if (typeof window === 'undefined' || typeof document === 'undefined') {

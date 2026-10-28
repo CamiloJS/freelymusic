@@ -30,12 +30,14 @@ import {
   downloadPlaylistAsZip,
   normalizeSong,
   normalizeUserData,
+  getCatalogFromIndexedDB,
 } from '../services/storage';
 import { loadFirebaseService } from '../services/firebaseLoader';
 import { detectAudioDuration } from '../utils/audioDuration';
 import { searchLyrics } from '../services/metadataEnrichment';
 import { cleanArtistSeparators } from '../utils/urlMetadataParser';
 import { preloadAllAppImages, preloadSingleImage } from '../utils/offlineImagePreloader';
+import { compressDataUrl } from '../utils/imageCompressor';
 
 export interface DownloadingState {
   isDownloading: boolean;
@@ -322,6 +324,28 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
 
+    // Hydrate complete catalog with rich covers from IndexedDB (instant offline storage)
+    getCatalogFromIndexedDB()
+      .then((cached) => {
+        if (cancelled || !cached || cached.length === 0) return;
+        setCatalog((current) => {
+          const map = new Map(current.map((s) => [s.id, s]));
+          let changed = false;
+          cached.forEach((cSong) => {
+            const existing = map.get(cSong.id);
+            if (!existing) {
+              map.set(cSong.id, cSong);
+              changed = true;
+            } else if (!existing.coverUrl && cSong.coverUrl) {
+              map.set(cSong.id, { ...existing, coverUrl: cSong.coverUrl });
+              changed = true;
+            }
+          });
+          return changed ? Array.from(map.values()) : current;
+        });
+      })
+      .catch(() => undefined);
+
     // Direct one-shot HTTP fetch (bypasses WebSocket/WebChannel blocks in Brave / private mode)
     loadFirebaseService()
       .then(async (firebase) => {
@@ -396,9 +420,16 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 chosenAvatar = c.avatarUrl;
                 chosenCustomAvatar = c.customAvatar;
               } else if (c.customAvatar && cloudTime > localTime) {
+                // Cloud has a newer manual user-assigned avatar
                 chosenAvatar = c.avatarUrl;
                 chosenCustomAvatar = true;
+              } else if (!local.customAvatar && cloudTime >= localTime) {
+                // Neither was manually set by user, so newer cloud avatar wins
+                chosenAvatar = c.avatarUrl;
+                chosenCustomAvatar = c.customAvatar;
               }
+              // If local.customAvatar is true and cloud is not a newer custom avatar,
+              // local custom photo is 100% PROTECTED and never reverted!
             }
 
             const mergedItem: ArtistProfile = {
@@ -497,8 +528,18 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const addTrackToCatalog = async (
     songData: Omit<Song, 'id' | 'createdAt' | 'addedBy'>
   ): Promise<Song> => {
+    let coverUrl = songData.coverUrl;
+    if (coverUrl && coverUrl.startsWith('data:') && coverUrl.length > 20000) {
+      try {
+        coverUrl = await compressDataUrl(coverUrl, 320, 0.75);
+      } catch (e) {
+        console.warn('Cover compression fallback:', e);
+      }
+    }
+
     const newSong: Song = {
       ...songData,
+      coverUrl,
       id: `song-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       addedBy: currentUser?.id || 'user',
       createdAt: new Date().toISOString(),
@@ -535,7 +576,21 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     songsData: Omit<Song, 'id' | 'createdAt' | 'addedBy'>[]
   ): Promise<Song[]> => {
     const now = Date.now();
-    const newSongs: Song[] = songsData
+    const processedSongsData = await Promise.all(
+      songsData.map(async (data) => {
+        if (data.coverUrl && data.coverUrl.startsWith('data:') && data.coverUrl.length > 20000) {
+          try {
+            const compressed = await compressDataUrl(data.coverUrl, 320, 0.75);
+            return { ...data, coverUrl: compressed };
+          } catch {
+            return data;
+          }
+        }
+        return data;
+      })
+    );
+
+    const newSongs: Song[] = processedSongsData
       .map((songData, idx) => {
         const song: Song = {
           ...songData,
@@ -574,8 +629,16 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return newSongs;
   };
 
-  const updateCatalogTrack = useCallback((song: Song) => {
-    const cleanSong = normalizeSong(song);
+  const updateCatalogTrack = useCallback(async (song: Song) => {
+    let coverUrl = song.coverUrl;
+    if (coverUrl && coverUrl.startsWith('data:') && coverUrl.length > 20000) {
+      try {
+        coverUrl = await compressDataUrl(coverUrl, 320, 0.75);
+      } catch {
+        // fallback
+      }
+    }
+    const cleanSong = normalizeSong({ ...song, coverUrl });
     if (!cleanSong) return;
 
     addStoredPendingSong(cleanSong);
@@ -1272,9 +1335,20 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const norm = rawId.replace(/[\/\\]/g, '_');
     if (!norm) return false;
 
+    let avatarUrl = artist.avatarUrl;
+    if (avatarUrl && avatarUrl.startsWith('data:') && avatarUrl.length > 20000) {
+      try {
+        avatarUrl = await compressDataUrl(avatarUrl, 360, 0.75);
+      } catch (err) {
+        console.warn('Avatar compression error:', err);
+      }
+    }
+
     const updated: ArtistProfile = {
       ...artist,
       id: norm,
+      avatarUrl,
+      customAvatar: Boolean(avatarUrl && avatarUrl.trim()),
       updatedAt: new Date().toISOString(),
     };
 

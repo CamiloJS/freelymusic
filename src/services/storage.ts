@@ -144,6 +144,61 @@ export async function getVideoBlob(songId: string, versionId?: string | null): P
   return getSongBlob(`${songId}-video`);
 }
 
+const CATALOG_CACHE_KEY = 'sonora_indexeddb_full_catalog';
+
+/**
+ * Caches the complete, unstripped catalog with all covers and metadata in IndexedDB.
+ * Unlike localStorage (5 MB limit), IndexedDB can hold hundreds of megabytes safely.
+ */
+export async function saveCatalogToIndexedDB(songs: Song[]): Promise<void> {
+  try {
+    const db = await openDB();
+    const jsonBlob = new Blob([JSON.stringify(songs)], { type: 'application/json' });
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.put(jsonBlob, CATALOG_CACHE_KEY);
+  } catch (e) {
+    console.warn('Could not cache full catalog in IndexedDB:', e);
+  }
+}
+
+/**
+ * Retrieves the complete cached catalog from IndexedDB for high-capacity offline startup.
+ */
+export async function getCatalogFromIndexedDB(): Promise<Song[] | null> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const transaction = db.transaction(STORE_NAME, 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get(CATALOG_CACHE_KEY);
+      request.onsuccess = async () => {
+        const result = request.result;
+        if (result instanceof Blob) {
+          try {
+            const text = await result.text();
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed)) {
+              const songs = parsed
+                .map((s) => normalizeSong(s))
+                .filter((s): s is Song => Boolean(s));
+              resolve(songs.length > 0 ? songs : null);
+              return;
+            }
+          } catch {
+            resolve(null);
+            return;
+          }
+        }
+        resolve(null);
+      };
+      request.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
 async function fetchMediaBlob(url: string, timeoutMs = 120000): Promise<Blob | null> {
   if (!url) return null;
   const controller = new AbortController();
@@ -880,11 +935,14 @@ export function saveStoredCatalog(songs: Song[]): void {
         !deleted.has(song.id)
     );
 
-  // Strip heavy base64 data URIs (> 25KB) from the localStorage cache
-  // so that the browser's 5MB quota is never exceeded. Firestore and IndexedDB
-  // maintain the full versions.
+  // Automatically mirror the complete, unstripped catalog to IndexedDB (which has gigabytes of storage)
+  void saveCatalogToIndexedDB(cleaned);
+
+  // Strip all inline base64 data URIs from the localStorage cache so that
+  // the browser's 5MB quota is never exceeded (catalog uses ~70 KB instead of 20 MB).
+  // IndexedDB and Firestore maintain all the full cover images.
   const lightForStorage = cleaned.map((s) => {
-    if (s.coverUrl && s.coverUrl.startsWith('data:') && s.coverUrl.length > 25000) {
+    if (s.coverUrl && s.coverUrl.startsWith('data:')) {
       return { ...s, coverUrl: '' };
     }
     return s;
