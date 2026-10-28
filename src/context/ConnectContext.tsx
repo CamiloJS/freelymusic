@@ -17,7 +17,7 @@ import {
 import { loadFirebaseService } from '../services/firebaseLoader';
 
 const HEARTBEAT_INTERVAL_MS = 60000; // 60 seconds
-const DEVICE_TIMEOUT_MS = 180000; // 3 minutes timeout for inactive devices
+const DEVICE_TIMEOUT_MS = 300000; // 5 minutes timeout for inactive devices (safeguards clock offsets)
 
 interface ConnectContextType {
   currentDeviceId: string;
@@ -73,39 +73,36 @@ export const ConnectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!isAuthenticated || !currentUser?.id) return;
       try {
         const fb = await loadFirebaseService();
-        const base = existingSession ?? latestSessionRef.current;
+        // Read fresh server document first to ensure we merge all other devices
+        const serverSession = await fb.getConnectSessionFromFirestore(currentUser.id);
+        const base = serverSession ?? existingSession ?? latestSessionRef.current;
         const now = Date.now();
 
         const rawDevices = base?.devices ? cleanDevices(base.devices) : [];
         const existingActiveId = base?.activeDeviceId;
-        const hasValidActiveDevice =
-          Boolean(existingActiveId) && rawDevices.some((d) => d.id === existingActiveId);
-
-        // Preserve activeDeviceId if one is alive; only if completely empty, default to this device
-        let targetActiveId: string;
-        if (hasValidActiveDevice && existingActiveId) {
-          targetActiveId = existingActiveId;
-        } else if (rawDevices.length > 0) {
-          targetActiveId = existingActiveId || rawDevices[0].id;
-        } else {
-          targetActiveId = currentDeviceId;
-        }
 
         const myDevice: ConnectDevice = {
           id: currentDeviceId,
           name: currentDeviceNameRef.current,
           type: currentDeviceType,
           lastSeenMs: now,
-          isActive: targetActiveId === currentDeviceId,
+          isActive: existingActiveId === currentDeviceId,
         };
 
         const updatedDevices = rawDevices.filter((d) => d.id !== currentDeviceId);
         updatedDevices.unshift(myDevice);
 
-        await fb.saveConnectSessionToFirestore(currentUser.id, {
-          activeDeviceId: targetActiveId,
+        const payload: Partial<ConnectSession> = {
           devices: updatedDevices,
-        });
+        };
+
+        // NEVER hijack an activeDeviceId!
+        // Only if there is literally NO activeDeviceId in the whole document, initialize it.
+        if (!existingActiveId) {
+          payload.activeDeviceId = currentDeviceId;
+        }
+
+        await fb.saveConnectSessionToFirestore(currentUser.id, payload);
       } catch (err) {
         console.warn('Connect heartbeat registration error:', err);
       }
@@ -220,7 +217,7 @@ export const ConnectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const sendCommand = useCallback(
     async (action: ConnectActionType, param?: any) => {
       if (!currentUser?.id) return;
-      const targetId = latestSessionRef.current?.activeDeviceId;
+      const targetId = latestSessionRef.current?.activeDeviceId || activeDeviceId;
       if (!targetId || targetId === currentDeviceId) {
         console.warn('Cannot send remote command: no other active device to target');
         return;

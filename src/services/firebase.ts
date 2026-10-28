@@ -707,7 +707,13 @@ export function subscribeToConnectSessionUpdates(
     if (!db) return () => undefined;
     return onSnapshot(
       doc(db, ...BASE_PATH, 'connectSessions', userId),
+      { includeMetadataChanges: true },
       (snapshot) => {
+        // If this snapshot came from the local cache and doesn't exist,
+        // it's an initial cache miss before the network responds. DO NOT treat as empty!
+        if (!snapshot.exists() && snapshot.metadata.fromCache) {
+          return;
+        }
         if (!snapshot.exists()) {
           onUpdate(null);
           return;
