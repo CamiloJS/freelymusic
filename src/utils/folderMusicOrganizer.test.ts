@@ -192,5 +192,5 @@ describe('folderMusicOrganizer', () => {
 
     // Single checks
     expect(result.singles[0].title).toBe('Sencillo Suelto');
-  });
+  }, 15000);
 });

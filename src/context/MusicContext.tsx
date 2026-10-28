@@ -213,15 +213,32 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const localTime = Date.parse(currentLocal.updatedAt || '') || 0;
 
       if (!cloud.updatedAt || cloudTime >= localTime) {
-        userDataRef.current = cloud;
-        setUserData(cloud);
-        saveStoredUserData(currentUser.id, cloud);
+        // Merge favorites so locally added favorites are never accidentally lost if cloud is delayed
+        const mergedFavorites = Array.from(
+          new Set([...(cloud.favoriteSongIds || []), ...(currentLocal.favoriteSongIds || [])])
+        );
+        const merged: UserLibraryData = {
+          ...cloud,
+          favoriteSongIds: mergedFavorites,
+        };
+        userDataRef.current = merged;
+        setUserData(merged);
+        saveStoredUserData(currentUser.id, merged);
       } else {
         void loadFirebaseService()
           .then((firebase) => firebase.saveUserDataToFirestore(currentUser.id, currentLocal))
           .catch((err) => console.warn('No se pudo subir la biblioteca local:', err));
       }
     };
+
+    // Direct one-shot fetch (HTTP getDoc) guarantees immediate user library loading in Brave / partitioned storage
+    loadFirebaseService()
+      .then(async (firebase) => {
+        const directData = await firebase.syncUserDataFromFirestore(currentUser.id);
+        if (cancelled || !directData) return;
+        applyCloudData(directData);
+      })
+      .catch((err) => console.warn('No se pudo sincronizar la biblioteca del usuario directa:', err));
 
     loadFirebaseService()
       .then((firebase) =>
@@ -291,27 +308,28 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsCatalogReady(true);
       clearTimeout(readyTimer);
 
-      // Retry syncing any pending songs or local songs not yet in cloud!
-      const cloudIds = new Set(cloudSongs.map((s) => s.id));
-      const songsToSync = [
-        ...pendingSongs.filter((s) => !deletedIds.has(s.id)),
-        ...getStoredCatalog().filter((s) => !cloudIds.has(s.id) && !deletedIds.has(s.id)),
-      ];
-
-      // Deduplicate by ID
-      const uniqueToSync = Array.from(new Map(songsToSync.map((s) => [s.id, s])).values());
-
-      if (uniqueToSync.length > 0) {
+      // Retry syncing only songs explicitly created while offline or failed earlier
+      const songsToSync = pendingSongs.filter((s) => !deletedIds.has(s.id));
+      if (songsToSync.length > 0) {
         void loadFirebaseService()
-          .then((firebase) => firebase.saveSongsToFirestore(uniqueToSync))
+          .then((firebase) => firebase.saveSongsToFirestore(songsToSync))
           .then((ok) => {
             if (ok) {
-              uniqueToSync.forEach((song) => removeStoredPendingSong(song.id));
+              songsToSync.forEach((song) => removeStoredPendingSong(song.id));
             }
           })
           .catch((err) => console.warn('No se pudieron sincronizar canciones locales a la nube:', err));
       }
     };
+
+    // Direct one-shot HTTP fetch (bypasses WebSocket/WebChannel blocks in Brave / private mode)
+    loadFirebaseService()
+      .then(async (firebase) => {
+        const directSongs = await firebase.syncCatalogFromFirestore();
+        if (cancelled || !directSongs || directSongs.length === 0) return;
+        applyCatalog(directSongs);
+      })
+      .catch((err) => console.warn('No se pudo sincronizar catálogo directo:', err));
 
     loadFirebaseService()
       .then((firebase) =>
@@ -344,66 +362,77 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let cancelled = false;
     let unsubscribe: (() => void) | null = null;
 
+    const applyArtistProfiles = (cloudArtists: ArtistProfile[]) => {
+      setArtistProfiles((prev) => {
+        const map = new Map<string, ArtistProfile>();
+        // Keep local profiles first
+        (prev || []).forEach((p) => {
+          if (!p) return;
+          const raw = (p.id || p.name || '').trim();
+          if (!raw) return;
+          const k = raw.toLowerCase().replace(/[\/\\]/g, '_');
+          map.set(k, { ...p, id: p.id || k, name: p.name || k });
+        });
+        // Merge cloud profiles
+        (cloudArtists || []).forEach((c) => {
+          if (!c) return;
+          const raw = (c.id || c.name || '').trim();
+          if (!raw) return;
+          const k = raw.toLowerCase().replace(/[\/\\]/g, '_');
+          const local = map.get(k);
+          if (!local) {
+            map.set(k, { ...c, id: c.id || k, name: c.name || k });
+          } else {
+            const localHasAvatar = Boolean(local.avatarUrl && local.avatarUrl.trim());
+            const cloudHasAvatar = Boolean(c.avatarUrl && c.avatarUrl.trim());
+            const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+            const cloudTime = c.updatedAt ? new Date(c.updatedAt).getTime() : 0;
+
+            let chosenAvatar = local.avatarUrl;
+            let chosenCustomAvatar = local.customAvatar;
+
+            if (cloudHasAvatar) {
+              if (!localHasAvatar) {
+                chosenAvatar = c.avatarUrl;
+                chosenCustomAvatar = c.customAvatar;
+              } else if (c.customAvatar && cloudTime > localTime) {
+                chosenAvatar = c.avatarUrl;
+                chosenCustomAvatar = true;
+              }
+            }
+
+            const mergedItem: ArtistProfile = {
+              ...local,
+              ...c,
+              id: c.id || local.id || k,
+              name: c.name || local.name || k,
+              avatarUrl: chosenAvatar,
+              customAvatar: chosenCustomAvatar,
+              updatedAt: cloudTime >= localTime ? c.updatedAt : local.updatedAt,
+            };
+            map.set(k, mergedItem);
+          }
+        });
+        const merged = Array.from(map.values());
+        saveStoredArtistProfiles(merged);
+        return merged;
+      });
+      setIsArtistProfilesReady(true);
+    };
+
+    // Direct one-shot HTTP fetch
+    loadFirebaseService()
+      .then(async (firebase) => {
+        const directArtists = await firebase.syncArtistProfilesFromFirestore();
+        if (cancelled || !directArtists || directArtists.length === 0) return;
+        applyArtistProfiles(directArtists);
+      })
+      .catch((err) => console.warn('No se pudieron sincronizar perfiles de artistas directos:', err));
+
     loadFirebaseService()
       .then((firebase) =>
         firebase.subscribeToArtistProfilesUpdates(
-          (cloudArtists) => {
-            setArtistProfiles((prev) => {
-              const map = new Map<string, ArtistProfile>();
-              // Keep local profiles first
-              (prev || []).forEach((p) => {
-                if (!p) return;
-                const raw = (p.id || p.name || '').trim();
-                if (!raw) return;
-                const k = raw.toLowerCase().replace(/[\/\\]/g, '_');
-                map.set(k, { ...p, id: p.id || k, name: p.name || k });
-              });
-              // Merge cloud profiles
-              (cloudArtists || []).forEach((c) => {
-                if (!c) return;
-                const raw = (c.id || c.name || '').trim();
-                if (!raw) return;
-                const k = raw.toLowerCase().replace(/[\/\\]/g, '_');
-                const local = map.get(k);
-                if (!local) {
-                  map.set(k, { ...c, id: c.id || k, name: c.name || k });
-                } else {
-                  const localHasAvatar = Boolean(local.avatarUrl && local.avatarUrl.trim());
-                  const cloudHasAvatar = Boolean(c.avatarUrl && c.avatarUrl.trim());
-                  const localTime = local.updatedAt ? new Date(local.updatedAt).getTime() : 0;
-                  const cloudTime = c.updatedAt ? new Date(c.updatedAt).getTime() : 0;
-
-                  let chosenAvatar = local.avatarUrl;
-                  let chosenCustomAvatar = local.customAvatar;
-
-                  if (cloudHasAvatar) {
-                    if (!localHasAvatar) {
-                      chosenAvatar = c.avatarUrl;
-                      chosenCustomAvatar = c.customAvatar;
-                    } else if (c.customAvatar && cloudTime > localTime) {
-                      chosenAvatar = c.avatarUrl;
-                      chosenCustomAvatar = true;
-                    }
-                  }
-
-                  const mergedItem: ArtistProfile = {
-                    ...local,
-                    ...c,
-                    id: c.id || local.id || k,
-                    name: c.name || local.name || k,
-                    avatarUrl: chosenAvatar,
-                    customAvatar: chosenCustomAvatar,
-                    updatedAt: cloudTime >= localTime ? c.updatedAt : local.updatedAt,
-                  };
-                  map.set(k, mergedItem);
-                }
-              });
-              const merged = Array.from(map.values());
-              saveStoredArtistProfiles(merged);
-              return merged;
-            });
-            setIsArtistProfilesReady(true);
-          },
+          applyArtistProfiles,
           (err) => {
             console.warn('No se pudieron sincronizar los artistas:', err);
             setIsArtistProfilesReady(true);
@@ -639,6 +668,8 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } catch (err) {
           console.warn('LRCLIB auto-fetch error:', song.title, err);
         }
+        // Polite delay to protect LRCLIB and Firestore rate limits
+        await new Promise((r) => setTimeout(r, 800));
       }
     };
 

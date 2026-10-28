@@ -838,7 +838,39 @@ export function saveStoredCatalog(songs: Song[]): void {
         song.id !== 'track-3' &&
         !deleted.has(song.id)
     );
-  safeSetItem(KEYS.CATALOG, JSON.stringify(cleaned));
+
+  // Strip heavy base64 data URIs (> 25KB) from the localStorage cache
+  // so that the browser's 5MB quota is never exceeded. Firestore and IndexedDB
+  // maintain the full versions.
+  const lightForStorage = cleaned.map((s) => {
+    if (s.coverUrl && s.coverUrl.startsWith('data:') && s.coverUrl.length > 25000) {
+      return { ...s, coverUrl: '' };
+    }
+    return s;
+  });
+
+  const ok = safeSetItem(KEYS.CATALOG, JSON.stringify(lightForStorage));
+  if (!ok) {
+    // Fallback: strip heavy synchronized lyrics in localStorage if quota is tight
+    const withoutLyrics = lightForStorage.map((s) => ({
+      ...s,
+      lyricsLrc: undefined,
+      plainLyrics: undefined,
+    }));
+    const fallbackOk = safeSetItem(KEYS.CATALOG, JSON.stringify(withoutLyrics));
+    if (!fallbackOk) {
+      // Ultra-lean fallback: essential metadata only
+      const minimal = withoutLyrics.map((s) => ({
+        id: s.id,
+        title: s.title,
+        artist: s.artist,
+        album: s.album,
+        audioUrl: s.audioUrl,
+        duration: s.duration,
+      }));
+      safeSetItem(KEYS.CATALOG, JSON.stringify(minimal));
+    }
+  }
 }
 
 export function getStoredProfiles(): UserProfile[] {
@@ -923,7 +955,34 @@ export function getStoredUserData(userId: string): UserLibraryData {
 }
 
 export function saveStoredUserData(userId: string, data: UserLibraryData): void {
-  safeSetItem(`${KEYS.USER_DATA_PREFIX}${userId}`, JSON.stringify(data));
+  const ok = safeSetItem(`${KEYS.USER_DATA_PREFIX}${userId}`, JSON.stringify(data));
+  if (!ok) {
+    // If quota exceeded, trim play history & listening counters to protect favorites & playlists
+    const trimmed: UserLibraryData = {
+      ...data,
+      playHistory: (data.playHistory || []).slice(0, 30),
+      songListenSeconds: {},
+      artistListenSeconds: {},
+    };
+    const fallbackOk = safeSetItem(`${KEYS.USER_DATA_PREFIX}${userId}`, JSON.stringify(trimmed));
+    if (!fallbackOk) {
+      // Critical fallback: guarantee favorites and playlists are never lost
+      const criticalOnly: UserLibraryData = {
+        favoriteSongIds: data.favoriteSongIds || [],
+        playlists: data.playlists || [],
+        followedArtists: data.followedArtists || [],
+        historySongIds: (data.historySongIds || []).slice(0, 20),
+        pinnedPlaylistIds: data.pinnedPlaylistIds || [],
+        savedAlbumNames: data.savedAlbumNames || [],
+        playCounts: {},
+        playHistory: [],
+        totalListenSeconds: 0,
+        songListenSeconds: {},
+        artistListenSeconds: {},
+      };
+      safeSetItem(`${KEYS.USER_DATA_PREFIX}${userId}`, JSON.stringify(criticalOnly));
+    }
+  }
 }
 
 // Artist Profiles storage
@@ -955,7 +1014,17 @@ export function getStoredArtistProfiles(): ArtistProfile[] {
 }
 
 export function saveStoredArtistProfiles(artists: ArtistProfile[]): void {
-  safeSetItem(KEYS.ARTIST_PROFILES, JSON.stringify(artists));
+  const ok = safeSetItem(KEYS.ARTIST_PROFILES, JSON.stringify(artists));
+  if (!ok) {
+    // If quota exceeded, strip heavy inline base64 avatars in localStorage
+    const lean = artists.map((a) => {
+      if (a.avatarUrl && a.avatarUrl.startsWith('data:') && a.avatarUrl.length > 25000) {
+        return { ...a, avatarUrl: '' };
+      }
+      return a;
+    });
+    safeSetItem(KEYS.ARTIST_PROFILES, JSON.stringify(lean));
+  }
 }
 
 export function getStoredArtistProfile(artistName: string): ArtistProfile | null {

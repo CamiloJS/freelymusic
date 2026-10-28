@@ -166,6 +166,36 @@ function sanitizeForFirestore<T>(data: T): T {
   return JSON.parse(JSON.stringify(data));
 }
 
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  initialDelayMs = 400
+): Promise<T> {
+  let delay = initialDelayMs;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      const errMsg = String(err);
+      const isQuotaOrRateLimit =
+        errMsg.includes('maximum bandwidth') ||
+        errMsg.includes('RESOURCE_EXHAUSTED') ||
+        errMsg.includes('exceeded their maximum bandwidth') ||
+        errMsg.includes('rate limit') ||
+        errMsg.includes('unavailable');
+
+      if (attempt < maxRetries && isQuotaOrRateLimit) {
+        console.warn(`Firestore write rate limited, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise((r) => setTimeout(r, delay));
+        delay *= 2;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error('Retries exhausted');
+}
+
 // Firestore operations for Songs Catalog
 export async function syncCatalogFromFirestore(): Promise<Song[] | null> {
   if (!db) return null;
@@ -195,7 +225,9 @@ export async function saveSongToFirestore(song: Song): Promise<boolean> {
       console.warn('Firebase anon auth pending, cannot save song to Firestore');
       return false;
     }
-    await setDoc(doc(db, ...BASE_PATH, 'catalog', cleanSong.id), sanitizeForFirestore(cleanSong), { merge: true });
+    await retryWithBackoff(() =>
+      setDoc(doc(db!, ...BASE_PATH, 'catalog', cleanSong.id), sanitizeForFirestore(cleanSong), { merge: true })
+    );
     return true;
   } catch (err) {
     console.warn('Error saving song to Firestore:', err);
@@ -224,7 +256,10 @@ export async function saveSongsToFirestore(songs: Song[]): Promise<boolean> {
       chunk.forEach((song) => {
         batch.set(doc(db!, ...BASE_PATH, 'catalog', song.id), sanitizeForFirestore(song), { merge: true });
       });
-      await batch.commit();
+      await retryWithBackoff(() => batch.commit());
+      if (i + BATCH_SIZE < cleanSongs.length) {
+        await new Promise((r) => setTimeout(r, 120));
+      }
     }
     return true;
   } catch (err) {
@@ -358,7 +393,9 @@ export async function saveUserDataToFirestore(userId: string, data: UserLibraryD
   try {
     await ensureAuth();
     const cleanData = normalizeUserData(data);
-    await setDoc(doc(db, ...BASE_PATH, 'usersData', userId), sanitizeForFirestore(cleanData), { merge: true });
+    await retryWithBackoff(() =>
+      setDoc(doc(db!, ...BASE_PATH, 'usersData', userId), sanitizeForFirestore(cleanData), { merge: true })
+    );
   } catch (err) {
     console.warn('Error saving user data to Firestore:', err);
   }
@@ -571,10 +608,12 @@ export async function saveArtistProfileToFirestore(artist: ArtistProfile): Promi
     const artistId = rawId.replace(/[\/\\]/g, '_');
     if (!artistId) return false;
 
-    await setDoc(
-      doc(db, ...BASE_PATH, 'artists', artistId),
-      sanitizeForFirestore({ ...artist, id: artistId }),
-      { merge: true }
+    await retryWithBackoff(() =>
+      setDoc(
+        doc(db!, ...BASE_PATH, 'artists', artistId),
+        sanitizeForFirestore({ ...artist, id: artistId }),
+        { merge: true }
+      )
     );
     return true;
   } catch (err) {
