@@ -52,6 +52,7 @@ interface MusicContextType {
   addTrackToCatalog: (song: Omit<Song, 'id' | 'createdAt' | 'addedBy'>) => Promise<Song>;
   addMultipleTracksToCatalog: (songs: Omit<Song, 'id' | 'createdAt' | 'addedBy'>[]) => Promise<Song[]>;
   updateCatalogTrack: (song: Song) => void;
+  updateMultipleCatalogTracks: (songs: Song[]) => Promise<void>;
   deleteCatalogTrack: (songId: string) => void;
 
   // Current user's library
@@ -654,6 +655,49 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (ok) removeStoredPendingSong(cleanSong.id);
       })
       .catch((err) => console.warn('La edición quedó pendiente de sincronizar:', err));
+  }, []);
+
+  const updateMultipleCatalogTracks = useCallback(async (songsToUpdate: Song[]) => {
+    if (!songsToUpdate.length) return;
+
+    const cleanedSongs: Song[] = [];
+    for (const song of songsToUpdate) {
+      let coverUrl = song.coverUrl;
+      if (coverUrl && coverUrl.startsWith('data:') && coverUrl.length > 20000) {
+        try {
+          coverUrl = await compressDataUrl(coverUrl, 320, 0.75);
+        } catch {
+          // fallback
+        }
+      }
+      const cleanSong = normalizeSong({ ...song, coverUrl });
+      if (cleanSong) {
+        cleanedSongs.push(cleanSong);
+      }
+    }
+
+    if (!cleanedSongs.length) return;
+
+    addMultipleStoredPendingSongs(cleanedSongs);
+    const cleanedMap = new Map(cleanedSongs.map((s) => [s.id, s]));
+
+    setCatalog((previous) => {
+      const updated = previous.map((item) => cleanedMap.get(item.id) || item);
+      saveStoredCatalog(updated);
+      return updated;
+    });
+
+    try {
+      const firebase = await loadFirebaseService();
+      if (firebase) {
+        const saved = await firebase.saveSongsToFirestore(cleanedSongs);
+        if (saved) {
+          cleanedSongs.forEach((s) => removeStoredPendingSong(s.id));
+        }
+      }
+    } catch (err) {
+      console.warn('La actualización de pistas quedó pendiente de sincronizar en Firestore:', err);
+    }
   }, []);
 
   // Background auto-repair for songs whose duration is defaulted to 180 (3:00) or 0
@@ -1613,6 +1657,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addTrackToCatalog,
         addMultipleTracksToCatalog,
         updateCatalogTrack,
+        updateMultipleCatalogTracks,
         deleteCatalogTrack,
         favoriteSongIds: userData.favoriteSongIds,
         toggleFavorite,

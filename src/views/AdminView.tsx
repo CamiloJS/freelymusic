@@ -18,6 +18,7 @@ import Download from 'lucide-react/dist/esm/icons/download.mjs';
 import FileCode from 'lucide-react/dist/esm/icons/file-code.mjs';
 import Pencil from 'lucide-react/dist/esm/icons/pencil.mjs';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import { useAuth } from '../context/AuthContext';
 import { useMusic } from '../context/MusicContext';
 import { Song, UserRole, FirebaseConfigOptions } from '../types';
@@ -31,7 +32,7 @@ import { MetadataEnrichmentModal } from '../components/MetadataEnrichmentModal';
 
 export const AdminView: React.FC = () => {
   const { currentUser, allUsers, createProfile, deleteProfile, isAdmin } = useAuth();
-  const { catalog, addTrackToCatalog, deleteCatalogTrack, updateCatalogTrack } = useMusic();
+  const { catalog, addTrackToCatalog, deleteCatalogTrack, updateCatalogTrack, updateMultipleCatalogTracks } = useMusic();
 
   const [activeTab, setActiveTab] = useState<'upload' | 'users' | 'catalog' | 'firebase'>('upload');
 
@@ -96,12 +97,14 @@ export const AdminView: React.FC = () => {
   const [editDiscNumber, setEditDiscNumber] = useState<number | undefined>(undefined);
   const [editDuration, setEditDuration] = useState(180);
   const [editMedia, setEditMedia] = useState<SongMediaValue>({ ...EMPTY_SONG_MEDIA });
+  const [applyCoverToAlbum, setApplyCoverToAlbum] = useState(false);
   const [isEnrichmentOpen, setIsEnrichmentOpen] = useState(false);
   const editCoverFileInputRef = useRef<HTMLInputElement | null>(null);
   const editLrcFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleOpenEditSong = (song: Song) => {
     setEditingSong(song);
+    setApplyCoverToAlbum(false);
     setEditTitle(song.title);
     const split = song.artist ? splitArtistNames(cleanArtistSeparators(song.artist)) : [''];
     setEditArtistList(split.length > 0 ? split : ['']);
@@ -178,7 +181,21 @@ export const AdminView: React.FC = () => {
         })),
     };
 
-    updateCatalogTrack(updated);
+    if (applyCoverToAlbum && updated.coverUrl && updated.album && updated.album.toLowerCase() !== 'sencillo') {
+      const albumTarget = updated.album.trim().toLowerCase();
+      const updatedCover = updated.coverUrl;
+      const otherAlbumTracks = catalog
+        .filter((s) => s.id !== updated.id && (s.album || '').trim().toLowerCase() === albumTarget)
+        .map((s) => ({ ...s, coverUrl: updatedCover }));
+
+      if (otherAlbumTracks.length > 0) {
+        void updateMultipleCatalogTracks([updated, ...otherAlbumTracks]);
+      } else {
+        updateCatalogTrack(updated);
+      }
+    } else {
+      updateCatalogTrack(updated);
+    }
     setEditingSong(null);
   };
 
@@ -1178,6 +1195,63 @@ export const AdminView: React.FC = () => {
                         />
                       </div>
                     </div>
+
+                    {/* Batch cover apply to album */}
+                    {(() => {
+                      const albumName = editAlbum.trim();
+                      const isRealAlbum = albumName && albumName.toLowerCase() !== 'sencillo';
+                      if (!isRealAlbum) return null;
+                      const albumTracksCount = catalog.filter(
+                        (s) => (s.album || '').trim().toLowerCase() === albumName.toLowerCase()
+                      ).length;
+
+                      return (
+                        <div className="mt-2 p-2.5 rounded-xl bg-neutral-900/80 border border-neutral-800 flex items-center justify-between gap-3">
+                          <label className="flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={applyCoverToAlbum}
+                              onChange={(e) => setApplyCoverToAlbum(e.target.checked)}
+                              className="w-4 h-4 rounded text-emerald-500 bg-neutral-950 border-neutral-700 focus:ring-emerald-500 focus:ring-offset-neutral-950"
+                            />
+                            <div className="text-xs">
+                              <span className="font-semibold text-white flex items-center gap-1.5">
+                                <Disc className="w-3.5 h-3.5 text-emerald-400" />
+                                Aplicar carátula a todo el álbum ({albumTracksCount} canciones)
+                              </span>
+                              <span className="block text-[11px] text-neutral-400">
+                                Al guardar, las canciones del álbum &quot;{albumName}&quot; tendrán esta carátula.
+                              </span>
+                            </div>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!editCoverUrl.trim()) {
+                                alert('Por favor ingresa o sube una carátula primero.');
+                                return;
+                              }
+                              const albumTarget = albumName.toLowerCase();
+                              const newCover = editCoverUrl.trim();
+                              const tracksToSync = catalog
+                                .filter((s) => (s.album || '').trim().toLowerCase() === albumTarget)
+                                .map((s) => ({ ...s, coverUrl: newCover }));
+
+                              if (tracksToSync.length === 0) {
+                                alert('No hay canciones encontradas para este álbum.');
+                                return;
+                              }
+
+                              await updateMultipleCatalogTracks(tracksToSync);
+                              alert(`¡Carátula aplicada exitosamente a ${tracksToSync.length} canciones del álbum "${albumName}"!`);
+                            }}
+                            className="shrink-0 px-2.5 py-1 text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30 rounded-lg transition-colors"
+                          >
+                            Aplicar ahora
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Audio URL */}
