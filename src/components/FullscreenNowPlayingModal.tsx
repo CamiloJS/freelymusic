@@ -22,7 +22,9 @@ import Check from 'lucide-react/dist/esm/icons/check.mjs';
 import Disc from 'lucide-react/dist/esm/icons/disc.mjs';
 import UserRound from 'lucide-react/dist/esm/icons/user-round.mjs';
 import Heart from 'lucide-react/dist/esm/icons/heart.mjs';
+import Radio from 'lucide-react/dist/esm/icons/radio.mjs';
 import { useAudio, useAudioTime, type PlaybackSource } from '../context/AudioContext';
+import { useConnect } from '../context/ConnectContext';
 import { useMusic } from '../context/MusicContext';
 import { buildDisplayLyrics, formatTime } from '../utils/lyrics';
 import { Album, Playlist, Song } from '../types';
@@ -83,6 +85,7 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
     toggleKaraoke,
   } = useAudio();
   const { currentTime, duration, activeLyricIndex } = useAudioTime();
+  const { activeDevice, isCurrentDeviceActive, setIsConnectModalOpen } = useConnect();
 
   // Mobile state for full-screen lyrics expansion & Spotify menus
   const [isLyricsExpanded, setIsLyricsExpanded] = useState(false);
@@ -594,26 +597,42 @@ export const FullscreenNowPlayingModal: React.FC<FullscreenNowPlayingModalProps>
               </button>
             </div>
 
-            {/* 7. Auxiliary Row (Karaoke on left if available, Share & Queue on right) */}
+            {/* 7. Auxiliary Row (Connect Device on left, Karaoke, Share & Queue on right) */}
             <div className="flex items-center justify-between py-1 text-neutral-400 flex-shrink-0">
-              {hasInstrumental ? (
+              <div className="flex items-center gap-2 min-w-0">
                 <button
                   type="button"
-                  onClick={toggleKaraoke}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all active:scale-95 ${
-                    isKaraoke
-                      ? 'bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/25'
-                      : 'bg-[#242424] text-neutral-300 hover:text-white border border-white/10'
+                  onClick={() => setIsConnectModalOpen(true)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all active:scale-95 ${
+                    !isCurrentDeviceActive
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : 'text-neutral-400 hover:text-white'
                   }`}
-                  title={isKaraoke ? 'Desactivar modo karaoke' : 'Activar modo karaoke'}
-                  aria-label={isKaraoke ? 'Desactivar modo karaoke' : 'Activar modo karaoke'}
+                  title="Conectar a un dispositivo (Connect)"
                 >
-                  <Mic2 className="w-4 h-4" />
-                  <span>Karaoke</span>
+                  <Radio className="w-4 h-4 flex-shrink-0 animate-pulse" />
+                  <span className="truncate max-w-[130px]">
+                    {!isCurrentDeviceActive && activeDevice ? activeDevice.name : 'Este dispositivo'}
+                  </span>
                 </button>
-              ) : (
-                <div className="w-5 h-5" />
-              )}
+
+                {hasInstrumental && (
+                  <button
+                    type="button"
+                    onClick={toggleKaraoke}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all active:scale-95 ${
+                      isKaraoke
+                        ? 'bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/25'
+                        : 'bg-[#242424] text-neutral-300 hover:text-white border border-white/10'
+                    }`}
+                    title={isKaraoke ? 'Desactivar modo karaoke' : 'Activar modo karaoke'}
+                    aria-label={isKaraoke ? 'Desactivar modo karaoke' : 'Activar modo karaoke'}
+                  >
+                    <Mic2 className="w-4 h-4" />
+                    <span>Karaoke</span>
+                  </button>
+                )}
+              </div>
 
               <div className="flex items-center gap-5">
                 <button

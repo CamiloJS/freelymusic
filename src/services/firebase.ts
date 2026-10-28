@@ -23,6 +23,7 @@ import {
   ArtistProfile,
   LyricsTranslation,
   GlobalStatsCacheEntry,
+  ConnectSession,
 } from '../types';
 import {
   getStoredFirebaseConfig,
@@ -650,3 +651,71 @@ export function subscribeToArtistProfilesUpdates(
     );
   }, onError);
 }
+
+// Sonora / Spotify Connect Session Operations
+export async function getConnectSessionFromFirestore(
+  userId: string
+): Promise<ConnectSession | null> {
+  if (!db || !userId) return null;
+  try {
+    await ensureAuth();
+    const snapshot = await getDoc(doc(db, ...BASE_PATH, 'connectSessions', userId));
+    if (!snapshot.exists()) return null;
+    return snapshot.data() as ConnectSession;
+  } catch (err) {
+    console.warn('Error fetching connect session from Firestore:', err);
+    return null;
+  }
+}
+
+export async function saveConnectSessionToFirestore(
+  userId: string,
+  sessionData: Partial<ConnectSession>
+): Promise<boolean> {
+  if (!db || !userId) return false;
+  try {
+    const authenticated = await ensureAuth();
+    if (!authenticated) {
+      console.warn('Firebase anon auth pending, cannot save connect session');
+      return false;
+    }
+    await retryWithBackoff(() =>
+      setDoc(
+        doc(db!, ...BASE_PATH, 'connectSessions', userId),
+        sanitizeForFirestore({
+          ...sessionData,
+          userId,
+          updatedAtMs: Date.now(),
+        }),
+        { merge: true }
+      )
+    );
+    return true;
+  } catch (err) {
+    console.warn('Error saving connect session to Firestore:', err);
+    return false;
+  }
+}
+
+export function subscribeToConnectSessionUpdates(
+  userId: string,
+  onUpdate: (session: ConnectSession | null) => void,
+  onError?: ErrorHandler
+): Promise<Unsubscribe | null> {
+  if (!userId) return Promise.resolve(null);
+  return subscribeWhenReady(() => {
+    if (!db) return () => undefined;
+    return onSnapshot(
+      doc(db, ...BASE_PATH, 'connectSessions', userId),
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          onUpdate(null);
+          return;
+        }
+        onUpdate(snapshot.data() as ConnectSession);
+      },
+      (err) => onError?.(err)
+    );
+  }, onError);
+}
+

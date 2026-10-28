@@ -20,8 +20,10 @@ import ListMusic from 'lucide-react/dist/esm/icons/list-music.mjs';
 import FastForward from 'lucide-react/dist/esm/icons/fast-forward.mjs';
 import Rewind from 'lucide-react/dist/esm/icons/rewind.mjs';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
+import Radio from 'lucide-react/dist/esm/icons/radio.mjs';
 
 import { useAuth } from '../context/AuthContext';
+import { useConnect } from '../context/ConnectContext';
 import { useMusic } from '../context/MusicContext';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { getAlbumsFromCatalog } from '../utils/albums';
@@ -38,6 +40,7 @@ type TvTab = 'home' | 'search' | 'library';
 
 export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
   const { currentUser } = useAuth();
+  const { currentDeviceName, isCurrentDeviceActive } = useConnect();
   const {
     catalog,
     playlists,
@@ -559,6 +562,19 @@ export const TvView: React.FC<TvViewProps> = ({ onExitTvMode }) => {
           </button>
         </nav>
 
+          {/* FreelyMusic Connect TV Badge */}
+          <div
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 text-xs font-semibold text-neutral-300"
+            title={`FreelyMusic Connect: ${currentDeviceName}`}
+          >
+            <Radio className={`w-3.5 h-3.5 ${isCurrentDeviceActive ? 'text-emerald-400 animate-pulse' : 'text-neutral-400'}`} />
+            <span className="truncate max-w-[120px]">{currentDeviceName}</span>
+            {isCurrentDeviceActive ? (
+              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/20 px-1.5 py-0.5 rounded-full">Activo</span>
+            ) : (
+              <span className="text-[10px] text-neutral-400">Remoto</span>
+            )}
+          </div>
         {/* Right: User Profile Pill & Exit Button */}
         <div className="flex items-center gap-3">
           <div

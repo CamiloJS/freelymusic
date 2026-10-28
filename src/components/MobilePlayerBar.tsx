@@ -3,11 +3,14 @@ import Play from 'lucide-react/dist/esm/icons/play.mjs';
 import Pause from 'lucide-react/dist/esm/icons/pause.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 import Mic2 from 'lucide-react/dist/esm/icons/mic-vocal.mjs';
+import Radio from 'lucide-react/dist/esm/icons/radio.mjs';
+import Volume2 from 'lucide-react/dist/esm/icons/volume-2.mjs';
 import { DownloadedIcon } from './DownloadedIcon';
 import { SavedCheckIcon } from './SavedCheckIcon';
 import { useAudio, useAudioTime } from '../context/AudioContext';
 import { useMusic } from '../context/MusicContext';
 import { useAuth } from '../context/AuthContext';
+import { useConnect } from '../context/ConnectContext';
 import { ArtistLinks } from './ArtistLinks';
 
 interface MobilePlayerBarProps {
@@ -28,6 +31,7 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
   } = useAudio();
   const { currentTime, duration } = useAudioTime();
   const { isDownloaded, isFavorite, toggleFavorite } = useMusic();
+  const { activeDevice, isCurrentDeviceActive, setIsConnectModalOpen } = useConnect();
 
   if (!currentSong) return null;
 
@@ -114,6 +118,25 @@ export const MobilePlayerBar: React.FC<MobilePlayerBarProps> = ({ onSelectArtist
               </button>
             )}
 
+
+            {/* Sonora / Spotify Connect Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsConnectModalOpen(true);
+              }}
+              className={`p-1.5 transition-colors active:scale-90 relative ${
+                !isCurrentDeviceActive ? 'text-emerald-400' : 'text-neutral-400 hover:text-white'
+              }`}
+              title="Dispositivos disponibles (Connect)"
+              aria-label="Dispositivos disponibles"
+            >
+              <Radio className="w-4 h-4" />
+              {!isCurrentDeviceActive && (
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full absolute top-1 right-1 animate-pulse" />
+              )}
+            </button>
             {/* Like button */}
             <button
               type="button"

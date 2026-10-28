@@ -18,8 +18,10 @@ import { SavedCheckIcon } from './SavedCheckIcon';
 import Maximize2 from 'lucide-react/dist/esm/icons/maximize-2.mjs';
 import Loader2 from 'lucide-react/dist/esm/icons/loader-circle.mjs';
 import AlertCircle from 'lucide-react/dist/esm/icons/circle-alert.mjs';
+import Radio from 'lucide-react/dist/esm/icons/radio.mjs';
 import Video from 'lucide-react/dist/esm/icons/video.mjs';
 import { useAudio, useAudioTime } from '../context/AudioContext';
+import { useConnect } from '../context/ConnectContext';
 import { useMusic } from '../context/MusicContext';
 import { formatTime } from '../utils/lyrics';
 import { ArtistLinks } from './ArtistLinks';
@@ -61,6 +63,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
 
   const { currentTime, duration } = useAudioTime();
   const { isFavorite, toggleFavorite, isDownloaded } = useMusic();
+  const { activeDevice, isCurrentDeviceActive, setIsConnectModalOpen } = useConnect();
   const [isHoveringProgress, setIsHoveringProgress] = useState(false);
 
   if (!currentSong) {
@@ -313,6 +316,26 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onSelectArtist }) => {
           )}
         </button>
 
+
+        {/* Sonora / Spotify Connect Device Selector */}
+        <button
+          onClick={() => setIsConnectModalOpen(true)}
+          className={`p-2 rounded-xl transition-colors relative ${
+            !isCurrentDeviceActive
+              ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+              : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+          }`}
+          title={
+            !isCurrentDeviceActive && activeDevice
+              ? `Escuchando en ${activeDevice.name}`
+              : 'Conectar a un dispositivo'
+          }
+        >
+          <Radio className="w-4 h-4" />
+          {!isCurrentDeviceActive && (
+            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full absolute bottom-1 left-1/2 -translate-x-1/2 animate-pulse" />
+          )}
+        </button>
         {/* Toggle Queue / Now Playing Panel (Fila de reproducción) */}
         <button
           onClick={handleToggleQueue}

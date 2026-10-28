@@ -222,3 +222,6 @@ export interface FirebaseConfigOptions {
   messagingSenderId: string;
   appId: string;
 }
+
+export * from './connect';
+

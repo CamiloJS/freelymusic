@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { MusicProvider, useMusic } from './context/MusicContext';
 import { AudioProvider, useAudio } from './context/AudioContext';
 import { CustomizationProvider, useCustomization } from './context/CustomizationContext';
+import { ConnectProvider, useConnect } from './context/ConnectContext';
 import { Sidebar } from './components/Sidebar';
 import { PlayerBar } from './components/PlayerBar';
 import { MobilePlayerBar } from './components/MobilePlayerBar';
@@ -117,6 +118,12 @@ const CreatePlaylistModal = lazy(() =>
     default: module.CreatePlaylistModal,
   }))
 );
+const ConnectDevicesModal = lazy(() =>
+  import('./components/ConnectDevicesModal').then((module) => ({
+    default: module.ConnectDevicesModal,
+  }))
+);
+
 const LoginLockScreen = lazy(() =>
   import('./components/LoginLockScreen').then((module) => ({ default: module.LoginLockScreen }))
 );
@@ -138,6 +145,7 @@ const MainLayout: React.FC = () => {
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
   const [songToAddToPlaylist, setSongToAddToPlaylist] = useState<Song | null>(null);
   const [isProfileSwitcherOpen, setIsProfileSwitcherOpen] = useState(false);
+  const { isConnectModalOpen, setIsConnectModalOpen } = useConnect();
   const [isSideDrawerOpen, setIsSideDrawerOpen] = useState(false);
   const [isRecientesOpen, setIsRecientesOpen] = useState(false);
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
@@ -889,6 +897,15 @@ const MainLayout: React.FC = () => {
         </Suspense>
       )}
 
+
+      {isConnectModalOpen && (
+        <Suspense fallback={null}>
+          <ConnectDevicesModal
+            isOpen={isConnectModalOpen}
+            onClose={() => setIsConnectModalOpen(false)}
+          />
+        </Suspense>
+      )}
       {selectedUserProfile && (
         <Suspense fallback={null}>
           <UserProfileModal
@@ -928,9 +945,11 @@ export function App() {
     <CustomizationProvider>
       <AuthProvider>
         <MusicProvider>
-          <AudioProvider>
+          <ConnectProvider>
+            <AudioProvider>
             <AuthenticatedApp />
-          </AudioProvider>
+            </AudioProvider>
+          </ConnectProvider>
         </MusicProvider>
       </AuthProvider>
     </CustomizationProvider>

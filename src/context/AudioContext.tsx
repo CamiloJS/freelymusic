@@ -5,6 +5,7 @@ import { getSongBlob, getInstrumentalBlob, getVideoBlob } from '../services/stor
 import { translateLyricsWithCache } from '../services/translation';
 import { useMusic } from './MusicContext';
 import { useAuth } from './AuthContext';
+import { useConnect } from './ConnectContext';
 
 const VOLUME_STORAGE_KEY = 'musica_volume';
 const LAST_PLAYBACK_KEY = 'musica_last_playback_state';
@@ -150,6 +151,8 @@ const AudioTimeContext = createContext<AudioTimeState | undefined>(undefined);
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { catalog, recordSongPlay, recordListeningTime, isDownloaded, updateCatalogTrack } = useMusic();
   const { isAuthenticated, currentUser } = useAuth();
+  const connect = useConnect();
+  const [remoteCurrentTime, setRemoteCurrentTime] = useState<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
   const hasRecordedPlayRef = useRef<string | null>(null);
@@ -615,6 +618,64 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => clearTimeout(timer);
   }, [videoUrl, isVideoMode, isPlaying]);
 
+
+  // Remote sync: calculate smooth remoteCurrentTime without continuous Firestore writes
+  useEffect(() => {
+    if (!connect.isRemoteControl || !connect.remotePlayback) return;
+    const { positionSec, timestampMs, isPlaying: remoteIsPlaying, durationSec } = connect.remotePlayback;
+    if (!remoteIsPlaying) {
+      setRemoteCurrentTime(positionSec || 0);
+      return;
+    }
+    const updateTime = () => {
+      const elapsed = (Date.now() - (timestampMs || Date.now())) / 1000;
+      const dur = durationSec || (currentSong?.duration ?? 0);
+      const est = dur > 0 ? Math.min(dur, Math.max(0, (positionSec || 0) + elapsed)) : Math.max(0, (positionSec || 0) + elapsed);
+      setRemoteCurrentTime(est);
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 350);
+    return () => clearInterval(timer);
+  }, [connect.isRemoteControl, connect.remotePlayback, currentSong?.duration]);
+
+  // When this device is remote control, make sure local audio is paused
+  useEffect(() => {
+    if (connect.isRemoteControl && audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+    }
+  }, [connect.isRemoteControl]);
+
+  // Synchronize remote playback track and state to local UI when remote
+  useEffect(() => {
+    if (!connect.isRemoteControl || !connect.remotePlayback) return;
+    const {
+      songId,
+      isPlaying: remotePlaying,
+      volume: remoteVol,
+      repeatMode: remoteRep,
+      isShuffle: remoteShuf,
+    } = connect.remotePlayback;
+
+    if (songId && (!currentSongRef.current || currentSongRef.current.id !== songId)) {
+      const found = catalog.find((s) => s.id === songId);
+      if (found) {
+        setCurrentSong(found);
+      }
+    }
+    setIsPlaying(Boolean(remotePlaying));
+    if (typeof remoteVol === 'number') {
+      setVolumeState(remoteVol);
+    }
+    if (remoteRep) {
+      setRepeatMode(remoteRep);
+    }
+    if (typeof remoteShuf === 'boolean') {
+      setIsShuffle(remoteShuf);
+    }
+  }, [connect.isRemoteControl, connect.remotePlayback, catalog]);
+
+
+
   // Karaoke can have its own LRC with different timings. Prefer it when present.
   const effectiveLyricsLrc =
     isKaraoke && playbackTrack?.instrumentalLyricsLrc
@@ -912,6 +973,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Play a specific song and optionally update queue and source
   const playSong = useCallback(
     (song: Song, newQueue?: Song[], source?: PlaybackSource) => {
+      if (connect.isRemoteControl) {
+        setCurrentSong(song);
+        void connect.sendCommand('playSong', { songId: song.id });
+        return;
+      }
       stopAllVideos();
       setCurrentSong(song);
       setActiveVersionIdState(null);
@@ -1188,6 +1254,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const togglePlayPause = useCallback(() => {
     if (!currentSong) return;
+    if (connect.isRemoteControl) {
+      void connect.sendCommand(isPlaying ? 'pause' : 'play');
+      return;
+    }
     if (isVideoMode) {
       setIsPlaying((prev) => !prev);
       return;
@@ -1198,7 +1268,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (isPlaying) {
       audio.pause();
+      if (connect.isCurrentDeviceActive) {
+        void connect.publishPlaybackState({ isPlaying: false, positionSec: audio.currentTime });
+      }
     } else {
+      if (connect.isCurrentDeviceActive) {
+        void connect.publishPlaybackState({ isPlaying: true, positionSec: audio.currentTime });
+      }
       setPlaybackError(null);
       audio.muted = false;
       const isMobile =
@@ -1223,6 +1299,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
     const clamped = Math.max(0, seconds);
+    if (connect.isRemoteControl) {
+      setRemoteCurrentTime(clamped);
+      void connect.sendCommand('seek', clamped);
+      return;
+    }
+    if (connect.isCurrentDeviceActive) {
+      void connect.publishPlaybackState({ positionSec: clamped });
+    }
     if (audio) {
       const maxDur = audio.duration || seconds;
       audio.currentTime = Math.min(clamped, maxDur);
@@ -1231,7 +1315,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const nextTrack = useCallback(() => {
-    if (!currentSong || queue.length === 0) return;
+    if (!currentSong) return;
+    if (connect.isRemoteControl) {
+      void connect.sendCommand('next');
+      return;
+    }
+    if (queue.length === 0) return;
 
     const currentIndex = queue.findIndex((s) => s.id === currentSong.id);
     let nextIndex = currentIndex + 1;
@@ -1253,8 +1342,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [currentSong, queue, isShuffle, repeatMode, playSong]);
 
   const prevTrack = useCallback(() => {
+    if (!currentSong) return;
+    if (connect.isRemoteControl) {
+      void connect.sendCommand('prev');
+      return;
+    }
     const audio = audioRef.current;
-    if (!audio || !currentSong || queue.length === 0) return;
+    if (!audio || queue.length === 0) return;
 
     // If more than 3 seconds in, restart the song
     if (audio.currentTime > 3) {
@@ -1350,11 +1444,17 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => audio.removeEventListener('ended', onEnded);
   }, [repeatMode, nextTrack, setSleepTimer]);
 
+  
+
   // Volume controls
   const setVolume = useCallback(
     (val: number) => {
       const clamped = Math.max(0, Math.min(1, val));
       setVolumeState(clamped);
+      if (connect.isRemoteControl) {
+        void connect.sendCommand('volume', clamped);
+        return;
+      }
       if (audioRef.current) {
         audioRef.current.volume = clamped;
       }
@@ -1388,6 +1488,73 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleShuffle = useCallback(() => {
     setIsShuffle((prev) => !prev);
   }, []);
+
+  // Handle incoming remote commands on the active playback host
+  useEffect(() => {
+    if (!connect.incomingCommand || !connect.isCurrentDeviceActive) return;
+    const { id, action, param } = connect.incomingCommand;
+    connect.consumeIncomingCommand(id);
+
+    switch (action) {
+      case 'play':
+        if (audioRef.current && !isPlaying) {
+          audioRef.current.play().catch(() => {});
+        }
+        break;
+      case 'pause':
+        if (audioRef.current && isPlaying) {
+          audioRef.current.pause();
+        }
+        break;
+      case 'seek':
+        if (typeof param === 'number') {
+          seek(param);
+        }
+        break;
+      case 'next':
+        nextTrack();
+        break;
+      case 'prev':
+        prevTrack();
+        break;
+      case 'volume':
+        if (typeof param === 'number') {
+          setVolume(param);
+        }
+        break;
+      case 'playSong':
+        if (param?.songId) {
+          const s = catalog.find((item) => item.id === param.songId);
+          if (s) playSong(s);
+        }
+        break;
+      case 'transfer':
+        if (connect.remotePlayback?.songId && !isPlaying) {
+          const s = catalog.find((item) => item.id === connect.remotePlayback?.songId);
+          if (s) {
+            void loadAndPlaySong(s, {
+              versionId: connect.remotePlayback.versionId,
+              karaoke: connect.remotePlayback.isKaraoke,
+              startAt: connect.remotePlayback.positionSec,
+            });
+          }
+        }
+        break;
+    }
+  }, [
+    connect.incomingCommand,
+    connect.isCurrentDeviceActive,
+    connect.remotePlayback,
+    connect.consumeIncomingCommand,
+    isPlaying,
+    seek,
+    nextTrack,
+    prevTrack,
+    setVolume,
+    playSong,
+    loadAndPlaySong,
+    catalog,
+  ]);
 
   // MediaSession API Integration (Lock Screen, Notification Controls, Car Bluetooth)
   useEffect(() => {
@@ -1447,9 +1614,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {}
   }, [currentTime, duration, isPlaying]);
 
+  const effectiveCurrentTime = connect.isRemoteControl ? remoteCurrentTime : currentTime;
+  const effectiveDuration = connect.isRemoteControl && connect.remotePlayback?.durationSec ? connect.remotePlayback.durationSec : duration;
+  const effectiveLyricIndex = connect.isRemoteControl
+    ? getActiveLyricIndex(parsedLyrics, effectiveCurrentTime)
+    : activeLyricIndex;
+
   const audioTimeValue = React.useMemo(
-    () => ({ currentTime, duration, activeLyricIndex }),
-    [currentTime, duration, activeLyricIndex]
+    () => ({
+      currentTime: effectiveCurrentTime,
+      duration: effectiveDuration,
+      activeLyricIndex: effectiveLyricIndex,
+    }),
+    [effectiveCurrentTime, effectiveDuration, effectiveLyricIndex]
   );
 
   const audioValue = React.useMemo(
