@@ -12,7 +12,7 @@ import { InstallPrompt } from './components/InstallPrompt';
 import { Playlist, Song, Album, UserProfile } from './types';
 import { getAlbumsFromCatalog } from './utils/albums';
 import { getCustomAppIcon, applyAppIcon } from './utils/appIcon';
-import { DEFAULT_AVATAR } from './services/storage';
+import { DEFAULT_AVATAR, requestPersistentStorage } from './services/storage';
 import Home from 'lucide-react/dist/esm/icons/house.mjs';
 import Search from 'lucide-react/dist/esm/icons/search.mjs';
 import X from 'lucide-react/dist/esm/icons/x.mjs';
@@ -152,6 +152,7 @@ const MainLayout: React.FC = () => {
   const [isTvMode, setIsTvMode] = useState<boolean>(() => getStoredTvMode());
 
   useEffect(() => {
+    void requestPersistentStorage();
     const handleHash = () => {
       const isTv = getStoredTvMode();
       setIsTvMode(isTv);

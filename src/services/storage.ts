@@ -225,6 +225,47 @@ export async function cacheSongOffline(song: Song): Promise<boolean> {
 }
 
 /**
+ * Requests persistent storage from the browser so offline audio blobs
+ * in IndexedDB are protected from automatic eviction when disk space is low.
+ * Exactly how YouTube Music and Spotify PWA manage offline downloads.
+ */
+export async function requestPersistentStorage(): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+    try {
+      const isPersisted = await navigator.storage.persisted();
+      if (!isPersisted) {
+        return await navigator.storage.persist();
+      }
+      return isPersisted;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Returns estimated disk space used and available quota for downloaded audio
+ */
+export async function getStorageEstimate(): Promise<{ usedBytes: number; quotaBytes: number; percent: number } | null> {
+  if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
+    try {
+      const estimate = await navigator.storage.estimate();
+      if (typeof estimate.usage === 'number' && typeof estimate.quota === 'number' && estimate.quota > 0) {
+        return {
+          usedBytes: estimate.usage,
+          quotaBytes: estimate.quota,
+          percent: Math.min(100, Math.round((estimate.usage / estimate.quota) * 100)),
+        };
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
  * Direct file download of a single song to the device's storage
  */
 export async function downloadSongFile(song: Song): Promise<void> {
