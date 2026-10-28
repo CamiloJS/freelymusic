@@ -16,7 +16,7 @@ import {
 } from '../utils/deviceInfo';
 import { loadFirebaseService } from '../services/firebaseLoader';
 
-const HEARTBEAT_INTERVAL_MS = 75000; // 75 seconds
+const HEARTBEAT_INTERVAL_MS = 60000; // 60 seconds
 const DEVICE_TIMEOUT_MS = 180000; // 3 minutes timeout for inactive devices
 
 interface ConnectContextType {
@@ -28,6 +28,7 @@ interface ConnectContextType {
   activeDevice: ConnectDevice | null;
   isCurrentDeviceActive: boolean;
   isRemoteControl: boolean;
+  isSessionLoaded: boolean;
   remotePlayback: ConnectPlaybackState | null;
   isConnectModalOpen: boolean;
   setIsConnectModalOpen: (open: boolean) => void;
@@ -49,6 +50,7 @@ export const ConnectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [currentDeviceName, setCurrentDeviceNameState] = useState<string>(getStoredDeviceName);
 
   const [session, setSession] = useState<ConnectSession | null>(null);
+  const [isSessionLoaded, setIsSessionLoaded] = useState<boolean>(false);
   const [incomingCommand, setIncomingCommand] = useState<ConnectCommand | null>(null);
   const [isConnectModalOpen, setIsConnectModalOpen] = useState<boolean>(false);
 
@@ -62,68 +64,84 @@ export const ConnectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Filter out devices not seen in the last DEVICE_TIMEOUT_MS
   const cleanDevices = useCallback((deviceList: ConnectDevice[]): ConnectDevice[] => {
     const cutoff = Date.now() - DEVICE_TIMEOUT_MS;
-    return deviceList.filter((d) => d.lastSeenMs > cutoff);
+    return (deviceList || []).filter((d) => d && typeof d.lastSeenMs === 'number' && d.lastSeenMs > cutoff);
   }, []);
 
-  // Heartbeat & Registration
-  const syncHeartbeat = useCallback(async () => {
-    if (!isAuthenticated || !currentUser?.id) return;
-    try {
-      const fb = await loadFirebaseService();
-      const current = latestSessionRef.current;
-      const now = Date.now();
+  // Update or register this device without hijacking activeDeviceId
+  const registerHeartbeat = useCallback(
+    async (existingSession?: ConnectSession | null) => {
+      if (!isAuthenticated || !currentUser?.id) return;
+      try {
+        const fb = await loadFirebaseService();
+        const base = existingSession ?? latestSessionRef.current;
+        const now = Date.now();
 
-      const existingDevices = current?.devices ? cleanDevices(current.devices) : [];
-      const updatedDevices = existingDevices.filter((d) => d.id !== currentDeviceId);
-      updatedDevices.unshift({
-        id: currentDeviceId,
-        name: currentDeviceNameRef.current,
-        type: currentDeviceType,
-        lastSeenMs: now,
-        isActive: current?.activeDeviceId === currentDeviceId,
-      });
+        const rawDevices = base?.devices ? cleanDevices(base.devices) : [];
+        const existingActiveId = base?.activeDeviceId;
+        const hasValidActiveDevice =
+          Boolean(existingActiveId) && rawDevices.some((d) => d.id === existingActiveId);
 
-      // If activeDeviceId is missing or dead, assign to current device
-      let activeId = current?.activeDeviceId;
-      if (!activeId || !updatedDevices.some((d) => d.id === activeId)) {
-        activeId = currentDeviceId;
+        // Preserve activeDeviceId if one is alive; only if completely empty, default to this device
+        let targetActiveId: string;
+        if (hasValidActiveDevice && existingActiveId) {
+          targetActiveId = existingActiveId;
+        } else if (rawDevices.length > 0) {
+          targetActiveId = existingActiveId || rawDevices[0].id;
+        } else {
+          targetActiveId = currentDeviceId;
+        }
+
+        const myDevice: ConnectDevice = {
+          id: currentDeviceId,
+          name: currentDeviceNameRef.current,
+          type: currentDeviceType,
+          lastSeenMs: now,
+          isActive: targetActiveId === currentDeviceId,
+        };
+
+        const updatedDevices = rawDevices.filter((d) => d.id !== currentDeviceId);
+        updatedDevices.unshift(myDevice);
+
+        await fb.saveConnectSessionToFirestore(currentUser.id, {
+          activeDeviceId: targetActiveId,
+          devices: updatedDevices,
+        });
+      } catch (err) {
+        console.warn('Connect heartbeat registration error:', err);
       }
+    },
+    [currentUser?.id, currentDeviceId, currentDeviceType, cleanDevices, isAuthenticated]
+  );
 
-      await fb.saveConnectSessionToFirestore(currentUser.id, {
-        activeDeviceId: activeId,
-        devices: updatedDevices,
-      });
-    } catch (err) {
-      console.warn('Connect heartbeat error:', err);
-    }
-  }, [currentUser?.id, currentDeviceId, currentDeviceType, cleanDevices, isAuthenticated]);
-
-  // Subscribe to realtime updates for this user's connect session
+  // Realtime subscription to the user's Connect Session
   useEffect(() => {
     if (!isAuthenticated || !currentUser?.id) {
       setSession(null);
+      setIsSessionLoaded(false);
       return;
     }
 
     let unsubscribe: (() => void) | null = null;
     let cancelled = false;
+    let initialRegistered = false;
 
     loadFirebaseService()
       .then((fb) => {
         if (cancelled) return;
         return fb.subscribeToConnectSessionUpdates(currentUser.id, (remoteSession) => {
           if (cancelled) return;
-          if (!remoteSession) {
-            // First time this user uses Connect, initiate heartbeat
-            void syncHeartbeat();
-            return;
-          }
-
+          setIsSessionLoaded(true);
           setSession(remoteSession);
 
-          // Check if there is a command directed to this device
+          // On first snapshot, register this device into devices list
+          if (!initialRegistered) {
+            initialRegistered = true;
+            void registerHeartbeat(remoteSession);
+          }
+
+          // Check if there is an incoming command for this device
           if (
-            remoteSession.command &&
+            remoteSession?.command &&
             remoteSession.command.targetDeviceId === currentDeviceId &&
             remoteSession.command.id !== lastProcessedCommandIdRef.current
           ) {
@@ -139,19 +157,16 @@ export const ConnectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.warn('Error subscribing to connect session:', err);
       });
 
-    // Run initial heartbeat
-    void syncHeartbeat();
-
-    // Set recurring heartbeat interval (only while tab is alive)
+    // Heartbeat every 60s while tab is visible
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        void syncHeartbeat();
+        void registerHeartbeat();
       }
     }, HEARTBEAT_INTERVAL_MS);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        void syncHeartbeat();
+        void registerHeartbeat();
       }
     };
 
@@ -163,7 +178,7 @@ export const ConnectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       clearInterval(interval);
       window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [currentUser?.id, isAuthenticated, syncHeartbeat, currentDeviceId]);
+  }, [currentUser?.id, isAuthenticated, registerHeartbeat, currentDeviceId]);
 
   // Consume an incoming command once handled by audio player
   const consumeIncomingCommand = useCallback((commandId: string) => {
@@ -173,8 +188,7 @@ export const ConnectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Compute active device & devices list
   const activeDeviceId = session?.activeDeviceId || null;
   const activeDevices = session?.devices ? cleanDevices(session.devices) : [];
-  
-  // Ensure this device appears in list
+
   const allDevices: ConnectDevice[] = (() => {
     const list = [...activeDevices];
     if (!list.some((d) => d.id === currentDeviceId)) {
@@ -183,26 +197,34 @@ export const ConnectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         name: currentDeviceName,
         type: currentDeviceType,
         lastSeenMs: Date.now(),
-        isActive: activeDeviceId === currentDeviceId || !activeDeviceId,
+        isActive: activeDeviceId === currentDeviceId,
       });
     }
     return list.map((d) => ({
       ...d,
-      isActive: d.id === activeDeviceId || (!activeDeviceId && d.id === currentDeviceId),
+      isActive: d.id === activeDeviceId,
     }));
   })();
 
-  const isCurrentDeviceActive =
-    activeDeviceId === currentDeviceId || (!activeDeviceId && allDevices.length <= 1);
-  const activeDevice = allDevices.find((d) => d.isActive) || null;
-  const isRemoteControl = !isCurrentDeviceActive && Boolean(activeDevice);
+  // While session is loading, do NOT assume active to avoid clobbering remote host
+  const isCurrentDeviceActive = isSessionLoaded
+    ? (activeDeviceId ? activeDeviceId === currentDeviceId : true)
+    : false;
 
-  // Send command from remote controller to active device
+  const activeDevice = allDevices.find((d) => d.id === activeDeviceId) || null;
+  const isRemoteControl = isSessionLoaded && !isCurrentDeviceActive && Boolean(activeDeviceId && activeDeviceId !== currentDeviceId);
+
+  // Send command from remote controller to active playback device
   const sendCommand = useCallback(
     async (action: ConnectActionType, param?: any) => {
       if (!currentUser?.id) return;
+      const targetId = latestSessionRef.current?.activeDeviceId;
+      if (!targetId || targetId === currentDeviceId) {
+        console.warn('Cannot send remote command: no other active device to target');
+        return;
+      }
+
       try {
-        const targetId = latestSessionRef.current?.activeDeviceId || currentDeviceId;
         const command: ConnectCommand = {
           id: `cmd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           issuedByDeviceId: currentDeviceId,
@@ -262,7 +284,7 @@ export const ConnectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await transferPlaybackTo(currentDeviceId);
   }, [transferPlaybackTo, currentDeviceId]);
 
-  // Active device publishes playback state (songId, isPlaying, positionSec, etc.)
+  // Active device publishes playback state
   const publishPlaybackState = useCallback(
     async (playbackUpdate: Partial<ConnectPlaybackState>) => {
       if (!currentUser?.id || !isCurrentDeviceActive) return;
@@ -331,6 +353,7 @@ export const ConnectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         activeDevice,
         isCurrentDeviceActive,
         isRemoteControl,
+        isSessionLoaded,
         remotePlayback: session?.playback || null,
         isConnectModalOpen,
         setIsConnectModalOpen,

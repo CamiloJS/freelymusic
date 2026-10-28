@@ -152,6 +152,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { catalog, recordSongPlay, recordListeningTime, isDownloaded, updateCatalogTrack } = useMusic();
   const { isAuthenticated, currentUser } = useAuth();
   const connect = useConnect();
+  const connectRef = useRef(connect);
+  connectRef.current = connect;
   const [remoteCurrentTime, setRemoteCurrentTime] = useState<number>(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -271,6 +273,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!isVideoModeRef.current) {
         setIsPlaying(true);
       }
+      if (connectRef.current.isCurrentDeviceActive && currentSongRef.current) {
+        void connectRef.current.publishPlaybackState({
+          songId: currentSongRef.current.id,
+          isPlaying: true,
+          positionSec: audio.currentTime,
+        });
+      }
     };
     const onPlaying = () => {
       if (!isVideoModeRef.current) {
@@ -281,6 +290,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const onPause = () => {
       if (!isVideoModeRef.current) {
         setIsPlaying(false);
+      }
+      if (connectRef.current.isCurrentDeviceActive && currentSongRef.current) {
+        void connectRef.current.publishPlaybackState({
+          songId: currentSongRef.current.id,
+          isPlaying: false,
+          positionSec: audio.currentTime,
+        });
       }
     };
     const onWaiting = () => setIsBuffering(true);
@@ -1046,6 +1062,17 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       void loadAndPlaySong(song, { versionId: null, karaoke: false });
+      if (connect.isCurrentDeviceActive) {
+        void connect.publishPlaybackState({
+          songId: song.id,
+          isPlaying: true,
+          positionSec: 0,
+          durationSec: song.duration,
+          volume,
+          repeatMode,
+          isShuffle,
+        });
+      }
     },
     [isDownloaded, loadAndPlaySong]
   );
@@ -1497,14 +1524,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     switch (action) {
       case 'play':
-        if (audioRef.current && !isPlaying) {
+        if (audioRef.current && audioRef.current.paused) {
           audioRef.current.play().catch(() => {});
         }
+        setIsPlaying(true);
         break;
       case 'pause':
-        if (audioRef.current && isPlaying) {
+        if (audioRef.current && !audioRef.current.paused) {
           audioRef.current.pause();
         }
+        setIsPlaying(false);
         break;
       case 'seek':
         if (typeof param === 'number') {
